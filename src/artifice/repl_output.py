@@ -187,7 +187,8 @@ class OutputBlock(Static):
                 
                 # Show code container if enabled and there's code to display
                 if self._show_code and self._result.code:
-                    if self._is_agent:
+                    if self._is_agent or self._block_type in ("shell_input", "shell_output"):
+                        # No syntax highlighting for agent messages or shell commands
                         yield Static(self._result.code, classes="code-container")
                     else:
                         # Show code with syntax highlighting
@@ -214,7 +215,7 @@ class OutputBlock(Static):
 
     def _get_status_display(self) -> tuple[str | None, str]:
         """Get the status icon and CSS class based on block type.
-        
+
         Returns:
             Tuple of (icon, css_class). Icon can be None for no icon.
         """
@@ -225,21 +226,33 @@ class OutputBlock(Static):
             elif self._result.status == ExecutionStatus.ERROR:
                 return (self.ICON_ERROR, "status-error")
             return (self.ICON_PENDING, "status-pending")
-        
+
         elif self._block_type == "code_output":
             # Python code output: no icon
             return (None, "status-empty")
-        
+
+        elif self._block_type == "shell_input":
+            # Shell command input: success/failure icon
+            if self._result.status == ExecutionStatus.SUCCESS:
+                return (self.ICON_SUCCESS, "status-success")
+            elif self._result.status == ExecutionStatus.ERROR:
+                return (self.ICON_ERROR, "status-error")
+            return (self.ICON_PENDING, "status-pending")
+
+        elif self._block_type == "shell_output":
+            # Shell command output: no icon
+            return (None, "status-empty")
+
         elif self._block_type == "agent_prompt":
             # Agent prompt: blue question mark
             return (self.ICON_QUESTION, "status-question")
-        
+
         elif self._block_type == "agent_response":
             # Agent response: magic icon
             if self._result.status == ExecutionStatus.RUNNING:
                 return (self.ICON_MAGIC, "status-magic")
             return (self.ICON_MAGIC, "status-magic")
-        
+
         # Default/auto behavior (backwards compatibility)
         if self._result.status == ExecutionStatus.SUCCESS:
             return (self.ICON_SUCCESS, "status-success")
@@ -326,7 +339,7 @@ class OutputBlock(Static):
                 import json
                 try:
                     input_str = json.dumps(tool_call.input, indent=2)
-                except:
+                except Exception:
                     input_str = str(tool_call.input)
                 widgets_to_add.append(Static(f"Input:\n{input_str}", classes="tool-call-input"))
             

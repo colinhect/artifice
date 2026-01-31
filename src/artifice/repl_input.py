@@ -15,12 +15,9 @@ class ReplTextArea(TextArea):
     def __init__(self, **kwargs) -> None:
         super().__init__(language="python", **kwargs)
 
-    def set_syntax_highlighting(self, enabled: bool) -> None:
+    def set_syntax_highlighting(self, language: str) -> None:
         """Enable or disable Python syntax highlighting."""
-        if enabled:
-            self.language = "python"
-        else:
-            self.language = None
+        self.language = language
 
     def _on_key(self, event: events.Key) -> None:
         """Intercept key events before TextArea processes them."""
@@ -36,12 +33,23 @@ class ReplTextArea(TextArea):
             event.stop()
             self.post_message(ReplInput.EscapePressed())
             return
-        # Question mark when input is empty
-        if event.key == "question_mark" and not self.text.strip():
-            event.prevent_default()
-            event.stop()
-            self.post_message(ReplInput.QuestionMarkPressed())
-            return
+        # If input is empty
+        if not self.text.strip():
+            if event.key == "question_mark":
+                event.prevent_default()
+                event.stop()
+                self.post_message(ReplInput.QuestionMarkPressed())
+                return
+            if event.key == "exclamation_mark":
+                event.prevent_default()
+                event.stop()
+                self.post_message(ReplInput.ExclamationMarkPressed())
+                return
+            if event.key == "greater_than_sign":
+                event.prevent_default()
+                event.stop()
+                self.post_message(ReplInput.GreaterThanSignPressed())
+                return
         # Let parent handle other keys
         super()._on_key(event)
 
@@ -69,10 +77,6 @@ class ReplInput(Static):
         color: $success;
         padding: 0;
         margin: 0;
-    }
-
-    ReplInput .prompt-ai {
-        color: $warning;
     }
 
     ReplInput TextArea {
@@ -105,6 +109,14 @@ class ReplInput(Static):
         """Internal message from TextArea when ? is pressed on empty input."""
         pass
 
+    class ExclamationMarkPressed(Message):
+        """Internal message from TextArea when ! is pressed on empty input."""
+        pass
+
+    class GreaterThanSignPressed(Message):
+        """Internal message from TextArea when > is pressed on empty input."""
+        pass
+
     class HistoryPrevious(Message):
         """Message requesting previous history item."""
         pass
@@ -116,9 +128,10 @@ class ReplInput(Static):
     class Submitted(Message):
         """Message sent when code is submitted."""
 
-        def __init__(self, code: str, is_agent_prompt: bool = False) -> None:
+        def __init__(self, code: str, is_agent_prompt: bool = False, is_shell_command: bool = False) -> None:
             self.code = code
             self.is_agent_prompt = is_agent_prompt
+            self.is_shell_command = is_shell_command
             super().__init__()
 
     def __init__(
@@ -130,9 +143,10 @@ class ReplInput(Static):
         classes: str | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self._python_prompt = prompt
+        self._python_prompt = ">"
         self._ai_prompt = "?"
-        self._is_ai_mode = False
+        self._shell_prompt = "!"
+        self.mode = "python"
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -149,14 +163,26 @@ class ReplInput(Static):
 
     def on_repl_input_escape_pressed(self, event: EscapePressed) -> None:
         """Handle escape key press - switch to Python mode."""
-        if self._is_ai_mode:
-            self._is_ai_mode = False
+        if self.mode != "python":
+            self.mode = "python"
             self._update_prompt()
 
     def on_repl_input_question_mark_pressed(self, event: QuestionMarkPressed) -> None:
         """Handle ? key press when input is empty - switch to AI mode."""
-        if not self._is_ai_mode:
-            self._is_ai_mode = True
+        if self.mode != "ai":
+            self.mode = "ai"
+            self._update_prompt()
+
+    def on_repl_input_greater_than_sign_pressed(self, event: GreaterThanSignPressed) -> None:
+        """Handle > key press when input is empty - switch to Python mode."""
+        if self.mode != "python":
+            self.mode = "python"
+            self._update_prompt()
+
+    def on_repl_input_exclamation_mark_pressed(self, event: ExclamationMarkPressed) -> None:
+        """Handle ! key press when input is empty - switch to Shell mode."""
+        if self.mode != "shell":
+            self.mode = "shell"
             self._update_prompt()
 
     def _update_prompt(self) -> None:
@@ -164,14 +190,15 @@ class ReplInput(Static):
         prompt_widget = self.query_one("#prompt-display", Static)
         text_area = self.query_one("#code-input", ReplTextArea)
         
-        if self._is_ai_mode:
+        if self.mode == "ai":
             prompt_widget.update(self._ai_prompt)
-            prompt_widget.add_class("prompt-ai")
-            text_area.set_syntax_highlighting(False)
+            text_area.set_syntax_highlighting(None)
+        elif self.mode == "shell":
+            prompt_widget.update(self._shell_prompt)
+            text_area.set_syntax_highlighting("bash")
         else:
             prompt_widget.update(self._python_prompt)
-            prompt_widget.remove_class("prompt-ai")
-            text_area.set_syntax_highlighting(True)
+            text_area.set_syntax_highlighting("python")
 
     @property
     def code(self) -> str:
@@ -186,7 +213,7 @@ class ReplInput(Static):
     @property
     def is_ai_mode(self) -> bool:
         """Check if currently in AI mode."""
-        return self._is_ai_mode
+        return self.mode == "ai"
 
     def clear(self) -> None:
         """Clear the input."""
@@ -197,7 +224,5 @@ class ReplInput(Static):
         code = self.code.strip()
         if code:
             # Submit with current mode
-            self.post_message(self.Submitted(code, is_agent_prompt=self._is_ai_mode))
-            # Reset to Python mode after submission
-            self._is_ai_mode = False
-            self._update_prompt()
+            is_shell = self.mode == "shell"
+            self.post_message(self.Submitted(code, is_agent_prompt=self.is_ai_mode, is_shell_command=is_shell))

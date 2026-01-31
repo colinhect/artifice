@@ -94,12 +94,12 @@ class CodeExecutor:
         try:
             # Run in executor to avoid blocking
             loop = asyncio.get_event_loop()
-            
+
             # Start execution task
             exec_task = loop.run_in_executor(
                 None, self._execute_sync, code, output_queue
             )
-            
+
             # Poll the queue for output while execution runs
             while not exec_task.done():
                 # Process any queued output
@@ -109,10 +109,10 @@ class CodeExecutor:
                         on_output(text)
                     elif stream_type == "stderr" and on_error:
                         on_error(text)
-                
+
                 # Small sleep to avoid busy-waiting
                 await asyncio.sleep(0.01)
-            
+
             # Process any remaining output
             while not output_queue.empty():
                 stream_type, text = output_queue.get_nowait()
@@ -120,7 +120,7 @@ class CodeExecutor:
                     on_output(text)
                 elif stream_type == "stderr" and on_error:
                     on_error(text)
-            
+
             # Get result
             result_value, captured_stdout, captured_stderr = await exec_task
             result.result_value = result_value
@@ -141,13 +141,13 @@ class CodeExecutor:
         """Execute code synchronously (called in thread pool)."""
         # Capture stdout/stderr in this thread
         old_stdout, old_stderr = sys.stdout, sys.stderr
-        
+
         captured_stdout = StreamCapture(output_queue, "stdout")
         captured_stderr = StreamCapture(output_queue, "stderr")
-        
+
         sys.stdout = captured_stdout
         sys.stderr = captured_stderr
-        
+
         try:
             # Try to compile as expression first (for return value)
             try:
@@ -158,7 +158,76 @@ class CodeExecutor:
                 compiled = compile(code, "<repl>", "exec")
                 exec(compiled, self._globals, self._locals)
                 result_value = None
-            
+
             return result_value, captured_stdout.getvalue(), captured_stderr.getvalue()
         finally:
             sys.stdout, sys.stderr = old_stdout, old_stderr
+
+
+class ShellExecutor:
+    """Executes shell commands asynchronously."""
+
+    async def execute(
+        self,
+        command: str,
+        on_output: Optional[Callable[[str], None]] = None,
+        on_error: Optional[Callable[[str], None]] = None,
+    ) -> ExecutionResult:
+        """Execute a shell command asynchronously with streaming output.
+
+        Args:
+            command: The shell command to execute.
+            on_output: Optional callback for stdout output.
+            on_error: Optional callback for stderr output.
+
+        Returns:
+            ExecutionResult with status, output, and any errors.
+        """
+        result = ExecutionResult(code=command, status=ExecutionStatus.RUNNING)
+
+        try:
+            # Create subprocess
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            # Stream output from both stdout and stderr
+            async def stream_output(stream, callback, buffer_list):
+                """Stream output from a subprocess stream."""
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+                    text = line.decode('utf-8')
+                    buffer_list.append(text)
+                    if callback:
+                        callback(text)
+
+            stdout_buffer = []
+            stderr_buffer = []
+
+            # Run both streams concurrently
+            await asyncio.gather(
+                stream_output(process.stdout, on_output, stdout_buffer),
+                stream_output(process.stderr, on_error, stderr_buffer),
+            )
+
+            # Wait for process to complete
+            await process.wait()
+
+            # Collect results
+            result.output = "".join(stdout_buffer)
+            result.error = "".join(stderr_buffer)
+            result.status = ExecutionStatus.SUCCESS if process.returncode == 0 else ExecutionStatus.ERROR
+
+        except Exception as e:
+            result.status = ExecutionStatus.ERROR
+            result.exception = e
+            error_text = f"Failed to execute command: {str(e)}\n{traceback.format_exc()}"
+            result.error = error_text
+            if on_error:
+                on_error(error_text)
+
+        return result
