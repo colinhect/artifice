@@ -39,7 +39,6 @@ export ANTHROPIC_API_KEY="your-api-key-here"
 artifice
 ```
 
-
 ## Usage
 
 ### Mode Switching
@@ -88,8 +87,8 @@ You'll see the proposed code and can choose to execute it, modify it, or skip it
 - **Command History** - Persistent history across sessions
 
 ### Block Navigation
-- **Ctrl+Up/Down** - Navigate between previous inputs and outputs
-- **Pin Blocks** - Mark important code blocks for easy reference
+- **Ctrl+Up/Down** - Navigate between previous inputs and outputs (blocks)
+- **Pin Blocks** - Mark important code/response/output blocks for easy reference
 - **Edit Blocks** - Modify and re-execute previous inputs
 - **Save/Restore** - Persist important blocks across sessions
 
@@ -103,10 +102,11 @@ You'll see the proposed code and can choose to execute it, modify it, or skip it
 ## Keybindings
 
 - **Ctrl+Up/Down** - Navigate through blocks
-- **Enter** - Execute input (single-line mode)
-- **Ctrl+Enter** - Submit multiline input
+- **Enter** - Execute input
 - **Ctrl+C** - Cancel current operation
 - **Ctrl+D** - Exit application
+- **Ctrl+O** - Toggle markdown rendering on selected block
+- **Ctrl+L** - Clear
 
 ## AI Agent Integration
 
