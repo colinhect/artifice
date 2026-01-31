@@ -187,11 +187,18 @@ class OutputBlock(Static):
                 
                 # Show code container if enabled and there's code to display
                 if self._show_code and self._result.code:
-                    if self._is_agent or self._block_type in ("shell_input", "shell_output"):
-                        # No syntax highlighting for agent messages or shell commands
+                    if self._is_agent:
+                        # No syntax highlighting for agent messages
                         yield Static(self._result.code, classes="code-container")
+                    elif self._block_type in ("shell_input", "shell_output"):
+                        # Shell syntax highlighting for shell commands
+                        highlighted_code = highlight.highlight(
+                            self._result.code,
+                            language="bash"
+                        )
+                        yield Static(highlighted_code, classes="code-container")
                     else:
-                        # Show code with syntax highlighting
+                        # Python syntax highlighting for code
                         highlighted_code = highlight.highlight(
                             self._result.code,
                             language="python"
@@ -200,11 +207,16 @@ class OutputBlock(Static):
 
                 # Show output section if enabled
                 if self._show_output:
-                    # Use Markdown for both agent responses and Python execution output
-                    if self._result.output:
-                        self._markdown_widget = Markdown(self._result.output, classes="agent-output")
-                        yield self._markdown_widget
-                    
+                    # For shell output, use plain text (no markdown)
+                    if self._block_type in ("shell_output",):
+                        if self._result.output:
+                            yield Static(self._result.output, classes="output-line")
+                    else:
+                        # Use Markdown for agent responses and Python execution output
+                        if self._result.output:
+                            self._markdown_widget = Markdown(self._result.output, classes="agent-output")
+                            yield self._markdown_widget
+
                     # Show result value if present (for Python execution)
                     if not self._is_agent and self._result.result_value is not None:
                         yield Static(repr(self._result.result_value), classes="output-line")
@@ -283,14 +295,24 @@ class OutputBlock(Static):
         self._current_text_segment.append(message.text)
         segment_text = "".join(self._current_text_segment)
 
-        # Use Markdown for both agent responses and Python execution output
-        if self._markdown_widget:
-            # Update existing markdown widget
-            self._markdown_widget.update(segment_text)
+        # For shell output, use plain text (no markdown)
+        if self._block_type in ("shell_output",):
+            # Find or create plain text widget
+            try:
+                output_widget = self._output_container.query_one(".output-line")
+                output_widget.update(segment_text)
+            except Exception:
+                # No output widget yet, create one
+                await self._output_container.mount(Static(segment_text, classes="output-line"))
         else:
-            # Create new markdown widget for this text segment
-            self._markdown_widget = Markdown(segment_text, classes="agent-output")
-            await self._output_container.mount(self._markdown_widget)
+            # Use Markdown for agent responses and Python execution output
+            if self._markdown_widget:
+                # Update existing markdown widget
+                self._markdown_widget.update(segment_text)
+            else:
+                # Create new markdown widget for this text segment
+                self._markdown_widget = Markdown(segment_text, classes="agent-output")
+                await self._output_container.mount(self._markdown_widget)
 
         # Scroll parent to bottom
         parent = self.parent
