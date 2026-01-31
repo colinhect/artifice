@@ -57,8 +57,9 @@ class InteractivePython(Widget):
         Binding("alt+down", "history_forward", "History Forward", show=True),
         Binding("ctrl+up", "highlight_previous", "Previous Block", show=True),
         Binding("ctrl+down", "highlight_next", "Next Block", show=True),
-        Binding("ctrl+l", "clear", "Clear Output", show=True),
-        Binding("ctrl+o", "toggle_markdown", "Toggle Markdown", show=True),
+        #Binding("ctrl+l", "clear", "Clear Output", show=True),
+        Binding("ctrl+o", "toggle_mode_markdown", "Toggle Mode Markdown", show=True),
+        Binding("ctrl+l", "toggle_block_markdown", "Toggle Block Markdown", show=True),
     ]
 
     def __init__(
@@ -95,6 +96,11 @@ class InteractivePython(Widget):
         self._max_history_size = max_history_size
         self._load_history()
         
+        # Per-mode markdown rendering settings
+        self._python_markdown_enabled = False  # Default: no markdown for Python output
+        self._agent_markdown_enabled = True    # Default: markdown for agent responses
+        self._shell_markdown_enabled = False   # Default: no markdown for shell output
+
         # AI Agent configuration
         if agent is not None:
             self._agent = agent
@@ -243,7 +249,7 @@ class InteractivePython(Widget):
                 from .executor import ExecutionStatus
                 agent_response_result = ExecutionResult(code="")
                 agent_response_result.status = ExecutionStatus.RUNNING
-                agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response")
+                agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
 
                 # Send prompt to agent with streaming into the NEW block
                 response = await self._agent.send_prompt(
@@ -270,7 +276,7 @@ class InteractivePython(Widget):
                 from .executor import ExecutionStatus
                 agent_response_result = ExecutionResult(code="")
                 agent_response_result.status = ExecutionStatus.RUNNING
-                agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response")
+                agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
 
                 # Send prompt to agent with streaming into the NEW block
                 response = await self._agent.send_prompt(
@@ -305,7 +311,7 @@ class InteractivePython(Widget):
         # Create a separate block for the execution output
         output_result = ExecutionResult(code="")
         output_result.status = ExecutionStatus.RUNNING
-        output_block = self.output.add_result(output_result, show_code=False, block_type="code_output")
+        output_block = self.output.add_result(output_result, show_code=False, block_type="code_output", render_markdown=self._python_markdown_enabled)
 
         # Execute asynchronously with streaming callbacks
         result = await self._executor.execute(
@@ -329,7 +335,7 @@ class InteractivePython(Widget):
         # Create a separate block for the execution output
         output_result = ExecutionResult(code="")
         output_result.status = ExecutionStatus.RUNNING
-        output_block = self.output.add_result(output_result, show_code=False, block_type="shell_output")
+        output_block = self.output.add_result(output_result, show_code=False, block_type="shell_output", render_markdown=self._shell_markdown_enabled)
 
         # Execute asynchronously with streaming callbacks
         result = await self._shell_executor.execute(
@@ -400,7 +406,7 @@ class InteractivePython(Widget):
                 status=ExecutionStatus.ERROR,
                 error="No AI agent configured. Set ANTHROPIC_API_KEY environment variable or pass an agent to InteractivePython.",
             )
-            self.output.add_result(error_result, is_agent=True)
+            self.output.add_result(error_result, is_agent=True, render_markdown=self._agent_markdown_enabled)
             return
 
         # Create a block showing the prompt
@@ -412,7 +418,7 @@ class InteractivePython(Widget):
         # Create a separate block for the agent's response
         response_result = ExecutionResult(code="")
         response_result.status = ExecutionStatus.RUNNING
-        response_block = self.output.add_result(response_result, is_agent=True, show_code=False, block_type="agent_response")
+        response_block = self.output.add_result(response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
 
         # Send prompt to agent with streaming
         response = await self._agent.send_prompt(
@@ -510,7 +516,20 @@ class InteractivePython(Widget):
         """Clear the output."""
         self.output.clear()
 
-    async def action_toggle_markdown(self) -> None:
+    async def action_toggle_mode_markdown(self) -> None:
+        """Toggle markdown rendering for the current input mode (affects future blocks only)."""
+        # Determine current mode and toggle its setting
+        if self.input.is_ai_mode:
+            self._agent_markdown_enabled = not self._agent_markdown_enabled
+        elif self.input.mode == "shell":
+            self._shell_markdown_enabled = not self._shell_markdown_enabled
+        else:
+            self._python_markdown_enabled = not self._python_markdown_enabled
+
+        # Save settings to disk
+        self._save_history()
+
+    async def action_toggle_block_markdown(self) -> None:
         """Toggle markdown rendering for the currently highlighted block."""
         block = self.output.get_highlighted_block()
         if block:
@@ -529,7 +548,7 @@ class InteractivePython(Widget):
         self._current_input = ""
     
     def _load_history(self) -> None:
-        """Load command history from disk."""
+        """Load command history and settings from disk."""
         try:
             if self._history_file.exists():
                 with open(self._history_file, "r", encoding="utf-8") as f:
@@ -545,6 +564,12 @@ class InteractivePython(Widget):
                         self._python_history = data.get("python", [])[-self._max_history_size:]
                         self._ai_history = data.get("ai", [])[-self._max_history_size:]
                         self._shell_history = data.get("shell", [])[-self._max_history_size:]
+
+                        # Load markdown settings (with defaults if not present)
+                        settings = data.get("settings", {})
+                        self._python_markdown_enabled = settings.get("python_markdown", False)
+                        self._agent_markdown_enabled = settings.get("agent_markdown", True)
+                        self._shell_markdown_enabled = settings.get("shell_markdown", False)
         except Exception:
             # If we can't load history, just start with empty lists
             self._python_history = []
@@ -552,7 +577,7 @@ class InteractivePython(Widget):
             self._shell_history = []
     
     def _save_history(self) -> None:
-        """Save command history to disk."""
+        """Save command history and settings to disk."""
         try:
             # Ensure parent directory exists
             self._history_file.parent.mkdir(parents=True, exist_ok=True)
@@ -562,6 +587,11 @@ class InteractivePython(Widget):
                 "python": self._python_history[-self._max_history_size:],
                 "ai": self._ai_history[-self._max_history_size:],
                 "shell": self._shell_history[-self._max_history_size:],
+                "settings": {
+                    "python_markdown": self._python_markdown_enabled,
+                    "agent_markdown": self._agent_markdown_enabled,
+                    "shell_markdown": self._shell_markdown_enabled,
+                },
             }
 
             with open(self._history_file, "w", encoding="utf-8") as f:

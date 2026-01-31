@@ -153,7 +153,7 @@ class OutputBlock(Static):
     ICON_MAGIC = " "
     ICON_QUESTION = "?"
 
-    def __init__(self, result: ExecutionResult, is_agent: bool = False, show_code: bool = True, show_output: bool = True, block_type: str = "auto", **kwargs) -> None:
+    def __init__(self, result: ExecutionResult, is_agent: bool = False, show_code: bool = True, show_output: bool = True, block_type: str = "auto", render_markdown: bool = True, **kwargs) -> None:
         super().__init__(**kwargs)
         self._result = result
         self._is_agent = is_agent  # Track if this is an agent response
@@ -166,7 +166,7 @@ class OutputBlock(Static):
         self._markdown_widget: Markdown | None = None  # For agent responses
         self._tool_calls: list[ToolCall] = []  # Track tool calls
         self._current_text_segment: list[str] = []  # Current text segment before next tool
-        self._render_as_markdown: bool = True  # Whether to render output as markdown
+        self._render_as_markdown: bool = render_markdown  # Whether to render output as markdown
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -207,15 +207,16 @@ class OutputBlock(Static):
 
                 # Show output section if enabled
                 if self._show_output:
-                    # For shell output, use plain text (no markdown)
-                    if self._block_type in ("shell_output",):
-                        if self._result.output:
-                            yield Static(self._result.output, classes="output-line")
-                    else:
-                        # Use Markdown for agent responses and Python execution output
+                    # Respect the render_markdown setting
+                    if self._render_as_markdown:
+                        # Use Markdown for output
                         if self._result.output:
                             self._markdown_widget = Markdown(self._result.output, classes="agent-output")
                             yield self._markdown_widget
+                    else:
+                        # Use plain text for output
+                        if self._result.output:
+                            yield Static(self._result.output, classes="output-line")
 
                     # Show result value if present (for Python execution)
                     if not self._is_agent and self._result.result_value is not None:
@@ -295,17 +296,9 @@ class OutputBlock(Static):
         self._current_text_segment.append(message.text)
         segment_text = "".join(self._current_text_segment)
 
-        # For shell output, use plain text (no markdown)
-        if self._block_type in ("shell_output",):
-            # Find or create plain text widget
-            try:
-                output_widget = self._output_container.query_one(".output-line")
-                output_widget.update(segment_text)
-            except Exception:
-                # No output widget yet, create one
-                await self._output_container.mount(Static(segment_text, classes="output-line"))
-        else:
-            # Use Markdown for agent responses and Python execution output
+        # Respect the render_markdown setting
+        if self._render_as_markdown:
+            # Use Markdown for output
             if self._markdown_widget:
                 # Update existing markdown widget
                 self._markdown_widget.update(segment_text)
@@ -313,6 +306,14 @@ class OutputBlock(Static):
                 # Create new markdown widget for this text segment
                 self._markdown_widget = Markdown(segment_text, classes="agent-output")
                 await self._output_container.mount(self._markdown_widget)
+        else:
+            # Use plain text output
+            try:
+                output_widget = self._output_container.query_one(".output-line")
+                output_widget.update(segment_text)
+            except Exception:
+                # No output widget yet, create one
+                await self._output_container.mount(Static(segment_text, classes="output-line"))
 
         # Scroll parent to bottom
         parent = self.parent
@@ -530,9 +531,9 @@ class ReplOutput(VerticalScroll):
         self._blocks: list[OutputBlock] = []
         self._highlighted_index: int | None = None
 
-    def add_result(self, result: ExecutionResult, is_agent: bool = False, show_code: bool = True, show_output: bool = True, block_type: str = "auto") -> OutputBlock:
+    def add_result(self, result: ExecutionResult, is_agent: bool = False, show_code: bool = True, show_output: bool = True, block_type: str = "auto", render_markdown: bool = True) -> OutputBlock:
         """Add an execution result to the output."""
-        block = OutputBlock(result, is_agent=is_agent, show_code=show_code, show_output=show_output, block_type=block_type)
+        block = OutputBlock(result, is_agent=is_agent, show_code=show_code, show_output=show_output, block_type=block_type, render_markdown=render_markdown)
         self._blocks.append(block)
         self.mount(block)
         self.scroll_end(animate=False)
