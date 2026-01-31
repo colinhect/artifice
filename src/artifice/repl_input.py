@@ -73,8 +73,8 @@ class ReplInput(Static):
     }
 
     ReplInput .prompt {
-        width: 4;
-        color: $success;
+        width: 2;
+        color: $primary;
         padding: 0;
         margin: 0;
     }
