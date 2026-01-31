@@ -44,16 +44,19 @@ class OutputBlock(Static):
     }
 
     OutputBlock .output-line {
+        background: $surface-darken-1;
         color: $text-muted;
         padding-left: 0;
     }
 
     OutputBlock .error-line {
+        background: $surface-darken-1;
         color: $error;
         padding-left: 0;
     }
 
     OutputBlock .agent-output {
+        background: $surface-darken-1;
         padding-left: 0;
         padding-right: 0;
         layout: stream;
@@ -68,29 +71,33 @@ class OutputBlock(Static):
     }
 
     OutputBlock .tool-call {
-        background: $surface;
-        padding: 1;
+        background: $surface-darken-1;
+        padding: 2;
         margin: 1 0 1 0;
         border-left: thick $accent;
     }
 
     OutputBlock .tool-call-name {
+        background: $surface-darken-1;
         color: $accent;
         text-style: bold;
     }
 
     OutputBlock .tool-call-input {
+        background: $surface-darken-1;
         color: $text-muted;
         padding-left: 2;
     }
 
     OutputBlock .tool-call-output {
+        background: $surface-darken-1;
         color: $text;
         padding-left: 1;
         padding-top: 1;
     }
 
     OutputBlock .tool-call-error {
+        background: $surface-darken-1;
         color: $error;
         padding-left: 1;
         padding-top: 1;
@@ -98,6 +105,7 @@ class OutputBlock(Static):
     
     OutputBlock .tool-call .code-container {
         background: $surface-darken-1;
+        background: transparent;
         padding: 0;
         border: none;
         margin: 0;

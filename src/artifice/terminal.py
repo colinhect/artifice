@@ -19,18 +19,12 @@ class ArtificeTerminal(App):
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit"),
-        Binding("ctrl+r", "reset", "Reset REPL"),
     ]
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield InteractivePython()
         yield Footer()
-
-    def action_reset(self) -> None:
-        """Reset the REPL."""
-        self.query_one(InteractivePython).reset()
-
 
 def main():
     """Main entry point for the artifice command."""
