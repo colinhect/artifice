@@ -2,6 +2,8 @@
 
 An interactive coding environment with human-in-the-loop AI assistance. Artifice combines a Python REPL, shell access, and AI agents into a unified terminal interface where you maintain full control over code execution.
 
+![Screenshot](screenshot.svg)
+
 ## What is Artifice?
 
 Artifice is a prototype terminal-based (TUI) coding assistant built with [Textual](https://github.com/Textualize/textual). Unlike traditional AI coding tools that execute code automatically, Artifice shows you every action an AI agent wants to take and lets you approve, modify, or reject it before execution. This creates a collaborative environment where AI suggestions enhance your workflow without removing you from the taking skillful actions.
