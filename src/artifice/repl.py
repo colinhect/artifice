@@ -86,8 +86,8 @@ class InteractivePython(Widget):
         
         # History persistence configuration
         if history_file is None:
-            # Default to ~/.textual_python_history.json
-            self._history_file = Path.home() / ".textual_python_history.json"
+            # Default to ~/.artifice_history.json
+            self._history_file = Path.home() / ".artifice_history.json"
         else:
             self._history_file = Path(history_file)
         
