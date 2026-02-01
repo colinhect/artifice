@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.message import Message
 from textual.widgets import Static, TextArea
 from textual import events
+
+if TYPE_CHECKING:
+    from .history import History
 
 
 class InputTextArea(TextArea):
@@ -61,6 +66,11 @@ class InputTextArea(TextArea):
 
 class TerminalInput(Static):
     """Input component for the Python REPL."""
+
+    BINDINGS = [
+        Binding("alt+up", "history_back", "History Back", show=True),
+        Binding("alt+down", "history_forward", "History Forward", show=True),
+    ]
 
     DEFAULT_CSS = """
     TerminalInput {
@@ -139,7 +149,7 @@ class TerminalInput(Static):
 
     def __init__(
         self,
-        prompt: str = ">",
+        history: History | None = None,
         *,
         name: str | None = None,
         id: str | None = None,
@@ -150,6 +160,7 @@ class TerminalInput(Static):
         self._ai_prompt = "?"
         self._shell_prompt = "!"
         self.mode = "python"
+        self._history = history
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -213,11 +224,6 @@ class TerminalInput(Static):
         """Set the code in the input."""
         self.query_one("#code-input", TextArea).text = value
 
-    @property
-    def is_ai_mode(self) -> bool:
-        """Check if currently in AI mode."""
-        return self.mode == "ai"
-
     def clear(self) -> None:
         """Clear the input."""
         self.code = ""
@@ -226,6 +232,32 @@ class TerminalInput(Static):
         """Submit the current code."""
         code = self.code.strip()
         if code:
+            # Add to history before submitting
+            if self._history is not None:
+                self._history.add(code, self.mode)
+                self._history.save()
+
             # Submit with current mode
+            is_ai = self.mode == "ai"
             is_shell = self.mode == "shell"
-            self.post_message(self.Submitted(code, is_agent_prompt=self.is_ai_mode, is_shell_command=is_shell))
+            self.post_message(self.Submitted(code, is_agent_prompt=is_ai, is_shell_command=is_shell))
+
+    def action_history_back(self) -> None:
+        """Navigate to previous history entry."""
+        if self._history is None:
+            return
+
+        # Get previous entry
+        entry = self._history.navigate_back(self.mode, self.code)
+        if entry is not None:
+            self.code = entry
+
+    def action_history_forward(self) -> None:
+        """Navigate to next history entry."""
+        if self._history is None:
+            return
+
+        # Get next entry
+        entry = self._history.navigate_forward(self.mode)
+        if entry is not None:
+            self.code = entry

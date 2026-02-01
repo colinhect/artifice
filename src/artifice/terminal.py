@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -13,8 +13,12 @@ from textual.containers import Vertical
 from textual.widget import Widget
 
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
+from .history import History
 from .terminal_input import TerminalInput
 from .terminal_output import TerminalOutput
+
+if TYPE_CHECKING:
+    from .app import ArtificeApp
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +49,6 @@ class ArtificeTerminal(Widget):
     """
 
     BINDINGS = [
-        Binding("alt+up", "history_back", "History Back", show=True),
-        Binding("alt+down", "history_forward", "History Forward", show=True),
         Binding("ctrl+l", "clear", "Clear Output", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown Output", show=True),
     ]
@@ -65,24 +67,16 @@ class ArtificeTerminal(Widget):
         self._executor = CodeExecutor()
         self._shell_executor = ShellExecutor()
 
-        # Separate histories for Python, AI, and Shell modes
-        self._python_history: list[str] = []
-        self._ai_history: list[str] = []
-        self._shell_history: list[str] = []
-        self._python_history_index: int = -1  # -1 means not browsing history
-        self._ai_history_index: int = -1
-        self._shell_history_index: int = -1
-        self._current_input: str = ""  # Store current input when browsing history
-        
-        # History persistence configuration
+        # Create history manager
+        self._history = History(history_file=history_file, max_history_size=max_history_size)
+
+        # Settings file for markdown preferences (separate from history)
         if history_file is None:
-            # Default to ~/.artifice_history.json
-            self._history_file = Path.home() / ".artifice_history.json"
+            self._settings_file = Path.home() / ".artifice_history.json"
         else:
-            self._history_file = Path(history_file)
-        
-        self._max_history_size = max_history_size
-        self._load_history()
+            self._settings_file = Path(history_file)
+
+        self._load_settings()
         
         # Per-mode markdown rendering settings
         self._python_markdown_enabled = False  # Default: no markdown for Python output
@@ -210,7 +204,7 @@ class ArtificeTerminal(Widget):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield TerminalOutput(id="output")
-            yield TerminalInput(id="input")
+            yield TerminalInput(history=self._history, id="input")
 
     @property
     def output(self) -> TerminalOutput:
@@ -225,28 +219,6 @@ class ArtificeTerminal(Widget):
     async def on_terminal_input_submitted(self, event: TerminalInput.Submitted) -> None:
         """Handle code submission from input."""
         code = event.code
-
-        # Add to appropriate history and trim if needed
-        if event.is_agent_prompt:
-            self._ai_history.append(code)
-            if len(self._ai_history) > self._max_history_size:
-                self._ai_history.pop(0)
-            self._ai_history_index = -1  # Reset history navigation
-        elif event.is_shell_command:
-            self._shell_history.append(code)
-            if len(self._shell_history) > self._max_history_size:
-                self._shell_history.pop(0)
-            self._shell_history_index = -1  # Reset history navigation
-        else:
-            self._python_history.append(code)
-            if len(self._python_history) > self._max_history_size:
-                self._python_history.pop(0)
-            self._python_history_index = -1  # Reset history navigation
-
-        self._current_input = ""
-
-        # Save history to disk
-        self._save_history()
 
         # Clear input
         self.input.clear()
@@ -451,74 +423,6 @@ class ArtificeTerminal(Widget):
         response_block.update_status(response_result)
 
 
-    def action_history_back(self) -> None:
-        """Handle request for previous history item."""
-        # Determine which history to use based on current mode
-        if self.input.is_ai_mode:
-            history = self._ai_history
-            history_index = self._ai_history_index
-        elif self.input.mode == "shell":
-            history = self._shell_history
-            history_index = self._shell_history_index
-        else:
-            history = self._python_history
-            history_index = self._python_history_index
-
-        if not history:
-            return
-
-        # First time navigating up, save current input
-        if history_index == -1:
-            self._current_input = self.input.code
-            history_index = len(history)
-
-        # Move back in history
-        if history_index > 0:
-            history_index -= 1
-            self.input.code = history[history_index]
-
-        # Update the appropriate history index
-        if self.input.is_ai_mode:
-            self._ai_history_index = history_index
-        elif self.input.mode == "shell":
-            self._shell_history_index = history_index
-        else:
-            self._python_history_index = history_index
-
-    def action_history_forward(self) -> None:
-        """Handle request for next history item."""
-        # Determine which history to use based on current mode
-        if self.input.is_ai_mode:
-            history = self._ai_history
-            history_index = self._ai_history_index
-        elif self.input.mode == "shell":
-            history = self._shell_history
-            history_index = self._shell_history_index
-        else:
-            history = self._python_history
-            history_index = self._python_history_index
-
-        if history_index == -1:
-            return  # Not browsing history
-
-        # Move forward in history
-        if history_index < len(history) - 1:
-            history_index += 1
-            self.input.code = history[history_index]
-        else:
-            # Reached the end, restore original input
-            history_index = -1
-            self.input.code = self._current_input
-            self._current_input = ""
-
-        # Update the appropriate history index
-        if self.input.is_ai_mode:
-            self._ai_history_index = history_index
-        elif self.input.mode == "shell":
-            self._shell_history_index = history_index
-        else:
-            self._python_history_index = history_index
-
     def action_clear(self) -> None:
         """Clear the output."""
         self.output.clear()
@@ -526,7 +430,7 @@ class ArtificeTerminal(Widget):
     async def action_toggle_mode_markdown(self) -> None:
         """Toggle markdown rendering for the current input mode (affects future blocks only)."""
         # Determine current mode and toggle its setting
-        if self.input.is_ai_mode:
+        if self.input.mode == "ai":
             self._agent_markdown_enabled = not self._agent_markdown_enabled
             enabled_str = "enabled" if self._agent_markdown_enabled else "disabled"
             self._app.notify(f"Markdown {enabled_str} for AI agent output")
@@ -540,78 +444,56 @@ class ArtificeTerminal(Widget):
             self._app.notify(f"Markdown {enabled_str} for Python code output")
 
         # Save settings to disk
-        self._save_history()
+        self._save_settings()
 
     def reset(self) -> None:
         """Reset the REPL state."""
         self._executor.reset()
         self.output.clear()
-        self._python_history.clear()
-        self._ai_history.clear()
-        self._shell_history.clear()
-        self._python_history_index = -1
-        self._ai_history_index = -1
-        self._shell_history_index = -1
-        self._current_input = ""
+        self._history.clear()
     
-    def _load_history(self) -> None:
-        """Load command history and settings from disk."""
+    def _load_settings(self) -> None:
+        """Load markdown settings from disk."""
         try:
-            if self._history_file.exists():
-                with open(self._history_file, "r", encoding="utf-8") as f:
+            if self._settings_file.exists():
+                with open(self._settings_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    # Support both old format (list) and new format (dict)
-                    if isinstance(data, list):
-                        # Old format: treat as Python history
-                        self._python_history = data[-self._max_history_size:]
-                        self._ai_history = []
-                        self._shell_history = []
-                    elif isinstance(data, dict):
-                        # New format: separate Python, AI, and Shell histories
-                        self._python_history = data.get("python", [])[-self._max_history_size:]
-                        self._ai_history = data.get("ai", [])[-self._max_history_size:]
-                        self._shell_history = data.get("shell", [])[-self._max_history_size:]
-
+                    if isinstance(data, dict):
                         # Load markdown settings (with defaults if not present)
                         settings = data.get("settings", {})
                         self._python_markdown_enabled = settings.get("python_markdown", False)
                         self._agent_markdown_enabled = settings.get("agent_markdown", True)
                         self._shell_markdown_enabled = settings.get("shell_markdown", False)
         except json.JSONDecodeError as e:
-            logger.warning(f"Failed to load history from {self._history_file}: Invalid JSON - {e}")
-            self._python_history = []
-            self._ai_history = []
-            self._shell_history = []
+            logger.warning(f"Failed to load settings from {self._settings_file}: Invalid JSON - {e}")
         except Exception as e:
-            logger.warning(f"Failed to load history from {self._history_file}: {e}")
-            self._python_history = []
-            self._ai_history = []
-            self._shell_history = []
-    
-    def _save_history(self) -> None:
-        """Save command history and settings to disk."""
-        try:
-            # Ensure parent directory exists
-            self._history_file.parent.mkdir(parents=True, exist_ok=True)
+            logger.warning(f"Failed to load settings from {self._settings_file}: {e}")
 
-            # Keep only the most recent entries
-            history_to_save = {
-                "python": self._python_history[-self._max_history_size:],
-                "ai": self._ai_history[-self._max_history_size:],
-                "shell": self._shell_history[-self._max_history_size:],
-                "settings": {
-                    "python_markdown": self._python_markdown_enabled,
-                    "agent_markdown": self._agent_markdown_enabled,
-                    "shell_markdown": self._shell_markdown_enabled,
-                },
+    def _save_settings(self) -> None:
+        """Save markdown settings to disk."""
+        try:
+            # Load existing data to preserve history
+            data = {}
+            if self._settings_file.exists():
+                with open(self._settings_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+            # Update settings only
+            data["settings"] = {
+                "python_markdown": self._python_markdown_enabled,
+                "agent_markdown": self._agent_markdown_enabled,
+                "shell_markdown": self._shell_markdown_enabled,
             }
 
-            with open(self._history_file, "w", encoding="utf-8") as f:
-                json.dump(history_to_save, f, indent=2)
+            # Ensure parent directory exists
+            self._settings_file.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(self._settings_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
 
             # Set restrictive permissions (user read/write only) for security
-            self._history_file.chmod(0o600)
+            self._settings_file.chmod(0o600)
         except OSError as e:
-            logger.warning(f"Failed to save history to {self._history_file}: {e}")
+            logger.warning(f"Failed to save settings to {self._settings_file}: {e}")
         except Exception as e:
-            logger.warning(f"Unexpected error saving history: {e}")
+            logger.warning(f"Unexpected error saving settings: {e}")
