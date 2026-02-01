@@ -11,9 +11,7 @@ from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widget import Widget
 
-from .executor import ExecutionResult
-from .code_executor import CodeExecutor
-from .shell_executor import ShellExecutor
+from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .repl_input import ReplInput
 from .repl_output import ReplOutput
 
@@ -231,7 +229,6 @@ class InteractivePython(Widget):
 
             if self._pending_code_execution is not None:
                 # The user executed a shell command requested by the agent
-                from .executor import ExecutionStatus
                 agent_response_result = ExecutionResult(code="")
                 agent_response_result.status = ExecutionStatus.RUNNING
                 agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
@@ -260,7 +257,6 @@ class InteractivePython(Widget):
 
             if self._pending_code_execution is not None:
                 # The user executed code requested by the agent
-                from .executor import ExecutionStatus
                 agent_response_result = ExecutionResult(code="")
                 agent_response_result.status = ExecutionStatus.RUNNING
                 agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
@@ -293,7 +289,6 @@ class InteractivePython(Widget):
     async def _handle_python_execution(self, code: str) -> ExecutionResult:
         """Execute Python code."""
         # Create a block showing the code input
-        from .executor import ExecutionStatus
         code_result = ExecutionResult(code=code)
         code_result.status = ExecutionStatus.SUCCESS
         self.output.add_result(code_result, show_output=False, block_type="code_input")
@@ -317,7 +312,6 @@ class InteractivePython(Widget):
     async def _handle_shell_execution(self, command: str) -> ExecutionResult:
         """Execute shell command."""
         # Create a block showing the command input
-        from .executor import ExecutionStatus
         command_result = ExecutionResult(code=command)
         command_result.status = ExecutionStatus.SUCCESS
         self.output.add_result(command_result, show_output=False, block_type="shell_input")
@@ -392,7 +386,6 @@ class InteractivePython(Widget):
         """Handle AI agent prompt with tool support."""
         if self._agent is None:
             # No agent configured, show error
-            from .executor import ExecutionStatus
             error_result = ExecutionResult(
                 code=f"{prompt}",
                 status=ExecutionStatus.ERROR,
@@ -402,7 +395,6 @@ class InteractivePython(Widget):
             return
 
         # Create a block showing the prompt
-        from .executor import ExecutionStatus
         prompt_result = ExecutionResult(code=f"{prompt}")
         prompt_result.status = ExecutionStatus.SUCCESS
         self.output.add_result(prompt_result, is_agent=True, show_output=False, block_type="agent_prompt")

@@ -7,7 +7,7 @@ from io import StringIO
 from queue import Queue
 from typing import Any, Callable, Optional
 
-from .executor import ExecutionStatus, ExecutionResult
+from .common import ExecutionStatus, ExecutionResult
 
 class StreamCapture(StringIO):
     """StringIO that puts output into a queue."""

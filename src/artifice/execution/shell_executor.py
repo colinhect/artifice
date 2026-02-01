@@ -4,7 +4,7 @@ import asyncio
 import traceback
 from typing import Callable, Optional
 
-from .executor import ExecutionStatus, ExecutionResult
+from .common import ExecutionStatus, ExecutionResult
 
 class ShellExecutor:
     """Executes shell commands asynchronously."""

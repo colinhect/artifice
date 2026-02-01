@@ -8,7 +8,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.widgets import Static, LoadingIndicator, Markdown
 
-from .executor import ExecutionResult, ExecutionStatus
+from .execution import ExecutionResult, ExecutionStatus
 from .agent import ToolCall
 
 
