@@ -41,6 +41,7 @@ class ClaudeAgent(AgentBase):
         self.tool_handler = tool_handler
         self.system_prompt = system_prompt
         self._client = None
+        self.messages = []  # Persistent conversation history
 
     def _get_client(self):
         """Lazy import and create Anthropic client."""
@@ -54,6 +55,13 @@ class ClaudeAgent(AgentBase):
                 )
         return self._client
 
+    def clear_conversation(self):
+        """Clear the conversation history.
+
+        This resets the agent's memory of previous interactions,
+        starting fresh with the next prompt.
+        """
+        self.messages = []
 
     async def send_prompt(
         self, prompt: str, on_chunk: Optional[Callable] = None
@@ -77,8 +85,9 @@ class ClaudeAgent(AgentBase):
             client = self._get_client()
             loop = asyncio.get_running_loop()
 
-            # Track conversation messages and tool calls
-            messages = [{"role": "user", "content": prompt}]
+            # Add new user message to conversation history (only if non-empty)
+            if prompt.strip():
+                self.messages.append({"role": "user", "content": prompt})
             all_text_chunks = []
             final_stop_reason = None
 
@@ -95,7 +104,7 @@ class ClaudeAgent(AgentBase):
                     api_params = {
                         "model": self.model,
                         "max_tokens": 4096,
-                        "messages": messages,
+                        "messages": self.messages,
                     }
                     
                     # Add system prompt if available
@@ -135,11 +144,27 @@ class ClaudeAgent(AgentBase):
                 all_text_chunks.append(text)
                 final_stop_reason = stop_reason
 
-                # Add assistant's response to conversation
-                messages.append({
-                    "role": "assistant",
-                    "content": content_blocks,
-                })
+                # Add assistant's response to conversation (convert content blocks to dicts)
+                serialized_content = []
+                for block in content_blocks:
+                    if block.type == "text":
+                        # Only add text blocks with non-empty text
+                        if block.text:
+                            serialized_content.append({"type": "text", "text": block.text})
+                    elif block.type == "tool_use":
+                        serialized_content.append({
+                            "type": "tool_use",
+                            "id": block.id,
+                            "name": block.name,
+                            "input": block.input,
+                        })
+
+                # Only add assistant message if it has content
+                if serialized_content:
+                    self.messages.append({
+                        "role": "assistant",
+                        "content": serialized_content,
+                    })
 
                 # If no tool uses, we're done
                 if not tool_uses or stop_reason != "tool_use":
@@ -181,11 +206,12 @@ class ClaudeAgent(AgentBase):
                             "is_error": True,
                         })
 
-                # Add tool results to conversation
-                messages.append({
-                    "role": "user",
-                    "content": tool_results,
-                })
+                # Add tool results to conversation (only if we have results)
+                if tool_results:
+                    self.messages.append({
+                        "role": "user",
+                        "content": tool_results,
+                    })
 
             return AgentResponse(
                 text="\n".join(all_text_chunks),
@@ -195,4 +221,14 @@ class ClaudeAgent(AgentBase):
         except ImportError as e:
             return AgentResponse(text="", error=str(e))
         except Exception as e:
-            return AgentResponse(text="", error=f"Error communicating with Claude: {e}")
+            error_msg = f"Error communicating with Claude: {e}"
+            # Add debug info about messages structure
+            if "empty content" in str(e).lower():
+                error_msg += f"\n\nMessage count: {len(self.messages)}"
+                for i, msg in enumerate(self.messages):
+                    content = msg.get("content", "")
+                    if isinstance(content, list):
+                        error_msg += f"\n  Message {i} ({msg['role']}): {len(content)} content blocks"
+                    else:
+                        error_msg += f"\n  Message {i} ({msg['role']}): {len(str(content))} chars"
+            return AgentResponse(text="", error=error_msg)

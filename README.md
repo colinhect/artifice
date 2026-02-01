@@ -152,4 +152,6 @@ Planned features and improvements:
 - [ ] GitHub Copilot integration
 - [ ] Additional AI provider support (OpenAI, local models)
 - [ ] Session export/import
+- [ ] LSP integration with agent
+- [ ] Other programming languages
 
