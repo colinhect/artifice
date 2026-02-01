@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from textual import highlight
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -10,6 +12,8 @@ from textual.widgets import Static, LoadingIndicator, Markdown
 
 from .execution import ExecutionResult, ExecutionStatus
 from .agent import ToolCall
+
+logger = logging.getLogger(__name__)
 
 
 class OutputBlock(Static):
@@ -319,9 +323,12 @@ class OutputBlock(Static):
             try:
                 output_widget = self._output_container.query_one(".output-line")
                 output_widget.update(segment_text)
-            except Exception:
+            except Exception as e:
                 # No output widget yet, create one
-                await self._output_container.mount(Static(segment_text, classes="output-line"))
+                try:
+                    await self._output_container.mount(Static(segment_text, classes="output-line"))
+                except Exception as mount_error:
+                    logger.warning(f"Failed to mount output widget: {mount_error}")
 
         # Scroll parent to bottom
         parent = self.parent
@@ -365,12 +372,13 @@ class OutputBlock(Static):
             else:
                 # For other tools, show name and input
                 widgets_to_add.append(Static(f"🔧 {tool_call.name}", classes="tool-call-name"))
-                
+
                 # Tool input (pretty printed)
                 import json
                 try:
                     input_str = json.dumps(tool_call.input, indent=2)
-                except Exception:
+                except (TypeError, ValueError) as e:
+                    logger.debug(f"Failed to JSON serialize tool input: {e}")
                     input_str = str(tool_call.input)
                 widgets_to_add.append(Static(f"Input:\n{input_str}", classes="tool-call-input"))
             
@@ -389,12 +397,8 @@ class OutputBlock(Static):
             if parent and hasattr(parent, 'scroll_end'):
                 parent.scroll_end(animate=False)
         except Exception as e:
-            # Debug: log the error
-            import sys
-            print(f"Error adding tool call: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc()
-            pass  # Container might be unmounted during shutdown
+            # Container might be unmounted during shutdown
+            logger.debug(f"Failed to add tool call widget (possibly during shutdown): {e}")
 
     async def on_output_block_stream_error(self, message: StreamError) -> None:
         """Handle streamed error update."""
@@ -408,9 +412,12 @@ class OutputBlock(Static):
         try:
             error_widget = self._output_container.query_one(".error-line")
             error_widget.update(full_error)
-        except Exception:
+        except Exception as e:
             # No error widget yet, create one
-            self._output_container.mount(Static(full_error, classes="error-line"))
+            try:
+                self._output_container.mount(Static(full_error, classes="error-line"))
+            except Exception as mount_error:
+                logger.warning(f"Failed to mount error widget: {mount_error}")
 
         # Scroll parent to bottom
         parent = self.parent
@@ -425,9 +432,9 @@ class OutputBlock(Static):
         try:
             status_widget = self.query_one(".status-widget")
             status_widget.remove()
-        except Exception:
+        except Exception as e:
             # Widget might already be removed during shutdown
-            pass
+            logger.debug(f"Failed to remove status widget (possibly during shutdown): {e}")
         
         # Get icon and CSS class based on block type
         icon, css_class = self._get_status_display()
@@ -442,17 +449,17 @@ class OutputBlock(Static):
         try:
             content = self.query_one("#output-content")
             self.mount(new_indicator, before=content)
-        except Exception:
+        except Exception as e:
             # Widget might be unmounted during shutdown
-            pass
+            logger.debug(f"Failed to mount status indicator (possibly during shutdown): {e}")
         
         # Add result value if present
         if result.result_value is not None and self._output_container:
             try:
                 self._output_container.mount(Static(repr(result.result_value), classes="output-line"))
-            except Exception:
+            except Exception as e:
                 # Container might be unmounted during shutdown
-                pass
+                logger.debug(f"Failed to mount result value (possibly during shutdown): {e}")
         
         # Add error if present (for errors that weren't streamed)
         if result.error and self._output_container:
@@ -460,9 +467,9 @@ class OutputBlock(Static):
             if not self._error_lines:
                 try:
                     self._output_container.mount(Static(result.error.rstrip(), classes="error-line"))
-                except Exception:
+                except Exception as e:
                     # Container might be unmounted during shutdown
-                    pass
+                    logger.debug(f"Failed to mount error message (possibly during shutdown): {e}")
         
         # Scroll parent to bottom
         parent = self.parent
@@ -510,9 +517,9 @@ class OutputBlock(Static):
                 
                 # Add plain text widget
                 await self._output_container.mount(Static(content, classes="output-line"))
-        except Exception:
+        except Exception as e:
             # Widget might be unmounted during operation
-            pass
+            logger.debug(f"Failed to toggle markdown rendering: {e}")
 
 
 class ReplOutput(VerticalScroll):

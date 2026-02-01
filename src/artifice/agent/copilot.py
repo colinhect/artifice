@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import Callable, Optional
 
 from .common import AgentBase, AgentResponse
 
@@ -17,7 +17,7 @@ class CopilotAgent(AgentBase):
         self.api_key = api_key or os.environ.get("GITHUB_TOKEN")
 
     async def send_prompt(
-        self, prompt: str, on_chunk: Optional[callable] = None
+        self, prompt: str, on_chunk: Optional[Callable] = None
     ) -> AgentResponse:
         """Send a prompt to Copilot.
 

@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+import shlex
 import traceback
 from typing import Callable, Optional
 
 from .common import ExecutionStatus, ExecutionResult
 
 class ShellExecutor:
-    """Executes shell commands asynchronously."""
+    """Executes shell commands asynchronously with streaming output.
+
+    Commands are parsed using shlex.split() and executed via subprocess
+    without shell interpretation, reducing shell injection risks.
+
+    Stdout and stderr are streamed concurrently with real-time callbacks.
+
+    Security Note: Commands run with full user permissions without sandboxing.
+    Only execute commands from trusted sources.
+    """
 
     async def execute(
         self,
@@ -17,20 +27,35 @@ class ShellExecutor:
     ) -> ExecutionResult:
         """Execute a shell command asynchronously with streaming output.
 
+        The command string is parsed into arguments using shlex.split() to
+        avoid shell injection vulnerabilities. Commands with shell-specific
+        features (pipes, redirects, etc.) may not work as expected.
+
         Args:
-            command: The shell command to execute.
-            on_output: Optional callback for stdout output.
-            on_error: Optional callback for stderr output.
+            command: The shell command string to execute (will be parsed into args).
+            on_output: Optional callback invoked for each stdout line.
+            on_error: Optional callback invoked for each stderr line.
 
         Returns:
-            ExecutionResult with status, output, and any errors.
+            ExecutionResult with status (SUCCESS/ERROR), output, and any errors.
         """
         result = ExecutionResult(code=command, status=ExecutionStatus.RUNNING)
 
         try:
-            # Create subprocess
-            process = await asyncio.create_subprocess_shell(
-                command,
+            # Parse command into arguments to avoid shell injection
+            try:
+                args = shlex.split(command)
+            except ValueError as e:
+                # If command parsing fails, return error immediately
+                result.status = ExecutionStatus.ERROR
+                result.error = f"Invalid command syntax: {e}"
+                if on_error:
+                    on_error(result.error)
+                return result
+
+            # Create subprocess with argument list (more secure than shell=True)
+            process = await asyncio.create_subprocess_exec(
+                *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

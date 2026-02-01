@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -15,16 +16,10 @@ from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExec
 from .repl_input import ReplInput
 from .repl_output import ReplOutput
 
-class InteractivePython(Widget):
-    """An interactive Python REPL widget for Textual applications.
+logger = logging.getLogger(__name__)
 
-    This widget provides a full-featured Python REPL that can be embedded
-    in any Textual application. It supports:
-    - Async code execution with activity indicators
-    - Success/failure icons for completed commands
-    - Multiline input
-    - Command history navigation
-    - Highlighted block navigation with Ctrl+Arrow keys
+class InteractivePython(Widget):
+    """An interactive Python REPL widget with AI agent integration.
     """
 
     DEFAULT_CSS = """
@@ -180,7 +175,7 @@ class InteractivePython(Widget):
             raise Exception(f"Unsupported agent {agent_type}")
         
         # Track pending code execution requests from agent
-        self._pending_code_execution: dict[str, Any] = None
+        self._pending_code_execution: dict[str, Any] | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -201,15 +196,21 @@ class InteractivePython(Widget):
         """Handle code submission from input."""
         code = event.code
 
-        # Add to appropriate history
+        # Add to appropriate history and trim if needed
         if event.is_agent_prompt:
             self._ai_history.append(code)
+            if len(self._ai_history) > self._max_history_size:
+                self._ai_history.pop(0)
             self._ai_history_index = -1  # Reset history navigation
         elif event.is_shell_command:
             self._shell_history.append(code)
+            if len(self._shell_history) > self._max_history_size:
+                self._shell_history.pop(0)
             self._shell_history_index = -1  # Reset history navigation
         else:
             self._python_history.append(code)
+            if len(self._python_history) > self._max_history_size:
+                self._python_history.pop(0)
             self._python_history_index = -1  # Reset history navigation
 
         self._current_input = ""
@@ -554,8 +555,13 @@ class InteractivePython(Widget):
                         self._python_markdown_enabled = settings.get("python_markdown", False)
                         self._agent_markdown_enabled = settings.get("agent_markdown", True)
                         self._shell_markdown_enabled = settings.get("shell_markdown", False)
-        except Exception:
-            # If we can't load history, just start with empty lists
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to load history from {self._history_file}: Invalid JSON - {e}")
+            self._python_history = []
+            self._ai_history = []
+            self._shell_history = []
+        except Exception as e:
+            logger.warning(f"Failed to load history from {self._history_file}: {e}")
             self._python_history = []
             self._ai_history = []
             self._shell_history = []
@@ -580,6 +586,10 @@ class InteractivePython(Widget):
 
             with open(self._history_file, "w", encoding="utf-8") as f:
                 json.dump(history_to_save, f, indent=2)
-        except Exception:
-            # Silently fail if we can't save history
-            pass
+
+            # Set restrictive permissions (user read/write only) for security
+            self._history_file.chmod(0o600)
+        except OSError as e:
+            logger.warning(f"Failed to save history to {self._history_file}: {e}")
+        except Exception as e:
+            logger.warning(f"Unexpected error saving history: {e}")

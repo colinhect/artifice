@@ -25,9 +25,21 @@ class StreamCapture(StringIO):
 
 
 class CodeExecutor:
-    """Executes Python code asynchronously with isolated context."""
+    """Executes Python code asynchronously with persistent session context.
+
+    The executor maintains a persistent globals/locals dictionary across executions,
+    allowing variables, functions, and imports to persist between code executions
+    (similar to a Python REPL).
+
+    Execution happens in a thread pool to avoid blocking the async event loop,
+    with output streamed via callbacks as it's generated.
+
+    Security Note: Code is executed with eval()/exec() without sandboxing.
+    Only execute trusted code from trusted sources.
+    """
 
     def __init__(self) -> None:
+        """Initialize executor with fresh globals/locals context."""
         self._globals: dict[str, Any] = {"__name__": "__main__", "__builtins__": __builtins__}
         self._locals: dict[str, Any] = {}
 

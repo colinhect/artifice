@@ -7,7 +7,17 @@ from typing import Optional, Any, Callable
 from .common import AgentBase, AgentResponse, ToolCall
 
 class ClaudeAgent(AgentBase):
-    """Agent for connecting to Claude via Anthropic API with tool support."""
+    """Agent for connecting to Claude via Anthropic API with tool support.
+
+    This agent provides streaming responses and supports agentic tool calling loops.
+    The agent will automatically iterate through multiple tool calls until Claude
+    stops requesting tools, up to a maximum of 10 iterations.
+
+    API Key: Reads from ANTHROPIC_API_KEY environment variable.
+
+    Thread Safety: The agent uses lazy client initialization and runs API calls
+    in a thread pool executor to avoid blocking the async event loop.
+    """
 
     def __init__(
         self,
@@ -19,10 +29,10 @@ class ClaudeAgent(AgentBase):
         """Initialize Claude agent.
 
         Args:
-            api_key: Anthropic API key. If None, reads from ANTHROPIC_API_KEY env var.
-            model: Model identifier to use. Defaults to latest Claude 3.5 Sonnet.
-            tools: List of tool definitions in Anthropic format.
-            tool_handler: Async function to handle tool calls. Takes (tool_name, tool_input) and returns result.
+            model: Model identifier to use. Defaults to Claude Sonnet 4.5.
+            tools: List of tool definitions in Anthropic API format.
+            tool_handler: Async callback to handle tool calls.
+                         Takes (tool_name: str, tool_input: dict) and returns result string.
             system_prompt: Optional system prompt to guide the agent's behavior.
         """
         self.api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -46,7 +56,7 @@ class ClaudeAgent(AgentBase):
 
 
     async def send_prompt(
-        self, prompt: str, on_chunk: Optional[callable] = None
+        self, prompt: str, on_chunk: Optional[Callable] = None
     ) -> AgentResponse:
         """Send a prompt to Claude with tool support.
 
