@@ -25,40 +25,40 @@ class ReplTextArea(TextArea):
         if event.key == "enter":
             event.prevent_default()
             event.stop()
-            self.post_message(ReplInput.SubmitRequested())
+            self.post_message(TerminalInput.SubmitRequested())
             return
         # Escape key
         if event.key == "escape":
             event.prevent_default()
             event.stop()
-            self.post_message(ReplInput.EscapePressed())
+            self.post_message(TerminalInput.EscapePressed())
             return
         # If input is empty
         if not self.text.strip():
             if event.key == "question_mark":
                 event.prevent_default()
                 event.stop()
-                self.post_message(ReplInput.QuestionMarkPressed())
+                self.post_message(TerminalInput.QuestionMarkPressed())
                 return
             if event.key == "exclamation_mark":
                 event.prevent_default()
                 event.stop()
-                self.post_message(ReplInput.ExclamationMarkPressed())
+                self.post_message(TerminalInput.ExclamationMarkPressed())
                 return
             if event.key == "greater_than_sign":
                 event.prevent_default()
                 event.stop()
-                self.post_message(ReplInput.GreaterThanSignPressed())
+                self.post_message(TerminalInput.GreaterThanSignPressed())
                 return
         # Let parent handle other keys
         super()._on_key(event)
 
 
-class ReplInput(Static):
+class TerminalInput(Static):
     """Input component for the Python REPL."""
 
     DEFAULT_CSS = """
-    ReplInput {
+    TerminalInput {
         height: auto;
         max-height: 24;
         padding: 0;
@@ -66,20 +66,20 @@ class ReplInput(Static):
         border: none;
     }
 
-    ReplInput Horizontal {
+    TerminalInput Horizontal {
         height: auto;
         padding: 0;
         margin: 0;
     }
 
-    ReplInput .prompt {
+    TerminalInput .prompt {
         width: 2;
         color: $primary;
         padding: 0;
         margin: 0;
     }
 
-    ReplInput TextArea {
+    TerminalInput TextArea {
         width: 1fr;
         min-height: 1;
         height: auto;
@@ -90,7 +90,7 @@ class ReplInput(Static):
         background: transparent;
     }
     
-    ReplInput TextArea:focus {
+    TerminalInput TextArea:focus {
         border: none !important;
     }
     """
@@ -157,29 +157,29 @@ class ReplInput(Static):
         """Focus the text area on mount."""
         self.query_one("#code-input", ReplTextArea).focus()
 
-    def on_repl_input_submit_requested(self, event: SubmitRequested) -> None:
+    def on_terminal_input_submit_requested(self, event: SubmitRequested) -> None:
         """Handle submission request from TextArea."""
         self.action_submit()
 
-    def on_repl_input_escape_pressed(self, event: EscapePressed) -> None:
+    def on_terminal_input_escape_pressed(self, event: EscapePressed) -> None:
         """Handle escape key press - switch to Python mode."""
         if self.mode != "python":
             self.mode = "python"
             self._update_prompt()
 
-    def on_repl_input_question_mark_pressed(self, event: QuestionMarkPressed) -> None:
+    def on_terminal_input_question_mark_pressed(self, event: QuestionMarkPressed) -> None:
         """Handle ? key press when input is empty - switch to AI mode."""
         if self.mode != "ai":
             self.mode = "ai"
             self._update_prompt()
 
-    def on_repl_input_greater_than_sign_pressed(self, event: GreaterThanSignPressed) -> None:
+    def on_terminal_input_greater_than_sign_pressed(self, event: GreaterThanSignPressed) -> None:
         """Handle > key press when input is empty - switch to Python mode."""
         if self.mode != "python":
             self.mode = "python"
             self._update_prompt()
 
-    def on_repl_input_exclamation_mark_pressed(self, event: ExclamationMarkPressed) -> None:
+    def on_terminal_input_exclamation_mark_pressed(self, event: ExclamationMarkPressed) -> None:
         """Handle ! key press when input is empty - switch to Shell mode."""
         if self.mode != "shell":
             self.mode = "shell"

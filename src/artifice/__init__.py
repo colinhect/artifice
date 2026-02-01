@@ -1,6 +1,6 @@
-from .repl import ArtificeRepl
+from .terminal import ArtificeTerminal
 
 __all__ = [
-    "ArtificeRepl"
+    "ArtificeTerminal"
 ]
 __version__ = "0.1.0"

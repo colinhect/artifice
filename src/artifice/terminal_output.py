@@ -522,11 +522,11 @@ class OutputBlock(Static):
             logger.debug(f"Failed to toggle markdown rendering: {e}")
 
 
-class ReplOutput(VerticalScroll):
+class TerminalOutput(VerticalScroll):
     """Scrollable container for REPL output blocks."""
 
     DEFAULT_CSS = """
-    ReplOutput {
+    TerminalOutput {
         height: 1fr;
         border: none;
         padding: 0;

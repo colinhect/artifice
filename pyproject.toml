@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-artifice = "artifice.terminal:main"
+artifice = "artifice.app:main"
 
 [project.optional-dependencies]
 dev = [
