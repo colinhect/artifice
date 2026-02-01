@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
-from typing import Optional, Any, Callable
+from typing import Optional
 
-from .agent import AgentBase, AgentResponse, ToolCall
+from .agent import AgentBase, AgentResponse
 
 class CopilotAgent(AgentBase):
     """Agent for connecting to GitHub Copilot (placeholder implementation)."""

@@ -70,7 +70,6 @@ class ClaudeAgent(AgentBase):
 
             # Track conversation messages and tool calls
             messages = [{"role": "user", "content": prompt}]
-            all_tool_calls = []
             all_text_chunks = []
             final_stop_reason = None
 
@@ -173,8 +172,6 @@ class ClaudeAgent(AgentBase):
                             "is_error": True,
                         })
 
-                    all_tool_calls.append(tool_call)
-                
                 # Add tool results to conversation
                 messages.append({
                     "role": "user",
@@ -184,7 +181,6 @@ class ClaudeAgent(AgentBase):
             return AgentResponse(
                 text="\n".join(all_text_chunks),
                 stop_reason=final_stop_reason,
-                tool_calls=all_tool_calls,
             )
 
         except ImportError as e:

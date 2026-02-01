@@ -11,7 +11,9 @@ from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widget import Widget
 
-from .executor import CodeExecutor, ShellExecutor, ExecutionResult
+from .executor import ExecutionResult
+from .code_executor import CodeExecutor
+from .shell_executor import ShellExecutor
 from .repl_input import ReplInput
 from .repl_output import ReplOutput
 
