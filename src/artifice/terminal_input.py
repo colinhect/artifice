@@ -9,7 +9,7 @@ from textual.widgets import Static, TextArea
 from textual import events
 
 
-class ReplTextArea(TextArea):
+class InputTextArea(TextArea):
     """Custom TextArea that handles Enter for submission and history navigation."""
 
     def __init__(self, **kwargs) -> None:
@@ -151,11 +151,11 @@ class TerminalInput(Static):
     def compose(self) -> ComposeResult:
         with Horizontal():
             yield Static(self._python_prompt, classes="prompt", id="prompt-display")
-            yield ReplTextArea(id="code-input")
+            yield InputTextArea(id="code-input")
 
     def on_mount(self) -> None:
         """Focus the text area on mount."""
-        self.query_one("#code-input", ReplTextArea).focus()
+        self.query_one("#code-input", InputTextArea).focus()
 
     def on_terminal_input_submit_requested(self, event: SubmitRequested) -> None:
         """Handle submission request from TextArea."""
@@ -188,7 +188,7 @@ class TerminalInput(Static):
     def _update_prompt(self) -> None:
         """Update the prompt display based on current mode."""
         prompt_widget = self.query_one("#prompt-display", Static)
-        text_area = self.query_one("#code-input", ReplTextArea)
+        text_area = self.query_one("#code-input", InputTextArea)
         
         if self.mode == "ai":
             prompt_widget.update(self._ai_prompt)
