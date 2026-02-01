@@ -11,7 +11,6 @@ class ClaudeAgent(AgentBase):
 
     def __init__(
         self,
-        api_key: str | None = None,
         model: str = "claude-sonnet-4-5-20250929",
         tools: list[dict[str, Any]] | None = None,
         tool_handler: Callable[[str, dict[str, Any]], Any] | None = None,
@@ -26,7 +25,7 @@ class ClaudeAgent(AgentBase):
             tool_handler: Async function to handle tool calls. Takes (tool_name, tool_input) and returns result.
             system_prompt: Optional system prompt to guide the agent's behavior.
         """
-        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        self.api_key = os.environ.get("ANTHROPIC_API_KEY")
         self.model = model
         self.tools = tools or []
         self.tool_handler = tool_handler

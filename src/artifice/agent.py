@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import Any, Callable, Optional
 
 
 @dataclass
 class ToolCall:
-    """Represents a tool call made by the agent."""
+    """Tool call made by the agent."""
     
     id: str
     name: str
@@ -32,7 +32,7 @@ class AgentBase(ABC):
 
     @abstractmethod
     async def send_prompt(
-        self, prompt: str, on_chunk: Optional[callable] = None
+        self, prompt: str, on_chunk: Optional[Callable] = None
     ) -> AgentResponse:
         """Send a prompt to the agent.
 
