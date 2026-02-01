@@ -2,7 +2,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Header, Footer
 
-from artifice import InteractivePython
+from artifice import ArtificeRepl
 
 
 class ArtificeTerminal(App):
@@ -12,7 +12,7 @@ class ArtificeTerminal(App):
         layout: vertical;
     }
 
-    InteractivePython {
+    ArtificeRepl {
         height: 1fr;
     }
     """
@@ -23,7 +23,7 @@ class ArtificeTerminal(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield InteractivePython()
+        yield ArtificeRepl()
         yield Footer()
 
 def main():

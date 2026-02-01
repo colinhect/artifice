@@ -1,6 +1,6 @@
-from .repl import InteractivePython
+from .repl import ArtificeRepl
 
 __all__ = [
-    "InteractivePython"
+    "ArtificeRepl"
 ]
 __version__ = "0.1.0"

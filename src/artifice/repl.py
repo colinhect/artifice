@@ -18,29 +18,29 @@ from .repl_output import ReplOutput
 
 logger = logging.getLogger(__name__)
 
-class InteractivePython(Widget):
-    """An interactive Python REPL widget with AI agent integration.
+class ArtificeRepl(Widget):
+    """An interactive REPL widget with AI agent integration.
     """
 
     DEFAULT_CSS = """
-    InteractivePython {
+    ArtificeRepl {
         height: 100%;
         width: 100%;
     }
 
-    InteractivePython Vertical {
+    ArtificeRepl Vertical {
         height: 100%;
     }
 
-    InteractivePython ReplOutput {
+    ArtificeRepl ReplOutput {
         height: 1fr;
     }
 
-    InteractivePython ReplInput {
+    ArtificeRepl ReplInput {
         dock: bottom;
     }
 
-    InteractivePython .highlighted {
+    ArtificeRepl .highlighted {
         background: $surface-lighten-2;
     }
     """
