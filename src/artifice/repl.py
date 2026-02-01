@@ -14,8 +14,6 @@ from textual.widget import Widget
 from .executor import CodeExecutor, ShellExecutor, ExecutionResult
 from .repl_input import ReplInput
 from .repl_output import ReplOutput
-from .agent import AgentBase, create_agent
-
 
 class InteractivePython(Widget):
     """An interactive Python REPL widget for Textual applications.
@@ -57,7 +55,7 @@ class InteractivePython(Widget):
         Binding("alt+down", "history_forward", "History Forward", show=True),
         Binding("ctrl+up", "highlight_previous", "Previous Block", show=True),
         Binding("ctrl+down", "highlight_next", "Next Block", show=True),
-        #Binding("ctrl+l", "clear", "Clear Output", show=True),
+        Binding("ctrl+n", "clear", "Clear Output", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Mode Markdown", show=True),
         Binding("ctrl+l", "toggle_block_markdown", "Toggle Block Markdown", show=True),
     ]
@@ -70,7 +68,6 @@ class InteractivePython(Widget):
         classes: str | None = None,
         history_file: str | Path | None = None,
         max_history_size: int = 1000,
-        agent: AgentBase | None = None,
         agent_type: str = "claude",
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
@@ -101,100 +98,86 @@ class InteractivePython(Widget):
         self._agent_markdown_enabled = True    # Default: markdown for agent responses
         self._shell_markdown_enabled = False   # Default: no markdown for shell output
 
-        # AI Agent configuration
-        if agent is not None:
-            self._agent = agent
-        elif agent_type:
-            try:
-                # Create agent with Python execution tool
-                from .agent import ClaudeAgent
-                
-                # Define Python execution request tool (user confirmation required)
-                python_tool = {
-                    "name": "request_execute_python",
-                    "description": (
-                        "Request execution of Python code in the REPL environment. "
-                        "The code will be presented to the user in the input prompt where they will choose to:\n"
-                        "- Execute the code as-is\n"
-                        "- Edit the code and execute the modified version\n"
-                        "- Decline execution\n\n"
-                        "After the user's action, you will receive either:\n"
-                        "- The executed code (possibly modified) and its output/result\n"
-                        "- A message that the user declined to execute the code\n\n"
-                        "Use this to run Python commands, perform calculations, test code snippets, "
-                        "or explore Python functionality. The code runs in a persistent Python session, "
-                        "so variables and imports persist across executions."
-                    ),
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {
-                            "code": {
-                                "type": "string",
-                                "description": "The Python code to request execution for",
-                            }
-                        },
-                        "required": ["code"],
-                    },
-                }
+        # Define Python execution request tool (user confirmation required)
+        python_tool = {
+            "name": "request_execute_python",
+            "description": (
+                "Request execution of Python code in the REPL environment. "
+                "The code will be presented to the user in the input prompt where they will choose to:\n"
+                "- Execute the code as-is\n"
+                "- Edit the code and execute the modified version\n"
+                "- Decline execution\n\n"
+                "After the user's action, you will receive either:\n"
+                "- The executed code (possibly modified) and its output/result\n"
+                "- A message that the user declined to execute the code\n\n"
+                "Use this to run Python commands, perform calculations, test code snippets, "
+                "or explore Python functionality. The code runs in a persistent Python session, "
+                "so variables and imports persist across executions."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "The Python code to request execution for",
+                    }
+                },
+                "required": ["code"],
+            },
+        }
 
-                # Define Shell execution request tool (user confirmation required)
-                shell_tool = {
-                    "name": "request_execute_shell",
-                    "description": (
-                        "Request execution of a shell command. "
-                        "The command will be presented to the user in the input prompt where they will choose to:\n"
-                        "- Execute the command as-is\n"
-                        "- Edit the command and execute the modified version\n"
-                        "- Decline execution\n\n"
-                        "After the user's action, you will receive either:\n"
-                        "- The executed command (possibly modified) and its output\n"
-                        "- A message that the user declined to execute the command\n\n"
-                        "Use this to run shell commands, check system state, run scripts, "
-                        "or perform file system operations."
-                    ),
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {
-                            "command": {
-                                "type": "string",
-                                "description": "The shell command to request execution for",
-                            }
-                        },
-                        "required": ["command"],
-                    },
-                }
-                
-                # System prompt to guide the agent's behavior
-                system_prompt = (
-                    "You are a minimal AI assistant in an interactive Python coding environment with shell access. "
-                    "Your primary goal is to help the user write and execute Python code or shell commands to accomplish what the user asks for. "
-                    "Provide the shortest possible code, do not overprovide examples unless asked to. "
-                    "Focus on action, not explanation:\n\n"
-                    "- Write the code or command that solves the user's problem\n"
-                    "- Use the request_execute_python tool to run Python code\n"
-                    "- Use the request_execute_shell tool to run shell commands\n"
-                    "- Only provide explanations if the user explicitly asks for them\n"
-                    "- Keep responses concise and code-focused\n"
-                    "- If code produces an error, explain what is wrong and how to fix it, fix it and try again\n\n"
-                    "Remember: Code/command execution, not explanation, is your primary mode of operation."
-                )
-                
-                # Create agent with tool support
-                if agent_type.lower() == "claude":
-                    self._agent = ClaudeAgent(
-                        tools=[python_tool, shell_tool],
-                        tool_handler=self._handle_tool_call,
-                        on_tool_call=None,
-                        system_prompt=system_prompt,
-                    )
-                else:
-                    self._agent = create_agent(agent_type)
-            except Exception:
-                # Agent creation failed (e.g., missing API key), but that's okay
-                # We'll show an error when the user tries to use it
-                self._agent = create_agent(agent_type)
+        # Define Shell execution request tool (user confirmation required)
+        shell_tool = {
+            "name": "request_execute_shell",
+            "description": (
+                "Request execution of a shell command. "
+                "The command will be presented to the user in the input prompt where they will choose to:\n"
+                "- Execute the command as-is\n"
+                "- Edit the command and execute the modified version\n"
+                "- Decline execution\n\n"
+                "After the user's action, you will receive either:\n"
+                "- The executed command (possibly modified) and its output\n"
+                "- A message that the user declined to execute the command\n\n"
+                "Use this to run shell commands, check system state, run scripts, "
+                "or perform file system operations."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "The shell command to request execution for",
+                    }
+                },
+                "required": ["command"],
+            },
+        }
+        
+        # System prompt to guide the agent's behavior
+        system_prompt = (
+            "You are a minimal AI assistant in an interactive Python coding environment with shell access. "
+            "Your primary goal is to help the user write and execute Python code or shell commands to accomplish what the user asks for. "
+            "Provide the shortest possible code, do not overprovide examples unless asked to. "
+            "Focus on action, not explanation:\n\n"
+            "- Write the code or command that solves the user's problem\n"
+            "- Use the request_execute_python tool to run Python code\n"
+            "- Use the request_execute_shell tool to run shell commands\n"
+            "- Only provide explanations if the user explicitly asks for them\n"
+            "- Keep responses concise and code-focused\n"
+            "- If code produces an error, explain what is wrong and how to fix it, fix it and try again\n\n"
+            "Remember: Code/command execution, not explanation, is your primary mode of operation."
+        )
+        
+        # Create agent with tool support
+        if agent_type.lower() == "claude":
+            from .claude import ClaudeAgent
+            self._agent = ClaudeAgent(
+                tools=[python_tool, shell_tool],
+                tool_handler=self._handle_tool_call,
+                system_prompt=system_prompt,
+            )
         else:
-            self._agent = None
+            raise Exception(f"Unsupported agent {agent_type}")
         
         # Track pending code execution requests from agent
         self._pending_code_execution: dict[str, Any] = None
@@ -280,7 +263,7 @@ class InteractivePython(Widget):
                 agent_response_result.status = ExecutionStatus.RUNNING
                 agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
 
-                prompt = "I executed code that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n",
+                prompt = "I executed code that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
 
                 # Send prompt to agent with streaming into the NEW block
                 response = await self._agent.send_prompt(
@@ -303,6 +286,7 @@ class InteractivePython(Widget):
     async def on_repl_input_decline_requested(self, event: ReplInput.DeclineRequested) -> None:
         """Handle decline request from input (escape key)."""
         # If no pending execution, just ignore the escape key
+        pass
 
     async def _handle_python_execution(self, code: str) -> ExecutionResult:
         """Execute Python code."""
