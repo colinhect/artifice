@@ -62,7 +62,7 @@ class ArtificeTerminal(Widget):
         classes: str | None = None,
         history_file: str | Path | None = None,
         max_history_size: int = 1000,
-        agent_type: str = "claude",
+        agent_type: str,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
         self._executor = CodeExecutor()
@@ -170,9 +170,35 @@ class ArtificeTerminal(Widget):
                 tool_handler=self._handle_tool_call,
                 system_prompt=system_prompt,
             )
-        else:
+        elif agent_type.lower() == "simulated":
+            from artifice.agent.simulated import SimulatedAgent, ScriptedAgent, EchoAgent
+            self._agent = SimulatedAgent(response_delay=0.01, tool_handler=self._handle_tool_call)
+
+            # Configure scenarios with pattern matching
+            self._agent.configure_scenarios([
+                {
+                    'pattern': r'hello|hi|hey',
+                    'response': 'Hello! I\'m a simulated agent. How can I help you today?'
+                },
+                {
+                    'pattern': r'calculate|math|sum|add',
+                    'response': 'I can help with that calculation!',
+                    'tools': [
+                        {
+                            'name': 'request_execute_python',
+                            'input': {'code': 'result = 10 + 5\nprint(f"The result is: {result}")'}
+                        }
+                    ]
+                },
+                {
+                    'pattern': r'goodbye|bye|exit',
+                    'response': 'Goodbye! Thanks for chatting with me.'
+                }
+            ])
+
+            self._agent.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
+        elif agent_type:
             raise Exception(f"Unsupported agent {agent_type}")
-        
         # Track pending code execution requests from agent
         self._pending_code_execution: dict[str, Any] | None = None
 
