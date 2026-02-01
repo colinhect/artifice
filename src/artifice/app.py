@@ -26,7 +26,7 @@ class ArtificeApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield ArtificeTerminal(agent_type=self.agent_type)
+        yield ArtificeTerminal(self)
         yield Footer()
 
 import argparse

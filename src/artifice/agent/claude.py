@@ -25,6 +25,7 @@ class ClaudeAgent(AgentBase):
         tools: list[dict[str, Any]] | None = None,
         tool_handler: Callable[[str, dict[str, Any]], Any] | None = None,
         system_prompt: str | None = None,
+        on_connect = None
     ):
         """Initialize Claude agent.
 
@@ -40,6 +41,7 @@ class ClaudeAgent(AgentBase):
         self.tools = tools or []
         self.tool_handler = tool_handler
         self.system_prompt = system_prompt
+        self.on_connect = on_connect
         self._client = None
         self.messages = []  # Persistent conversation history
 
@@ -49,6 +51,8 @@ class ClaudeAgent(AgentBase):
             try:
                 from anthropic import Anthropic
                 self._client = Anthropic(api_key=self.api_key)
+                if self.on_connect:
+                    self.on_connect("Claude")
             except ImportError:
                 raise ImportError(
                     "anthropic package not installed. Install with: pip install anthropic"

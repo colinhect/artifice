@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.message import Message
 from textual.widgets import Static, TextArea
@@ -11,6 +12,10 @@ from textual import events
 
 class InputTextArea(TextArea):
     """Custom TextArea that handles Enter for submission and history navigation."""
+
+    BINDINGS = [
+        Binding("shift+tab", "", "Move to Output", show=True)
+    ]
 
     def __init__(self, **kwargs) -> None:
         super().__init__(language="python", **kwargs)
@@ -94,8 +99,6 @@ class TerminalInput(Static):
         border: none !important;
     }
     """
-
-    BINDINGS = []
 
     class SubmitRequested(Message):
         """Internal message from TextArea requesting submission."""

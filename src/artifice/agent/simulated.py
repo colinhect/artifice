@@ -20,6 +20,7 @@ class SimulatedAgent(AgentBase):
         self,
         system_prompt: Optional[str] = None,
         tool_handler: Optional[Callable] = None,
+        on_connect: Optional[Callable] = None,
         response_delay: float = 0.05,
     ):
         """Initialize the simulated agent.
@@ -38,6 +39,9 @@ class SimulatedAgent(AgentBase):
         self.scenarios: list[dict[str, Any]] = []
         self.current_scenario_index = 0
         self.default_response = "I'm a simulated AI agent. I can be configured with custom responses and tool calls."
+
+        if on_connect:
+            on_connect("Artifice")
 
     def configure_scenarios(self, scenarios: list[dict[str, Any]]) -> None:
         """Configure the agent with predefined scenarios.

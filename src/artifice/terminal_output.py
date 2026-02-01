@@ -6,12 +6,14 @@ import logging
 
 from textual import highlight
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.widgets import Static, LoadingIndicator, Markdown
 
 from .execution import ExecutionResult, ExecutionStatus
 from .agent import ToolCall
+from .terminal_input import InputTextArea
 
 logger = logging.getLogger(__name__)
 
@@ -535,6 +537,13 @@ class TerminalOutput(VerticalScroll):
     }
     """
 
+    BINDINGS = [
+        Binding("tab", "", "Move to Input", show=True),
+        Binding("up", "highlight_previous", "Previous Block", show=True),
+        Binding("down", "highlight_next", "Next Block", show=True),
+        Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown On Block", show=True),
+    ]
+
     def __init__(
         self,
         *,
@@ -561,15 +570,17 @@ class TerminalOutput(VerticalScroll):
         self._blocks.clear()
         self._highlighted_index = None
 
-    def highlight_next(self) -> None:
+    def highlight_next(self) -> bool:
         """Move highlight to next block."""
         if not self._blocks:
             return
+        original_index = self._highlighted_index
         if self._highlighted_index is None:
             self._highlighted_index = 0
         else:
             self._highlighted_index = min(self._highlighted_index + 1, len(self._blocks) - 1)
         self._update_highlight()
+        return original_index != self._highlighted_index
 
     def highlight_previous(self) -> None:
         """Move highlight to previous block."""
@@ -579,6 +590,32 @@ class TerminalOutput(VerticalScroll):
             self._highlighted_index = len(self._blocks) - 1
         else:
             self._highlighted_index = max(self._highlighted_index - 1, 0)
+        self._update_highlight()
+
+    async def action_toggle_block_markdown(self) -> None:
+        """Toggle markdown rendering for the currently highlighted block."""
+        block = self.get_highlighted_block()
+        if block:
+            await block.toggle_markdown()
+
+    def action_highlight_previous(self) -> None:
+        """Move highlight to previous output block."""
+        self.highlight_previous()
+
+    def action_highlight_next(self) -> None:
+        """Move highlight to next output block."""
+        if not self.highlight_next():
+            self.app.query_one("#code-input", InputTextArea).focus()
+
+    def on_focus(self) -> None:
+        """When focusing on TerminalOutput, highlight the newest block."""
+        if self._blocks:
+            self._highlighted_index = len(self._blocks) - 1
+            self._update_highlight()
+
+    def on_blur(self) -> None:
+        """When unfocusing, unhighlight the highlighted block."""
+        self._highlighted_index = None
         self._update_highlight()
 
     def _update_highlight(self) -> None:

@@ -47,24 +47,21 @@ class ArtificeTerminal(Widget):
     BINDINGS = [
         Binding("alt+up", "history_back", "History Back", show=True),
         Binding("alt+down", "history_forward", "History Forward", show=True),
-        Binding("ctrl+up", "highlight_previous", "Previous Block", show=True),
-        Binding("ctrl+down", "highlight_next", "Next Block", show=True),
-        Binding("ctrl+n", "clear", "Clear Output", show=True),
-        Binding("ctrl+o", "toggle_mode_markdown", "Toggle Mode Markdown", show=True),
-        Binding("ctrl+l", "toggle_block_markdown", "Toggle Block Markdown", show=True),
+        Binding("ctrl+l", "clear", "Clear Output", show=True),
+        Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown Output", show=True),
     ]
 
     def __init__(
         self,
-        *,
+        app: ArtificeApp,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
         history_file: str | Path | None = None,
         max_history_size: int = 1000,
-        agent_type: str,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
+        self._app = app
         self._executor = CodeExecutor()
         self._shell_executor = ShellExecutor()
 
@@ -162,17 +159,25 @@ class ArtificeTerminal(Widget):
             "Remember: Code/command execution, not explanation, is your primary mode of operation."
         )
         
+        def on_agent_connect(agent_name):
+            app.notify(f"Connected to {agent_name}")
+
         # Create agent with tool support
-        if agent_type.lower() == "claude":
+        if app.agent_type.lower() == "claude":
             from .agent import ClaudeAgent
             self._agent = ClaudeAgent(
                 tools=[python_tool, shell_tool],
                 tool_handler=self._handle_tool_call,
                 system_prompt=system_prompt,
+                on_connect=on_agent_connect,
             )
-        elif agent_type.lower() == "simulated":
-            from artifice.agent.simulated import SimulatedAgent, ScriptedAgent, EchoAgent
-            self._agent = SimulatedAgent(response_delay=0.01, tool_handler=self._handle_tool_call)
+        elif app.agent_type.lower() == "simulated":
+            from artifice.agent.simulated import SimulatedAgent
+            self._agent = SimulatedAgent(
+                response_delay=0.01,
+                tool_handler=self._handle_tool_call,
+                on_connect=on_agent_connect,
+             )
 
             # Configure scenarios with pattern matching
             self._agent.configure_scenarios([
@@ -197,8 +202,8 @@ class ArtificeTerminal(Widget):
             ])
 
             self._agent.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
-        elif agent_type:
-            raise Exception(f"Unsupported agent {agent_type}")
+        elif app.agent_type:
+            raise Exception(f"Unsupported agent {app.agent_type}")
         # Track pending code execution requests from agent
         self._pending_code_execution: dict[str, Any] | None = None
 
@@ -357,7 +362,7 @@ class ArtificeTerminal(Widget):
         # Update the output block status
         output_block.update_status(result)
         return result
-    
+
     async def _handle_tool_call(self, tool_name: str, tool_input: dict) -> str:
         """Handle tool calls from the agent.
 
@@ -514,14 +519,6 @@ class ArtificeTerminal(Widget):
         else:
             self._python_history_index = history_index
 
-    def action_highlight_previous(self) -> None:
-        """Move highlight to previous output block."""
-        self.output.highlight_previous()
-
-    def action_highlight_next(self) -> None:
-        """Move highlight to next output block."""
-        self.output.highlight_next()
-
     def action_clear(self) -> None:
         """Clear the output."""
         self.output.clear()
@@ -531,19 +528,19 @@ class ArtificeTerminal(Widget):
         # Determine current mode and toggle its setting
         if self.input.is_ai_mode:
             self._agent_markdown_enabled = not self._agent_markdown_enabled
+            enabled_str = "enabled" if self._agent_markdown_enabled else "disabled"
+            self._app.notify(f"Markdown {enabled_str} for AI agent output")
         elif self.input.mode == "shell":
             self._shell_markdown_enabled = not self._shell_markdown_enabled
+            enabled_str = "enabled" if self._shell_markdown_enabled else "disabled"
+            self._app.notify(f"Markdown {enabled_str} for shell command output")
         else:
             self._python_markdown_enabled = not self._python_markdown_enabled
+            enabled_str = "enabled" if self._python_markdown_enabled else "disabled"
+            self._app.notify(f"Markdown {enabled_str} for Python code output")
 
         # Save settings to disk
         self._save_history()
-
-    async def action_toggle_block_markdown(self) -> None:
-        """Toggle markdown rendering for the currently highlighted block."""
-        block = self.output.get_highlighted_block()
-        if block:
-            await block.toggle_markdown()
 
     def reset(self) -> None:
         """Reset the REPL state."""
