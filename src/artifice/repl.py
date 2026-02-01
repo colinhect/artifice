@@ -166,8 +166,8 @@ class InteractivePython(Widget):
                 
                 # System prompt to guide the agent's behavior
                 system_prompt = (
-                    "You are an AI assistant in an interactive Python REPL environment with shell access. "
-                    "Your primary goal is to write and execute Python code or shell commands to accomplish what the user asks for. "
+                    "You are a minimal AI assistant in an interactive Python coding environment with shell access. "
+                    "Your primary goal is to help the user write and execute Python code or shell commands to accomplish what the user asks for. "
                     "Provide the shortest possible code, do not overprovide examples unless asked to. "
                     "Focus on action, not explanation:\n\n"
                     "- Write the code or command that solves the user's problem\n"
@@ -251,9 +251,11 @@ class InteractivePython(Widget):
                 agent_response_result.status = ExecutionStatus.RUNNING
                 agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
 
+                prompt = "I executed the shell command that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
+
                 # Send prompt to agent with streaming into the NEW block
                 response = await self._agent.send_prompt(
-                    "The user executed shell command that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n",
+                    prompt,
                     on_chunk=lambda text: agent_response_block.append_output(text),
                 )
 
@@ -278,9 +280,11 @@ class InteractivePython(Widget):
                 agent_response_result.status = ExecutionStatus.RUNNING
                 agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
 
+                prompt = "I executed code that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n",
+
                 # Send prompt to agent with streaming into the NEW block
                 response = await self._agent.send_prompt(
-                    "The user executed code that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n",
+                    prompt,
                     on_chunk=lambda text: agent_response_block.append_output(text),
                 )
 
@@ -362,6 +366,7 @@ class InteractivePython(Widget):
             code = tool_input.get("code", "")
             if not code:
                 return "Error: No code provided"
+            code = code.strip()
 
             # Store pending execution state
             self._pending_code_execution = {
@@ -374,12 +379,13 @@ class InteractivePython(Widget):
             self.input.mode = "python"
             self.input._update_prompt()
 
-            return "The user will respond after requested code has been executed."
+            return "I will respond after requested code has been executed."
 
         elif tool_name == "request_execute_shell":
             command = tool_input.get("command", "")
             if not command:
                 return "Error: No command provided"
+            command = command.strip()
 
             # Store pending execution state
             self._pending_code_execution = {
@@ -392,7 +398,7 @@ class InteractivePython(Widget):
             self.input.mode = "shell"
             self.input._update_prompt()
 
-            return "The user will respond after requested command has been executed."
+            return "I will respond after requested command has been executed."
 
         return f"Error: Unknown tool '{tool_name}'"
 
@@ -404,7 +410,7 @@ class InteractivePython(Widget):
             error_result = ExecutionResult(
                 code=f"{prompt}",
                 status=ExecutionStatus.ERROR,
-                error="No AI agent configured. Set ANTHROPIC_API_KEY environment variable or pass an agent to InteractivePython.",
+                error="No AI agent configured.",
             )
             self.output.add_result(error_result, is_agent=True, render_markdown=self._agent_markdown_enabled)
             return
