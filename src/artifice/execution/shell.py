@@ -42,23 +42,35 @@ class ShellExecutor:
         result = ExecutionResult(code=command, status=ExecutionStatus.RUNNING)
 
         try:
-            # Parse command into arguments to avoid shell injection
-            try:
-                args = shlex.split(command)
-            except ValueError as e:
-                # If command parsing fails, return error immediately
-                result.status = ExecutionStatus.ERROR
-                result.error = f"Invalid command syntax: {e}"
-                if on_error:
-                    on_error(result.error)
-                return result
+            # Detect if command contains shell metacharacters
+            shell_metachars = {'|', '&', ';', '>', '<', '*', '?', '[', ']', '$', '(', ')', '{', '}', '`', '\\', '"', "'", '\n'}
+            use_shell = any(char in command for char in shell_metachars)
 
-            # Create subprocess with argument list (more secure than shell=True)
-            process = await asyncio.create_subprocess_exec(
-                *args,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            if use_shell:
+                # Use shell for commands with shell metacharacters
+                process = await asyncio.create_subprocess_shell(
+                    command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+            else:
+                # Parse command into arguments to avoid shell injection
+                try:
+                    args = shlex.split(command)
+                except ValueError as e:
+                    # If command parsing fails, return error immediately
+                    result.status = ExecutionStatus.ERROR
+                    result.error = f"Invalid command syntax: {e}"
+                    if on_error:
+                        on_error(result.error)
+                    return result
+
+                # Create subprocess with argument list (more secure than shell=True)
+                process = await asyncio.create_subprocess_exec(
+                    *args,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
 
             # Stream output from both stdout and stderr
             async def stream_output(stream, callback, buffer_list):
