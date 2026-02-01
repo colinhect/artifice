@@ -4,7 +4,7 @@ import asyncio
 import os
 from typing import Optional, Any, Callable
 
-from .agent import AgentBase, AgentResponse, ToolCall
+from .common import AgentBase, AgentResponse, ToolCall
 
 class ClaudeAgent(AgentBase):
     """Agent for connecting to Claude via Anthropic API with tool support."""

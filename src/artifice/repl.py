@@ -172,7 +172,7 @@ class InteractivePython(Widget):
         
         # Create agent with tool support
         if agent_type.lower() == "claude":
-            from .claude import ClaudeAgent
+            from .agent import ClaudeAgent
             self._agent = ClaudeAgent(
                 tools=[python_tool, shell_tool],
                 tool_handler=self._handle_tool_call,
