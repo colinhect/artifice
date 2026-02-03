@@ -18,109 +18,79 @@ from .terminal_input import InputTextArea
 logger = logging.getLogger(__name__)
 
 class BaseBlock(Static):
-    pass
-
-class CodeInputBlock(BaseBlock):
     DEFAULT_CSS = """
-    CodeInputBlock {
+    BaseBlock {
         margin: 0 0 1 0;
         padding: 0;
     }
 
-    CodeInputBlock .status-indicator {
+    BaseBlock Horizontal {
+        height: auto;
+        align: left top;
+    }
+
+    BaseBlock Vertical {
+        height: auto;
+        width: 1fr;
+    }
+
+    BaseBlock .status-indicator {
         width: 2;
         height: 1;
         content-align: center top;
         padding: 0;
     }
+    """
 
+class CodeInputBlock(BaseBlock):
+    DEFAULT_CSS = """
     CodeInputBlock .code {
         background: $surface-darken-1;
         padding: 0;
         border: none;
     }
-
-    CodeInputBlock Horizontal {
-        height: auto;
-        align: left top;
-    }
-
-    CodeInputBlock Vertical {
-        height: auto;
-        width: 1fr;
-    }
     """
 
     def __init__(self, code: str, language: str, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._code = code
-        self._language = language
-        self._status_indicator = Vertical(classes="status-indicator")
         self._loading_indicator = LoadingIndicator()
-        self._result_icon = Static(classes="status-indicator")
-        self._container = Vertical(id="output-content")
+        self._status_indicator = Static(classes="status-indicator")
+        self._code = Static(highlight.highlight(code, language=language), classes="code")
 
     def compose(self) -> ComposeResult:
         with Horizontal():
-            with self._status_indicator:
+            with Vertical(classes="status-indicator"):
                 yield self._loading_indicator
-                yield self._result_icon
-            with self._container:
-                highlighted_code = highlight.highlight(
-                    self._code,
-                    language=self._language
-                )
-                yield Static(highlighted_code, classes="code")
+                yield self._status_indicator
+            with Vertical():
+                yield self._code
 
     def update_status(self, result: ExecutionResult) -> None:
-        if result.status == ExecutionStatus.SUCCESS:
-            self._result_icon.update("[green]✓[/]")
-        elif result.status == ExecutionStatus.ERROR:
-            self._result_icon.update("[red]✗[/]")
         self._loading_indicator.styles.display = "none"
+        if result.status == ExecutionStatus.SUCCESS:
+            self._status_indicator.update("[green]✓[/]")
+        elif result.status == ExecutionStatus.ERROR:
+            self._status_indicator.update("[red]✗[/]")
 
 class AgentInputBlock(BaseBlock):
     DEFAULT_CSS = """
-    AgentInputBlock {
-        margin: 0 0 1 0;
-        padding: 0;
-    }
-
-    AgentInputBlock .status-indicator {
-        width: 2;
-        height: 1;
-        content-align: center top;
-        padding: 0;
-    }
-
     AgentInputBlock .prompt {
         background: $surface-darken-1;
         padding: 0;
         border: none;
     }
-
-    AgentInputBlock Horizontal {
-        height: auto;
-        align: left top;
-    }
-
-    AgentInputBlock Vertical {
-        height: auto;
-        width: 1fr;
-    }
     """
 
     def __init__(self, prompt: str, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._prompt = prompt
-        self._result_icon = Static("[cyan]?[/]", classes="status-indicator")
-        self._container = Vertical(id="output-content")
+        self._status_indicator = Static("[cyan]?[/]", classes="status-indicator")
+        self._prompt = Static(prompt, classes="prompt")
 
     def compose(self) -> ComposeResult:
         with Horizontal():
-            yield self._result_icon
-            with self._container:
-                yield Static(self._prompt, classes="prompt")
+            yield self._status_indicator
+            with Vertical():
+                yield self._prompt
 
 class OutputBlock(Static):
     """A single output block showing code and its result.
