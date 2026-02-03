@@ -15,7 +15,7 @@ from textual.widget import Widget
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput
-from .terminal_output import TerminalOutput, CodeInputBlock
+from .terminal_output import TerminalOutput, AgentInputBlock, CodeInputBlock
 
 if TYPE_CHECKING:
     from .app import ArtificeApp
@@ -299,9 +299,6 @@ class ArtificeTerminal(Widget):
             on_error=lambda text: output_block.append_error(text),
         )
 
-        # Update the output block status
-        output_block.update_status(result)
-
         code_input_block.update_status(result)
         return result
 
@@ -321,9 +318,6 @@ class ArtificeTerminal(Widget):
             on_output=lambda text: output_block.append_output(text),
             on_error=lambda text: output_block.append_error(text),
         )
-
-        # Update the output block status
-        output_block.update_status(result)
 
         command_input_block.update_status(result)
         return result
@@ -391,9 +385,8 @@ class ArtificeTerminal(Widget):
             return
 
         # Create a block showing the prompt
-        prompt_result = ExecutionResult(code=f"{prompt}")
-        prompt_result.status = ExecutionStatus.SUCCESS
-        self.output.add_result(prompt_result, is_agent=True, show_output=False, block_type="agent_prompt")
+        agent_input_block = AgentInputBlock(prompt)
+        self.output.append_block(agent_input_block)
 
         # Create a separate block for the agent's response
         response_result = ExecutionResult(code="")

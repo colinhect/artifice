@@ -17,10 +17,10 @@ from .terminal_input import InputTextArea
 
 logger = logging.getLogger(__name__)
 
-class BaseOutputBlock(Static):
+class BaseBlock(Static):
     pass
 
-class CodeInputBlock(BaseOutputBlock):
+class CodeInputBlock(BaseBlock):
     DEFAULT_CSS = """
     CodeInputBlock {
         margin: 0 0 1 0;
@@ -78,6 +78,49 @@ class CodeInputBlock(BaseOutputBlock):
         elif result.status == ExecutionStatus.ERROR:
             self._result_icon.update("[red]✗[/]")
         self._loading_indicator.styles.display = "none"
+
+class AgentInputBlock(BaseBlock):
+    DEFAULT_CSS = """
+    AgentInputBlock {
+        margin: 0 0 1 0;
+        padding: 0;
+    }
+
+    AgentInputBlock .status-indicator {
+        width: 2;
+        height: 1;
+        content-align: center top;
+        padding: 0;
+    }
+
+    AgentInputBlock .prompt {
+        background: $surface-darken-1;
+        padding: 0;
+        border: none;
+    }
+
+    AgentInputBlock Horizontal {
+        height: auto;
+        align: left top;
+    }
+
+    AgentInputBlock Vertical {
+        height: auto;
+        width: 1fr;
+    }
+    """
+
+    def __init__(self, prompt: str, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._prompt = prompt
+        self._result_icon = Static("[cyan]?[/]", classes="status-indicator")
+        self._container = Vertical(id="output-content")
+
+    def compose(self) -> ComposeResult:
+        with Horizontal():
+            yield self._result_icon
+            with self._container:
+                yield Static(self._prompt, classes="prompt")
 
 class OutputBlock(Static):
     """A single output block showing code and its result.
