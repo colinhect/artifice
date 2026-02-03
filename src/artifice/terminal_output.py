@@ -9,7 +9,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
-from textual.widgets import Static, LoadingIndicator, Markdown
+from textual.widgets import Static, LoadingIndicator, Markdown, Label
 
 from .execution import ExecutionResult, ExecutionStatus
 from .agent import ToolCall
@@ -17,6 +17,67 @@ from .terminal_input import InputTextArea
 
 logger = logging.getLogger(__name__)
 
+class BaseOutputBlock(Static):
+    pass
+
+class CodeInputBlock(BaseOutputBlock):
+    DEFAULT_CSS = """
+    CodeInputBlock {
+        margin: 0 0 1 0;
+        padding: 0;
+    }
+
+    CodeInputBlock .status-indicator {
+        width: 2;
+        height: 1;
+        content-align: center top;
+        padding: 0;
+    }
+
+    CodeInputBlock .code {
+        background: $surface-darken-1;
+        padding: 0;
+        border: none;
+    }
+
+    CodeInputBlock Horizontal {
+        height: auto;
+        align: left top;
+    }
+
+    CodeInputBlock Vertical {
+        height: auto;
+        width: 1fr;
+    }
+    """
+
+    def __init__(self, code: str, language: str, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._code = code
+        self._language = language
+        self._status_indicator = Vertical(classes="status-indicator")
+        self._loading_indicator = LoadingIndicator()
+        self._result_icon = Static(classes="status-indicator")
+        self._container = Vertical(id="output-content")
+
+    def compose(self) -> ComposeResult:
+        with Horizontal():
+            with self._status_indicator:
+                yield self._loading_indicator
+                yield self._result_icon
+            with self._container:
+                highlighted_code = highlight.highlight(
+                    self._code,
+                    language=self._language
+                )
+                yield Static(highlighted_code, classes="code")
+
+    def update_status(self, result: ExecutionResult) -> None:
+        if result.status == ExecutionStatus.SUCCESS:
+            self._result_icon.update("[green]✓[/]")
+        elif result.status == ExecutionStatus.ERROR:
+            self._result_icon.update("[red]✗[/]")
+        self._loading_indicator.styles.display = "none"
 
 class OutputBlock(Static):
     """A single output block showing code and its result.
@@ -74,47 +135,6 @@ class OutputBlock(Static):
 
     OutputBlock .agent-output MarkdownFence {
         margin: 0 0 1 0;
-    }
-
-    OutputBlock .tool-call {
-        background: $surface-darken-1;
-        padding: 2;
-        margin: 1 0 1 0;
-        border-left: thick $accent;
-    }
-
-    OutputBlock .tool-call-name {
-        background: $surface-darken-1;
-        color: $accent;
-        text-style: bold;
-    }
-
-    OutputBlock .tool-call-input {
-        background: $surface-darken-1;
-        color: $text-muted;
-        padding-left: 2;
-    }
-
-    OutputBlock .tool-call-output {
-        background: $surface-darken-1;
-        color: $text;
-        padding-left: 1;
-        padding-top: 1;
-    }
-
-    OutputBlock .tool-call-error {
-        background: $surface-darken-1;
-        color: $error;
-        padding-left: 1;
-        padding-top: 1;
-    }
-    
-    OutputBlock .tool-call .code-container {
-        background: $surface-darken-1;
-        background: transparent;
-        padding: 0;
-        border: none;
-        margin: 0;
     }
 
     OutputBlock .status-indicator {
@@ -347,61 +367,6 @@ class OutputBlock(Static):
             return
         self.post_message(self.StreamError(text))
     
-    def add_tool_call(self, tool_call: ToolCall) -> None:
-        """Add a tool call to the output display.
-        
-        Args:
-            tool_call: The tool call to display.
-        """
-        if not self._output_container:
-            return
-        
-        self._tool_calls.append(tool_call)
-        
-        # Finalize current text segment - subsequent text will go to a new widget
-        self._markdown_widget = None
-        self._current_text_segment = []
-        
-        # Create tool call display - build widgets list first, then mount together
-        try:
-            widgets_to_add = []
-            
-            # For execute_python tool, show the code with syntax highlighting
-            if tool_call.name == "execute_python" and "code" in tool_call.input:
-                code = tool_call.input["code"]
-                highlighted_code = highlight.highlight(code, language="python")
-                widgets_to_add.append(Static(highlighted_code, classes="code-container"))
-            else:
-                # For other tools, show name and input
-                widgets_to_add.append(Static(f"🔧 {tool_call.name}", classes="tool-call-name"))
-
-                # Tool input (pretty printed)
-                import json
-                try:
-                    input_str = json.dumps(tool_call.input, indent=2)
-                except (TypeError, ValueError) as e:
-                    logger.debug(f"Failed to JSON serialize tool input: {e}")
-                    input_str = str(tool_call.input)
-                widgets_to_add.append(Static(f"Input:\n{input_str}", classes="tool-call-input"))
-            
-            # Tool output/error (if available)
-            if tool_call.output:
-                widgets_to_add.append(Static(f"{tool_call.output}", classes="tool-call-output"))
-            elif tool_call.error:
-                widgets_to_add.append(Static(f"Error:\n{tool_call.error}", classes="tool-call-error"))
-            
-            # Create container and mount all widgets
-            tool_widget = Vertical(*widgets_to_add, classes="tool-call")
-            self._output_container.mount(tool_widget)
-            
-            # Scroll parent to bottom
-            parent = self.parent
-            if parent and hasattr(parent, 'scroll_end'):
-                parent.scroll_end(animate=False)
-        except Exception as e:
-            # Container might be unmounted during shutdown
-            logger.debug(f"Failed to add tool call widget (possibly during shutdown): {e}")
-
     async def on_output_block_stream_error(self, message: StreamError) -> None:
         """Handle streamed error update."""
         if not self._output_container:
@@ -552,8 +517,15 @@ class TerminalOutput(VerticalScroll):
         classes: str | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self._blocks: list[OutputBlock] = []
+        #self._blocks: list[BaseOutputBlock] = []
+        self._blocks = []
         self._highlighted_index: int | None = None
+
+    def append_block(self, block: BaseOutputBlock):
+        self._blocks.append(block)
+        self.mount(block)
+        self.scroll_end(animate=False)
+        return block
 
     def add_result(self, result: ExecutionResult, is_agent: bool = False, show_code: bool = True, show_output: bool = True, block_type: str = "auto", render_markdown: bool = True) -> OutputBlock:
         """Add an execution result to the output."""

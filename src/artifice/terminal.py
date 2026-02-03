@@ -1,4 +1,4 @@
-"""Main Interactive Python REPL widget."""
+"""Main Artifice terminal widget."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from textual.widget import Widget
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput
-from .terminal_output import TerminalOutput
+from .terminal_output import TerminalOutput, CodeInputBlock
 
 if TYPE_CHECKING:
     from .app import ArtificeApp
@@ -201,20 +201,13 @@ class ArtificeTerminal(Widget):
         # Track pending code execution requests from agent
         self._pending_code_execution: dict[str, Any] | None = None
 
+        self.output = TerminalOutput(id="output")
+        self.input = TerminalInput(history=self._history, id="input")
+
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield TerminalOutput(id="output")
-            yield TerminalInput(history=self._history, id="input")
-
-    @property
-    def output(self) -> TerminalOutput:
-        """Get the output component."""
-        return self.query_one("#output", TerminalOutput)
-
-    @property
-    def input(self) -> TerminalInput:
-        """Get the input component."""
-        return self.query_one("#input", TerminalInput)
+            yield self.output
+            yield self.input
 
     async def on_terminal_input_submitted(self, event: TerminalInput.Submitted) -> None:
         """Handle code submission from input."""
@@ -291,10 +284,8 @@ class ArtificeTerminal(Widget):
 
     async def _handle_python_execution(self, code: str) -> ExecutionResult:
         """Execute Python code."""
-        # Create a block showing the code input
-        code_result = ExecutionResult(code=code)
-        code_result.status = ExecutionStatus.SUCCESS
-        self.output.add_result(code_result, show_output=False, block_type="code_input")
+        code_input_block = CodeInputBlock(code, language="python")
+        self.output.append_block(code_input_block)
 
         # Create a separate block for the execution output
         output_result = ExecutionResult(code="")
@@ -310,14 +301,14 @@ class ArtificeTerminal(Widget):
 
         # Update the output block status
         output_block.update_status(result)
+
+        code_input_block.update_status(result)
         return result
 
     async def _handle_shell_execution(self, command: str) -> ExecutionResult:
         """Execute shell command."""
-        # Create a block showing the command input
-        command_result = ExecutionResult(code=command)
-        command_result.status = ExecutionStatus.SUCCESS
-        self.output.add_result(command_result, show_output=False, block_type="shell_input")
+        command_input_block = CodeInputBlock(command, language="bash")
+        self.output.append_block(command_input_block)
 
         # Create a separate block for the execution output
         output_result = ExecutionResult(code="")
@@ -333,6 +324,8 @@ class ArtificeTerminal(Widget):
 
         # Update the output block status
         output_block.update_status(result)
+
+        command_input_block.update_status(result)
         return result
 
     async def _handle_tool_call(self, tool_name: str, tool_input: dict) -> str:
