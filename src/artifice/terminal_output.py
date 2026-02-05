@@ -125,14 +125,14 @@ class CodeOutputBlock(BaseBlock):
         if self._render_markdown:
             self._markdown.append(output)
         else:
-            self._output.update(self._full)
+            self._output.update(self._full.rstrip('\n'))
 
     def append_error(self, output) -> None:
         self._full += output
-        self._output.update(self._full)
         if self._render_markdown:
             self._markdown.append(output)
         else:
+            self._output.update(self._full.rstrip('\n'))
             if not self._has_error:
                 self._has_error = True
                 self._output.remove_class("code-output")
