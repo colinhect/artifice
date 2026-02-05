@@ -2,25 +2,21 @@
 
 from __future__ import annotations
 
-import json
-import logging
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widget import Widget
 
-from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
+from .execution import ExecutionResult, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput
 from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock
 
 if TYPE_CHECKING:
     from .app import ArtificeApp
-
-logger = logging.getLogger(__name__)
 
 class ArtificeTerminal(Widget):
     """Primary widget for interacting with Artifice."""

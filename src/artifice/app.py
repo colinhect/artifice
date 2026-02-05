@@ -1,3 +1,5 @@
+import argparse
+
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Header, Footer
@@ -29,7 +31,6 @@ class ArtificeApp(App):
         yield ArtificeTerminal(self)
         yield Footer()
 
-import argparse
 
 def main():
     parser = argparse.ArgumentParser()

@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import logging
 
 from textual import highlight
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.message import Message
-from textual.widgets import Static, LoadingIndicator, Markdown, Label
+from textual.widgets import Static, LoadingIndicator, Markdown
 
 from .execution import ExecutionResult, ExecutionStatus
-from .agent import ToolCall
 from .terminal_input import InputTextArea
 
 class BaseBlock(Static):
@@ -109,22 +106,21 @@ class CodeOutputBlock(BaseBlock):
         self._full = output
         self._render_markdown= render_markdown
         self._has_error = False
-        self._contents = None
+        self._contents = Horizontal()
 
     def compose(self) -> ComposeResult:
-        with Horizontal() as contents:
-            self._contents = contents
+        with self._contents:
             yield self._status_indicator
-            if self._render_markdown:
+            if self._markdown:
                 yield self._markdown
-            else:
+            elif self._output:
                 yield self._output
 
     def append_output(self, output) -> None:
         self._full += output
-        if self._render_markdown:
+        if self._markdown:
             self._markdown.append(output)
-        else:
+        elif self._output:
             self._output.update(self._full.rstrip('\n'))
 
     def append_error(self, output) -> None:
@@ -134,19 +130,22 @@ class CodeOutputBlock(BaseBlock):
     def mark_failed(self) -> None:
         if not self._has_error:
             self._has_error = True
-            self._output.remove_class("code-output")
-            self._output.add_class("error-output")
+            if self._output:
+                self._output.remove_class("code-output")
+                self._output.add_class("error-output")
 
     def toggle_markdown(self) -> None:
         self._render_markdown = not self._render_markdown
         if self._render_markdown:
-            self._output.remove()
-            self._output = None
+            if self._output:
+                self._output.remove()
+                self._output = None
             self._markdown = Markdown(self._full, classes="markdown-output")
             self._contents.mount(self._markdown)
         else:
-            self._markdown.remove()
-            self._markdown = None
+            if self._markdown:
+                self._markdown.remove()
+                self._markdown = None
             self._output = Static(self._full.rstrip('\n'), classes="code-output")
             self._contents.mount(self._output)
 
@@ -243,7 +242,7 @@ class TerminalOutput(VerticalScroll):
         self._blocks = []
         self._highlighted_index: int | None = None
 
-    def append_block(self, block: BaseOutputBlock):
+    def append_block(self, block: BaseBlock):
         self._blocks.append(block)
         self.mount(block)
         self.scroll_end(animate=False)
@@ -281,7 +280,7 @@ class TerminalOutput(VerticalScroll):
     async def action_toggle_block_markdown(self) -> None:
         """Toggle markdown rendering for the currently highlighted block."""
         block = self.get_highlighted_block()
-        if block:
+        if block and block is CodeOutputBlock:
             block.toggle_markdown()
 
     def action_highlight_previous(self) -> None:
@@ -312,7 +311,7 @@ class TerminalOutput(VerticalScroll):
             else:
                 block.remove_class("highlighted")
 
-    def get_highlighted_block(self) -> OutputBlock | None:
+    def get_highlighted_block(self) -> BaseBlock | None:
         """Get the currently highlighted block, if any."""
         if self._highlighted_index is None or not self._blocks:
             return None
