@@ -43,7 +43,7 @@ class BaseBlock(Static):
 class CodeInputBlock(BaseBlock):
     DEFAULT_CSS = """
     CodeInputBlock .code {
-        background: $surface-darken-1;
+        background: $primary-background-darken-2;
         padding: 0;
         border: none;
     }
@@ -147,13 +147,13 @@ class CodeOutputBlock(BaseBlock):
         else:
             self._markdown.remove()
             self._markdown = None
-            self._output = Static(self._full, classes="code-output")
+            self._output = Static(self._full.rstrip('\n'), classes="code-output")
             self._contents.mount(self._output)
 
 class AgentInputBlock(BaseBlock):
     DEFAULT_CSS = """
     AgentInputBlock .prompt {
-        background: $surface-darken-1;
+        background: $primary-background-darken-2;
         padding: 0;
         border: none;
     }

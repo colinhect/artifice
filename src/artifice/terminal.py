@@ -70,14 +70,6 @@ class ArtificeTerminal(Widget):
         # Create history manager
         self._history = History(history_file=history_file, max_history_size=max_history_size)
 
-        # Settings file for markdown preferences (separate from history)
-        if history_file is None:
-            self._settings_file = Path.home() / ".artifice_history.json"
-        else:
-            self._settings_file = Path(history_file)
-
-        self._load_settings()
-        
         # Per-mode markdown rendering settings
         self._python_markdown_enabled = False  # Default: no markdown for Python output
         self._agent_markdown_enabled = True    # Default: markdown for agent responses
@@ -199,8 +191,7 @@ class ArtificeTerminal(Widget):
             self._agent.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
         elif app.agent_type:
             raise Exception(f"Unsupported agent {app.agent_type}")
-        # Track pending code execution requests from agent
-        self._pending_code_execution: dict[str, Any] | None = None
+        self._agent_requested_execution: bool = False
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
@@ -218,14 +209,11 @@ class ArtificeTerminal(Widget):
         self.input.clear()
 
         if event.is_agent_prompt:
-            # Route to AI agent
             await self._handle_agent_prompt(code)
         elif event.is_shell_command:
-            # Execute as shell command
             result = await self._handle_shell_execution(code)
 
-            if self._pending_code_execution is not None:
-                # The user executed a shell command requested by the agent
+            if self._agent_requested_execution:
                 agent_output_block = AgentOutputBlock()
                 self.output.append_block(agent_output_block)
 
@@ -240,13 +228,11 @@ class ArtificeTerminal(Widget):
                 else:
                     agent_output_block.mark_success()
 
-                self._pending_code_execution = None
+                self._agent_requested_execution = False
         else:
-            # Execute as Python code
             result = await self._handle_python_execution(code)
 
-            if self._pending_code_execution is not None:
-                # The user executed code requested by the agent
+            if self._agent_requested_execution:
                 agent_output_block = AgentOutputBlock()
                 self.output.append_block(agent_output_block)
 
@@ -263,7 +249,7 @@ class ArtificeTerminal(Widget):
                 else:
                     agent_output_block.mark_success()
 
-                self._pending_code_execution = None
+                self._agent_requested_execution = False
     
     async def on_terminal_input_decline_requested(self, event: TerminalInput.DeclineRequested) -> None:
         """Handle decline request from input (escape key)."""
@@ -321,10 +307,7 @@ class ArtificeTerminal(Widget):
                 return "Error: No code provided"
             code = code.strip()
 
-            # Store pending execution state
-            self._pending_code_execution = {
-                "code": code,
-            }
+            self._agent_requested_execution = True
 
             # Populate the input field with the code for user review
             self.input.code = code
@@ -340,10 +323,7 @@ class ArtificeTerminal(Widget):
                 return "Error: No command provided"
             command = command.strip()
 
-            # Store pending execution state
-            self._pending_code_execution = {
-                "command": command,
-            }
+            self._agent_requested_execution = True
 
             # Populate the input field with the command for user review
             self.input.code = command
@@ -403,57 +383,9 @@ class ArtificeTerminal(Widget):
             enabled_str = "enabled" if self._python_markdown_enabled else "disabled"
             self._app.notify(f"Markdown {enabled_str} for Python code output")
 
-        # Save settings to disk
-        self._save_settings()
-
     def reset(self) -> None:
         """Reset the REPL state."""
         self._executor.reset()
         self.output.clear()
         self._history.clear()
     
-    def _load_settings(self) -> None:
-        """Load markdown settings from disk."""
-        try:
-            if self._settings_file.exists():
-                with open(self._settings_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, dict):
-                        # Load markdown settings (with defaults if not present)
-                        settings = data.get("settings", {})
-                        self._python_markdown_enabled = settings.get("python_markdown", False)
-                        self._agent_markdown_enabled = settings.get("agent_markdown", True)
-                        self._shell_markdown_enabled = settings.get("shell_markdown", False)
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to load settings from {self._settings_file}: Invalid JSON - {e}")
-        except Exception as e:
-            logger.warning(f"Failed to load settings from {self._settings_file}: {e}")
-
-    def _save_settings(self) -> None:
-        """Save markdown settings to disk."""
-        try:
-            # Load existing data to preserve history
-            data = {}
-            if self._settings_file.exists():
-                with open(self._settings_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-
-            # Update settings only
-            data["settings"] = {
-                "python_markdown": self._python_markdown_enabled,
-                "agent_markdown": self._agent_markdown_enabled,
-                "shell_markdown": self._shell_markdown_enabled,
-            }
-
-            # Ensure parent directory exists
-            self._settings_file.parent.mkdir(parents=True, exist_ok=True)
-
-            with open(self._settings_file, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
-
-            # Set restrictive permissions (user read/write only) for security
-            self._settings_file.chmod(0o600)
-        except OSError as e:
-            logger.warning(f"Failed to save settings to {self._settings_file}: {e}")
-        except Exception as e:
-            logger.warning(f"Unexpected error saving settings: {e}")
