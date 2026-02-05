@@ -72,6 +72,32 @@ class CodeInputBlock(BaseBlock):
         elif result.status == ExecutionStatus.ERROR:
             self._status_indicator.update("[red]✗[/]")
 
+class CodeOutputBlock(BaseBlock):
+    DEFAULT_CSS = """
+    CodeOutputBlock .code-output {
+        background: $surface-darken-1;
+        color: $text-muted;
+        padding-left: 0;
+        padding-right: 0;
+    }
+    """
+
+    def __init__(self, output="") -> None:
+        super().__init__()
+        self._status_indicator = Static(classes="status-indicator")
+        self._output = Static(output, classes="code-output")
+        self._full = output
+
+    def compose(self) -> ComposeResult:
+        with Horizontal():
+            yield self._status_indicator
+            with Vertical():
+                yield self._output
+
+    def append_output(self, output) -> None:
+        self._full += output
+        self._output.update(self._full)
+
 class AgentInputBlock(BaseBlock):
     DEFAULT_CSS = """
     AgentInputBlock .prompt {
@@ -98,7 +124,6 @@ class AgentOutputBlock(BaseBlock):
         background: $surface-darken-1;
         padding: 0;
         border: none;
-
     }
 
     AgentOutputBlock .agent-output {
@@ -117,11 +142,11 @@ class AgentOutputBlock(BaseBlock):
     }
     """
 
-    def __init__(self) -> None:
+    def __init__(self, output="") -> None:
         super().__init__()
         self._loading_indicator = LoadingIndicator()
         self._status_indicator = Static(classes="status-indicator")
-        self._output = Markdown(classes="agent-output")
+        self._output = Markdown(output, classes="agent-output")
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -131,7 +156,7 @@ class AgentOutputBlock(BaseBlock):
             with Vertical():
                 yield self._output
 
-    def append_response(self, response) -> None:
+    def append(self, response) -> None:
         self._output.append(response)
 
     def mark_success(self) -> None:

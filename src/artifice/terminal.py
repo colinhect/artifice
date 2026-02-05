@@ -15,7 +15,7 @@ from textual.widget import Widget
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput
-from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock
+from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock
 
 if TYPE_CHECKING:
     from .app import ArtificeApp
@@ -193,7 +193,7 @@ class ArtificeTerminal(Widget):
                 {
                     'pattern': r'goodbye|bye|exit',
                     'response': 'Goodbye! Thanks for chatting with me.'
-                }
+                },
             ])
 
             self._agent.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
@@ -232,7 +232,7 @@ class ArtificeTerminal(Widget):
                 prompt = "I executed the shell command that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
                 response = await self._agent.send_prompt(
                     prompt,
-                    on_chunk=lambda text: agent_output_block.append_response(text),
+                    on_chunk=lambda text: agent_output_block.append(text),
                 )
 
                 if response.error:
@@ -255,7 +255,7 @@ class ArtificeTerminal(Widget):
                 # Send prompt to agent with streaming into the NEW block
                 response = await self._agent.send_prompt(
                     prompt,
-                    on_chunk=lambda text: agent_output_block.append_response(text),
+                    on_chunk=lambda text: agent_output_block.append(text),
                 )
 
                 if response.error:
@@ -275,16 +275,13 @@ class ArtificeTerminal(Widget):
         code_input_block = CodeInputBlock(code, language="python")
         self.output.append_block(code_input_block)
 
-        # Create a separate block for the execution output
-        output_result = ExecutionResult(code="")
-        output_result.status = ExecutionStatus.RUNNING
-        output_block = self.output.add_result(output_result, show_code=False, block_type="code_output", render_markdown=self._python_markdown_enabled)
+        code_output_block = CodeOutputBlock()
+        self.output.append_block(code_output_block)
 
-        # Execute asynchronously with streaming callbacks
         result = await self._executor.execute(
             code,
-            on_output=lambda text: output_block.append_output(text),
-            on_error=lambda text: output_block.append_error(text),
+            on_output=lambda text: code_output_block.append_output(text),
+            on_error=lambda text: code_output_block.append_output(text),
         )
 
         code_input_block.update_status(result)
@@ -368,9 +365,8 @@ class ArtificeTerminal(Widget):
 
         if self._agent is None:
             # No agent configured, show error
-            agent_output_block = AgentOutputBlock()
+            agent_output_block = AgentOutputBlock("No AI agent configured.")
             self.output.append_block(agent_output_block)
-            agent_output_block.append_response("No AI agent configured.")
             agent_output_block.mark_failed()
             return
 
@@ -381,7 +377,7 @@ class ArtificeTerminal(Widget):
         # Send prompt to agent with streaming
         response = await self._agent.send_prompt(
             prompt,
-            on_chunk=lambda text: agent_output_block.append_response(text),
+            on_chunk=lambda text: agent_output_block.append(text),
         )
 
         if response.error:
