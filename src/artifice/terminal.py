@@ -275,13 +275,13 @@ class ArtificeTerminal(Widget):
         code_input_block = CodeInputBlock(code, language="python")
         self.output.append_block(code_input_block)
 
-        code_output_block = CodeOutputBlock()
+        code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
         self.output.append_block(code_output_block)
 
         result = await self._executor.execute(
             code,
             on_output=lambda text: code_output_block.append_output(text),
-            on_error=lambda text: code_output_block.append_output(text),
+            on_error=lambda text: code_output_block.append_error(text),
         )
 
         code_input_block.update_status(result)
@@ -292,16 +292,14 @@ class ArtificeTerminal(Widget):
         command_input_block = CodeInputBlock(command, language="bash")
         self.output.append_block(command_input_block)
 
-        # Create a separate block for the execution output
-        output_result = ExecutionResult(code="")
-        output_result.status = ExecutionStatus.RUNNING
-        output_block = self.output.add_result(output_result, show_code=False, block_type="shell_output", render_markdown=self._shell_markdown_enabled)
+        code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
+        self.output.append_block(code_output_block)
 
         # Execute asynchronously with streaming callbacks
         result = await self._shell_executor.execute(
             command,
-            on_output=lambda text: output_block.append_output(text),
-            on_error=lambda text: output_block.append_error(text),
+            on_output=lambda text: code_output_block.append_output(text),
+            on_error=lambda text: code_output_block.append_error(text),
         )
 
         command_input_block.update_status(result)
