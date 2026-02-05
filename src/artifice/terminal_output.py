@@ -104,8 +104,8 @@ class CodeOutputBlock(BaseBlock):
     def __init__(self, output="", render_markdown=False) -> None:
         super().__init__()
         self._status_indicator = Static(classes="status-indicator")
-        self._output = Static(output, classes="code-output")
-        self._markdown = Markdown(output, classes="markdown-output")
+        self._output = Static(output, classes="code-output") if not render_markdown else None
+        self._markdown = Markdown(output, classes="markdown-output") if render_markdown else None
         self._full = output
         self._render_markdown= render_markdown
         self._has_error = False
@@ -128,25 +128,26 @@ class CodeOutputBlock(BaseBlock):
             self._output.update(self._full.rstrip('\n'))
 
     def append_error(self, output) -> None:
-        self._full += output
-        if self._render_markdown:
-            self._markdown.append(output)
-        else:
-            self._output.update(self._full.rstrip('\n'))
-            if not self._has_error:
-                self._has_error = True
-                self._output.remove_class("code-output")
-                self._output.add_class("error-output")
+        self.append_output(output)
+        self.mark_failed()
+
+    def mark_failed(self) -> None:
+        if not self._has_error:
+            self._has_error = True
+            self._output.remove_class("code-output")
+            self._output.add_class("error-output")
 
     def toggle_markdown(self) -> None:
         self._render_markdown = not self._render_markdown
         if self._render_markdown:
             self._output.remove()
-            self._markdown.remove()
+            self._output = None
             self._markdown = Markdown(self._full, classes="markdown-output")
             self._contents.mount(self._markdown)
         else:
             self._markdown.remove()
+            self._markdown = None
+            self._output = Static(self._full, classes="code-output")
             self._contents.mount(self._output)
 
 class AgentInputBlock(BaseBlock):
@@ -211,7 +212,7 @@ class AgentOutputBlock(BaseBlock):
 
     def mark_success(self) -> None:
         self._loading_indicator.styles.display = "none"
-        self._status_indicator.update("[green]✓[/]")
+        self._status_indicator.update("✨")
 
     def mark_failed(self) -> None:
         self._loading_indicator.styles.display = "none"
