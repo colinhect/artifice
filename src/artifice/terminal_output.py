@@ -172,12 +172,6 @@ class AgentInputBlock(BaseBlock):
 
 class AgentOutputBlock(BaseBlock):
     DEFAULT_CSS = """
-    AgentOutputBlock .code {
-        background: $surface-darken-1;
-        padding: 0;
-        border: none;
-    }
-
     AgentOutputBlock .agent-output {
         background: $surface-darken-1;
         padding-left: 0;

@@ -147,7 +147,7 @@ class ArtificeTerminal(Widget):
             "- Write the code or command that solves the user's problem\n"
             "- Use the request_execute_python tool to run Python code\n"
             "- Use the request_execute_shell tool to run shell commands\n"
-            "- Only provide explanations if the user explicitly asks for them\n"
+            "- Provide a brief explanation of the code or shell commands you request\n"
             "- Keep responses concise and code-focused\n"
             "- If code produces an error, explain what is wrong and how to fix it, fix it and try again\n\n"
             "Remember: Code/command execution, not explanation, is your primary mode of operation."
