@@ -15,7 +15,7 @@ from textual.widget import Widget
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput
-from .terminal_output import TerminalOutput, AgentInputBlock, CodeInputBlock
+from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock
 
 if TYPE_CHECKING:
     from .app import ArtificeApp
@@ -157,6 +157,7 @@ class ArtificeTerminal(Widget):
             app.notify(f"Connected to {agent_name}")
 
         # Create agent with tool support
+        self._agent = None
         if app.agent_type.lower() == "claude":
             from .agent import ClaudeAgent
             self._agent = ClaudeAgent(
@@ -177,7 +178,7 @@ class ArtificeTerminal(Widget):
             self._agent.configure_scenarios([
                 {
                     'pattern': r'hello|hi|hey',
-                    'response': 'Hello! I\'m a simulated agent. How can I help you today?'
+                    'response': 'Hello! I\'m a **simulated** agent. How can I help you today?'
                 },
                 {
                     'pattern': r'calculate|math|sum|add',
@@ -225,26 +226,19 @@ class ArtificeTerminal(Widget):
 
             if self._pending_code_execution is not None:
                 # The user executed a shell command requested by the agent
-                agent_response_result = ExecutionResult(code="")
-                agent_response_result.status = ExecutionStatus.RUNNING
-                agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
+                agent_output_block = AgentOutputBlock()
+                self.output.append_block(agent_output_block)
 
                 prompt = "I executed the shell command that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
-
-                # Send prompt to agent with streaming into the NEW block
                 response = await self._agent.send_prompt(
                     prompt,
-                    on_chunk=lambda text: agent_response_block.append_output(text),
+                    on_chunk=lambda text: agent_output_block.append_response(text),
                 )
 
-                # Finalize the agent response block
                 if response.error:
-                    agent_response_result.status = ExecutionStatus.ERROR
-                    agent_response_result.error = response.error
+                    agent_output_block.mark_failed()
                 else:
-                    agent_response_result.status = ExecutionStatus.SUCCESS
-
-                agent_response_block.update_status(agent_response_result)
+                    agent_output_block.mark_success()
 
                 self._pending_code_execution = None
         else:
@@ -253,29 +247,23 @@ class ArtificeTerminal(Widget):
 
             if self._pending_code_execution is not None:
                 # The user executed code requested by the agent
-                agent_response_result = ExecutionResult(code="")
-                agent_response_result.status = ExecutionStatus.RUNNING
-                agent_response_block = self.output.add_result(agent_response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
+                agent_output_block = AgentOutputBlock()
+                self.output.append_block(agent_output_block)
 
                 prompt = "I executed code that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
 
                 # Send prompt to agent with streaming into the NEW block
                 response = await self._agent.send_prompt(
                     prompt,
-                    on_chunk=lambda text: agent_response_block.append_output(text),
+                    on_chunk=lambda text: agent_output_block.append_response(text),
                 )
 
-                # Finalize the agent response block
                 if response.error:
-                    agent_response_result.status = ExecutionStatus.ERROR
-                    agent_response_result.error = response.error
+                    agent_output_block.mark_failed()
                 else:
-                    agent_response_result.status = ExecutionStatus.SUCCESS
-
-                agent_response_block.update_status(agent_response_result)
+                    agent_output_block.mark_success()
 
                 self._pending_code_execution = None
-
     
     async def on_terminal_input_decline_requested(self, event: TerminalInput.DeclineRequested) -> None:
         """Handle decline request from input (escape key)."""
@@ -374,40 +362,32 @@ class ArtificeTerminal(Widget):
 
     async def _handle_agent_prompt(self, prompt: str) -> None:
         """Handle AI agent prompt with tool support."""
-        if self._agent is None:
-            # No agent configured, show error
-            error_result = ExecutionResult(
-                code=f"{prompt}",
-                status=ExecutionStatus.ERROR,
-                error="No AI agent configured.",
-            )
-            self.output.add_result(error_result, is_agent=True, render_markdown=self._agent_markdown_enabled)
-            return
-
         # Create a block showing the prompt
         agent_input_block = AgentInputBlock(prompt)
         self.output.append_block(agent_input_block)
 
+        if self._agent is None:
+            # No agent configured, show error
+            agent_output_block = AgentOutputBlock()
+            self.output.append_block(agent_output_block)
+            agent_output_block.append_response("No AI agent configured.")
+            agent_output_block.mark_failed()
+            return
+
         # Create a separate block for the agent's response
-        response_result = ExecutionResult(code="")
-        response_result.status = ExecutionStatus.RUNNING
-        response_block = self.output.add_result(response_result, is_agent=True, show_code=False, block_type="agent_response", render_markdown=self._agent_markdown_enabled)
+        agent_output_block = AgentOutputBlock()
+        self.output.append_block(agent_output_block)
 
         # Send prompt to agent with streaming
         response = await self._agent.send_prompt(
             prompt,
-            on_chunk=lambda text: response_block.append_output(text),
+            on_chunk=lambda text: agent_output_block.append_response(text),
         )
 
-        # Finalize the response block
         if response.error:
-            response_result.status = ExecutionStatus.ERROR
-            response_result.error = response.error
+            agent_output_block.mark_failed()
         else:
-            response_result.status = ExecutionStatus.SUCCESS
-
-        response_block.update_status(response_result)
-
+            agent_output_block.mark_success()
 
     def action_clear(self) -> None:
         """Clear the output."""

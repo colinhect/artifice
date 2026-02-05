@@ -92,6 +92,57 @@ class AgentInputBlock(BaseBlock):
             with Vertical():
                 yield self._prompt
 
+class AgentOutputBlock(BaseBlock):
+    DEFAULT_CSS = """
+    AgentOutputBlock .code {
+        background: $surface-darken-1;
+        padding: 0;
+        border: none;
+
+    }
+
+    AgentOutputBlock .agent-output {
+        background: $surface-darken-1;
+        padding-left: 0;
+        padding-right: 0;
+        layout: stream;
+    }
+
+    AgentOutputBlock .agent-output MarkdownBlock:last-child {
+        margin-bottom: 0;
+    }
+
+    AgentOutputBlock .agent-output MarkdownFence {
+        margin: 0 0 1 0;
+    }
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._loading_indicator = LoadingIndicator()
+        self._status_indicator = Static(classes="status-indicator")
+        self._output = Markdown(classes="agent-output")
+
+    def compose(self) -> ComposeResult:
+        with Horizontal():
+            with Vertical(classes="status-indicator"):
+                yield self._loading_indicator
+                yield self._status_indicator
+            with Vertical():
+                yield self._output
+
+    def append_response(self, response) -> None:
+        self._output.append(response)
+
+    def mark_success(self) -> None:
+        self._loading_indicator.styles.display = "none"
+        self._status_indicator.update("[green]✓[/]")
+
+    def mark_failed(self) -> None:
+        self._loading_indicator.styles.display = "none"
+        self._status_indicator.update("[red]✗[/]")
+
+
 class OutputBlock(Static):
     """A single output block showing code and its result.
 
@@ -208,7 +259,6 @@ class OutputBlock(Static):
         self._show_output = show_output  # Whether to show the output section
         self._block_type = block_type  # Type of block: "auto", "code_input", "code_output", "agent_prompt", "agent_response"
         self._output_container: Vertical | None = None
-        self._output_lines: list[str] = []
         self._error_lines: list[str] = []
         self._markdown_widget: Markdown | None = None  # For agent responses
         self._tool_calls: list[ToolCall] = []  # Track tool calls
@@ -618,3 +668,4 @@ class TerminalOutput(VerticalScroll):
         if 0 <= self._highlighted_index < len(self._blocks):
             return self._blocks[self._highlighted_index]
         return None
+
