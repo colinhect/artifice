@@ -17,20 +17,34 @@ class ArtificeApp(App):
     ArtificeTerminal {
         height: auto;
     }
+
+    Footer {
+        background: $panel-darken-3;
+        color: $text-muted;
+        dock: bottom;
+    }
     """
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit"),
+        Binding("f2", "toggle_footer", "Toggle Help"),
     ]
 
     def __init__(self, agent_type):
         self.agent_type = agent_type
+        self.footer_visible = True
         super().__init__()
 
     def compose(self) -> ComposeResult:
         #yield Header()
         yield ArtificeTerminal(self)
         yield Footer()
+
+    def action_toggle_footer(self) -> None:
+        """Toggle the visibility of the footer."""
+        footer = self.query_one(Footer)
+        self.footer_visible = not self.footer_visible
+        footer.display = self.footer_visible
 
 
 def main():
