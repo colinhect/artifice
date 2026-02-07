@@ -113,7 +113,7 @@ class CodeOutputBlock(BaseBlock):
             yield self._status_indicator
             if self._markdown:
                 yield self._markdown
-            elif self._output:
+            elif self._output is not None:
                 yield self._output
 
     def append_output(self, output) -> None:
@@ -258,7 +258,7 @@ class TerminalOutput(VerticalScroll):
     def highlight_next(self) -> bool:
         """Move highlight to next block."""
         if not self._blocks:
-            return
+            return False
         original_index = self._highlighted_index
         if self._highlighted_index is None:
             self._highlighted_index = 0
