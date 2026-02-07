@@ -7,6 +7,7 @@ from textual import highlight
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static, LoadingIndicator, Markdown
 
@@ -256,11 +257,18 @@ class TerminalOutput(VerticalScroll):
     }
     """
 
+    class PinRequested(Message):
+        """Posted when the user wants to pin the highlighted widget block."""
+        def __init__(self, block: WidgetOutputBlock) -> None:
+            super().__init__()
+            self.block = block
+
     BINDINGS = [
         Binding("tab", "", "Move to Input", show=True),
         Binding("up", "highlight_previous", "Previous Block", show=True),
         Binding("down", "highlight_next", "Next Block", show=True),
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown On Block", show=True),
+        Binding("ctrl+u", "pin_block", "Pin Block", show=True),
     ]
 
     def __init__(
@@ -326,6 +334,20 @@ class TerminalOutput(VerticalScroll):
         if block and isinstance(block, CodeOutputBlock):
             block.toggle_markdown()
 
+    def action_pin_block(self) -> None:
+        """Pin the currently highlighted widget block."""
+        block = self.get_highlighted_block()
+        if not isinstance(block, WidgetOutputBlock):
+            return
+        self._blocks.remove(block)
+        # Adjust highlighted index after removal
+        if not self._blocks:
+            self._highlighted_index = None
+        elif self._highlighted_index is not None and self._highlighted_index >= len(self._blocks):
+            self._highlighted_index = len(self._blocks) - 1
+        self._update_highlight()
+        self.post_message(self.PinRequested(block))
+
     def action_highlight_previous(self) -> None:
         """Move highlight to previous output block."""
         self.highlight_previous()
@@ -360,5 +382,112 @@ class TerminalOutput(VerticalScroll):
             return None
         if 0 <= self._highlighted_index < len(self._blocks):
             return self._blocks[self._highlighted_index]
+        return None
+
+
+class PinnedOutput(Vertical):
+    """Container for pinned output blocks, displayed below the input."""
+
+    DEFAULT_CSS = """
+    PinnedOutput {
+        height: auto;
+        max-height: 30vh;
+        overflow-y: auto;
+        display: none;
+    }
+
+    PinnedOutput.has-pins {
+        display: block;
+        border-top: solid $accent;
+        padding-top: 1;
+    }
+    """
+
+    class UnpinRequested(Message):
+        """Posted when the user wants to unpin a block."""
+        def __init__(self, block: WidgetOutputBlock) -> None:
+            super().__init__()
+            self.block = block
+
+    BINDINGS = [
+        Binding("tab", "", "Move to Next", show=False),
+        Binding("up", "highlight_previous", "Previous Pin", show=True),
+        Binding("down", "highlight_next", "Next Pin", show=True),
+        Binding("ctrl+u", "unpin_block", "Unpin Block", show=True),
+    ]
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._pinned_blocks: list[WidgetOutputBlock] = []
+        self._highlighted_index: int | None = None
+
+    can_focus = True
+
+    async def add_pinned_block(self, block: WidgetOutputBlock) -> None:
+        self._pinned_blocks.append(block)
+        await self.mount(block)
+        await block.recompose()
+        self.add_class("has-pins")
+
+    async def remove_pinned_block(self, block: WidgetOutputBlock) -> None:
+        if block in self._pinned_blocks:
+            idx = self._pinned_blocks.index(block)
+            self._pinned_blocks.remove(block)
+            await block.remove()
+            # Adjust highlighted index
+            if not self._pinned_blocks:
+                self._highlighted_index = None
+                self.remove_class("has-pins")
+            elif self._highlighted_index is not None:
+                if idx <= self._highlighted_index:
+                    self._highlighted_index = max(0, self._highlighted_index - 1)
+                if self._highlighted_index >= len(self._pinned_blocks):
+                    self._highlighted_index = len(self._pinned_blocks) - 1
+            self._update_highlight()
+
+    def action_highlight_previous(self) -> None:
+        if not self._pinned_blocks:
+            return
+        if self._highlighted_index is None:
+            self._highlighted_index = len(self._pinned_blocks) - 1
+        else:
+            self._highlighted_index = max(self._highlighted_index - 1, 0)
+        self._update_highlight()
+
+    def action_highlight_next(self) -> None:
+        if not self._pinned_blocks:
+            return
+        if self._highlighted_index is None:
+            self._highlighted_index = 0
+        else:
+            self._highlighted_index = min(self._highlighted_index + 1, len(self._pinned_blocks) - 1)
+        self._update_highlight()
+
+    def action_unpin_block(self) -> None:
+        block = self._get_highlighted_block()
+        if block:
+            self.post_message(self.UnpinRequested(block))
+
+    def on_focus(self) -> None:
+        if self._pinned_blocks:
+            self._highlighted_index = 0
+            self._update_highlight()
+
+    def on_blur(self) -> None:
+        self._highlighted_index = None
+        self._update_highlight()
+
+    def _update_highlight(self) -> None:
+        for i, block in enumerate(self._pinned_blocks):
+            if i == self._highlighted_index:
+                block.add_class("highlighted")
+            else:
+                block.remove_class("highlighted")
+
+    def _get_highlighted_block(self) -> WidgetOutputBlock | None:
+        if self._highlighted_index is None or not self._pinned_blocks:
+            return None
+        if 0 <= self._highlighted_index < len(self._pinned_blocks):
+            return self._pinned_blocks[self._highlighted_index]
         return None
 

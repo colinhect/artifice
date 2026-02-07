@@ -14,7 +14,7 @@ from .config import ArtificeConfig
 from .execution import ExecutionResult, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput
-from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock
+from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput
 
 if TYPE_CHECKING:
     from .app import ArtificeApp
@@ -43,6 +43,11 @@ class ArtificeTerminal(Widget):
 
     ArtificeTerminal .highlighted {
         background: $surface-lighten-2;
+    }
+
+    ArtificeTerminal PinnedOutput {
+        height: auto;
+        max-height: 30vh;
     }
     """
 
@@ -195,11 +200,13 @@ class ArtificeTerminal(Widget):
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
+        self.pinned_output = PinnedOutput(id="pinned")
 
     def compose(self) -> ComposeResult:
         with Vertical():
             yield self.output
             yield self.input
+            yield self.pinned_output
 
     async def on_terminal_input_submitted(self, event: TerminalInput.Submitted) -> None:
         """Handle code submission from input."""
@@ -396,6 +403,16 @@ class ArtificeTerminal(Widget):
             agent_output_block.mark_failed()
         else:
             agent_output_block.mark_success()
+
+    async def on_terminal_output_pin_requested(self, event: TerminalOutput.PinRequested) -> None:
+        """Handle pin request: move widget block from output to pinned area."""
+        block = event.block
+        await block.remove()
+        await self.pinned_output.add_pinned_block(block)
+
+    async def on_pinned_output_unpin_requested(self, event: PinnedOutput.UnpinRequested) -> None:
+        """Handle unpin request: remove block from pinned area."""
+        await self.pinned_output.remove_pinned_block(event.block)
 
     def action_clear(self) -> None:
         """Clear the output."""
