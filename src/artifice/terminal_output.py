@@ -54,6 +54,7 @@ class CodeInputBlock(BaseBlock):
         self._loading_indicator = LoadingIndicator()
         self._status_indicator = Static(classes="status-indicator")
         self._code = Static(highlight.highlight(code, language=language), classes="code")
+        self._language = language
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -64,10 +65,11 @@ class CodeInputBlock(BaseBlock):
 
     def update_status(self, result: ExecutionResult) -> None:
         self._loading_indicator.styles.display = "none"
+        prompt = ">" if self._language == "python" else "$"
         if result.status == ExecutionStatus.SUCCESS:
-            self._status_indicator.update("[green]✓[/]")
+            self._status_indicator.update(f"[cyan]{prompt}[/]")
         elif result.status == ExecutionStatus.ERROR:
-            self._status_indicator.update("[red]✗[/]")
+            self._status_indicator.update(f"[red]{prompt}[/]")
 
 class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """

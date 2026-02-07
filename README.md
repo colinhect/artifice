@@ -58,7 +58,7 @@ Artifice has three input modes. Switch modes by typing a special character when 
 
 - `?` - **AI Agent mode** - Ask questions and get AI assistance
 - `>` - **Python mode** - Execute Python code interactively
-- `!` - **Shell mode** - Run shell commands
+- `$` - **Shell mode** - Run shell commands
 
 ### Example: Python Session
 
@@ -84,8 +84,8 @@ You'll see the proposed code and can choose to execute it, modify it, or skip it
 ### Example: Shell Commands
 
 ```
-! ls -la
-! git status
+$ ls -la
+$ git status
 ```
 
 ## Features

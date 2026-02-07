@@ -151,7 +151,8 @@ class ArtificeTerminal(Widget):
         )
         
         def on_agent_connect(agent_name):
-            app.notify(f"Connected to {agent_name}")
+            pass
+            #app.notify(f"Connected to {agent_name}")
 
         # Create agent with tool support
         self._agent = None
@@ -224,7 +225,7 @@ class ArtificeTerminal(Widget):
                 agent_output_block = AgentOutputBlock()
                 self.output.append_block(agent_output_block)
 
-                prompt = "I executed the shell command that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
+                prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
 
                 def on_chunk(text):
                     agent_output_block.append(text)
@@ -248,7 +249,7 @@ class ArtificeTerminal(Widget):
                 agent_output_block = AgentOutputBlock()
                 self.output.append_block(agent_output_block)
 
-                prompt = "I executed code that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
+                prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
 
                 def on_chunk(text):
                     agent_output_block.append(text)
@@ -423,16 +424,16 @@ class ArtificeTerminal(Widget):
         # Determine current mode and toggle its setting
         if self.input.mode == "ai":
             self._agent_markdown_enabled = not self._agent_markdown_enabled
-            enabled_str = "enabled" if self._agent_markdown_enabled else "disabled"
-            self.app.notify(f"Markdown {enabled_str} for AI agent output")
+            #enabled_str = "enabled" if self._agent_markdown_enabled else "disabled"
+            #self.app.notify(f"Markdown {enabled_str} for AI agent output")
         elif self.input.mode == "shell":
             self._shell_markdown_enabled = not self._shell_markdown_enabled
-            enabled_str = "enabled" if self._shell_markdown_enabled else "disabled"
-            self.app.notify(f"Markdown {enabled_str} for shell command output")
+            #enabled_str = "enabled" if self._shell_markdown_enabled else "disabled"
+            #self.app.notify(f"Markdown {enabled_str} for shell command output")
         else:
             self._python_markdown_enabled = not self._python_markdown_enabled
-            enabled_str = "enabled" if self._python_markdown_enabled else "disabled"
-            self.app.notify(f"Markdown {enabled_str} for Python code output")
+            #enabled_str = "enabled" if self._python_markdown_enabled else "disabled"
+            #self.app.notify(f"Markdown {enabled_str} for Python code output")
 
     def reset(self) -> None:
         """Reset the REPL state."""

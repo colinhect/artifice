@@ -41,24 +41,24 @@ class InputTextArea(TextArea):
         if event.key == "escape":
             event.prevent_default()
             event.stop()
-            self.post_message(TerminalInput.EscapePressed())
+            self.post_message(TerminalInput.PythonMode())
             return
         # If input is empty
         if not self.text.strip():
             if event.key == "question_mark":
                 event.prevent_default()
                 event.stop()
-                self.post_message(TerminalInput.QuestionMarkPressed())
+                self.post_message(TerminalInput.AgentMode())
                 return
-            if event.key == "exclamation_mark":
+            if event.key == "dollar_sign":
                 event.prevent_default()
                 event.stop()
-                self.post_message(TerminalInput.ExclamationMarkPressed())
+                self.post_message(TerminalInput.ShellMode())
                 return
             if event.key == "greater_than_sign":
                 event.prevent_default()
                 event.stop()
-                self.post_message(TerminalInput.GreaterThanSignPressed())
+                self.post_message(TerminalInput.PythonMode())
                 return
         # Let parent handle other keys
         super()._on_key(event)
@@ -114,20 +114,13 @@ class TerminalInput(Static):
         """Internal message from TextArea requesting submission."""
         pass
 
-    class EscapePressed(Message):
-        """Internal message from TextArea when escape is pressed."""
+    class AgentMode(Message):
         pass
 
-    class QuestionMarkPressed(Message):
-        """Internal message from TextArea when ? is pressed on empty input."""
+    class ShellMode(Message):
         pass
 
-    class ExclamationMarkPressed(Message):
-        """Internal message from TextArea when ! is pressed on empty input."""
-        pass
-
-    class GreaterThanSignPressed(Message):
-        """Internal message from TextArea when > is pressed on empty input."""
+    class PythonMode(Message):
         pass
 
     class HistoryPrevious(Message):
@@ -158,7 +151,7 @@ class TerminalInput(Static):
         super().__init__(name=name, id=id, classes=classes)
         self._python_prompt = ">"
         self._ai_prompt = "?"
-        self._shell_prompt = "!"
+        self._shell_prompt = "$"
         self.mode = "python"
         self._history = history
 
@@ -175,25 +168,19 @@ class TerminalInput(Static):
         """Handle submission request from TextArea."""
         self.action_submit()
 
-    def on_terminal_input_escape_pressed(self, event: EscapePressed) -> None:
-        """Handle escape key press - switch to Python mode."""
-        if self.mode != "python":
-            self.mode = "python"
-            self._update_prompt()
-
-    def on_terminal_input_question_mark_pressed(self, event: QuestionMarkPressed) -> None:
+    def on_terminal_input_agent_mode(self, event: AgentMode) -> None:
         """Handle ? key press when input is empty - switch to AI mode."""
         if self.mode != "ai":
             self.mode = "ai"
             self._update_prompt()
 
-    def on_terminal_input_greater_than_sign_pressed(self, event: GreaterThanSignPressed) -> None:
+    def on_terminal_input_python_mode(self, event: PythonMode) -> None:
         """Handle > key press when input is empty - switch to Python mode."""
         if self.mode != "python":
             self.mode = "python"
             self._update_prompt()
 
-    def on_terminal_input_exclamation_mark_pressed(self, event: ExclamationMarkPressed) -> None:
+    def on_terminal_input_shell_mode(self, event: ShellMode) -> None:
         """Handle ! key press when input is empty - switch to Shell mode."""
         if self.mode != "shell":
             self.mode = "shell"
