@@ -11,6 +11,7 @@ from textual.widgets import Static, LoadingIndicator, Markdown
 
 from .execution import ExecutionResult, ExecutionStatus
 from .terminal_input import InputTextArea
+from .ansi_handler import ansi_to_textual
 
 class BaseBlock(Static):
     DEFAULT_CSS = """
@@ -125,7 +126,9 @@ class CodeOutputBlock(BaseBlock):
         if self._markdown:
             self._markdown.append(output)
         elif self._output:
-            self._output.update(self._full.rstrip('\n'))
+            # Convert ANSI escape codes to Textual markup
+            textual_output = ansi_to_textual(self._full.rstrip('\n'))
+            self._output.update(textual_output)
 
     def append_error(self, output) -> None:
         self.append_output(output)
@@ -150,7 +153,9 @@ class CodeOutputBlock(BaseBlock):
             if self._markdown:
                 self._markdown.remove()
                 self._markdown = None
-            self._output = Static(self._full.rstrip('\n'), classes="code-output")
+            # Convert ANSI escape codes to Textual markup
+            textual_output = ansi_to_textual(self._full.rstrip('\n'))
+            self._output = Static(textual_output, classes="code-output")
             self._contents.mount(self._output)
 
 class AgentInputBlock(BaseBlock):
