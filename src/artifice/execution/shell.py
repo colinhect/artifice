@@ -43,7 +43,7 @@ class ShellExecutor:
 
         try:
             # Detect if command contains shell metacharacters
-            shell_metachars = {'|', '&', ';', '>', '<', '*', '?', '[', ']', '$', '(', ')', '{', '}', '`', '\\', '"', "'", '\n'}
+            shell_metachars = {'|', '&', ';', '>', '<', '*', '?', '[', ']', '$', '(', ')', '{', '}', '`', '\n'}
             use_shell = any(char in command for char in shell_metachars)
 
             if use_shell:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import threading
 import traceback
 from io import StringIO
 from queue import Queue
@@ -42,6 +43,7 @@ class CodeExecutor:
         """Initialize executor with fresh globals/locals context."""
         self._globals: dict[str, Any] = {"__name__": "__main__", "__builtins__": __builtins__}
         self._locals: dict[str, Any] = {}
+        self._exec_lock = threading.Lock()
 
     def reset(self) -> None:
         """Reset the execution context."""
@@ -71,7 +73,7 @@ class CodeExecutor:
 
         try:
             # Run in executor to avoid blocking
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             # Start execution task
             exec_task = loop.run_in_executor(
@@ -117,27 +119,31 @@ class CodeExecutor:
 
     def _execute_sync(self, code: str, output_queue: Queue) -> tuple[Any, str, str]:
         """Execute code synchronously (called in thread pool)."""
-        # Capture stdout/stderr in this thread
-        old_stdout, old_stderr = sys.stdout, sys.stderr
+        with self._exec_lock:
+            old_stdout, old_stderr = sys.stdout, sys.stderr
 
-        captured_stdout = StreamCapture(output_queue, "stdout")
-        captured_stderr = StreamCapture(output_queue, "stderr")
+            captured_stdout = StreamCapture(output_queue, "stdout")
+            captured_stderr = StreamCapture(output_queue, "stderr")
 
-        sys.stdout = captured_stdout
-        sys.stderr = captured_stderr
+            sys.stdout = captured_stdout
+            sys.stderr = captured_stderr
 
-        try:
-            # Try to compile as expression first (for return value)
             try:
-                compiled = compile(code, "<repl>", "eval")
-                result_value = eval(compiled, self._globals, self._locals)
-            except SyntaxError:
-                # Not an expression, execute as statements
-                compiled = compile(code, "<repl>", "exec")
-                exec(compiled, self._globals, self._locals)
-                result_value = None
+                # Try to compile as expression first (for return value)
+                try:
+                    compiled = compile(code, "<repl>", "eval")
+                    result_value = eval(compiled, self._globals, self._locals)
+                except SyntaxError:
+                    # Not an expression, execute as statements
+                    compiled = compile(code, "<repl>", "exec")
+                    exec(compiled, self._globals, self._locals)
+                    result_value = None
 
-            return result_value, captured_stdout.getvalue(), captured_stderr.getvalue()
-        finally:
-            sys.stdout, sys.stderr = old_stdout, old_stderr
+                return result_value, captured_stdout.getvalue(), captured_stderr.getvalue()
+            except Exception:
+                # Runtime error - capture traceback in stderr
+                traceback.print_exc(file=captured_stderr)
+                return None, captured_stdout.getvalue(), captured_stderr.getvalue()
+            finally:
+                sys.stdout, sys.stderr = old_stdout, old_stderr
 

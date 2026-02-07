@@ -33,6 +33,7 @@ class ArtificeApp(App):
 
 
 def main():
+    """Main entry point for the artifice command."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--agent-type",
@@ -42,7 +43,6 @@ def main():
     )
     args = parser.parse_args()
 
-    """Main entry point for the artifice command."""
     app = ArtificeApp(args.agent_type)
     app.run()
 
