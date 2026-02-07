@@ -30,7 +30,7 @@ class History:
         self._python_history_index: int = -1  # -1 means not browsing history
         self._ai_history_index: int = -1
         self._shell_history_index: int = -1
-        self._current_input: str = ""  # Store current input when browsing history
+        self._current_input: dict[str, str] = {"python": "", "ai": "", "shell": ""}  # Store current input per mode when browsing history
 
         # History persistence configuration
         if history_file is None:
@@ -65,7 +65,7 @@ class History:
                 self._python_history.pop(0)
             self._python_history_index = -1
 
-        self._current_input = ""
+        self._current_input[mode] = ""
 
     def navigate_back(self, mode: str, current_input: str) -> str | None:
         """Navigate to previous history entry.
@@ -93,7 +93,7 @@ class History:
 
         # First time navigating up, save current input
         if history_index == -1:
-            self._current_input = current_input
+            self._current_input[mode] = current_input
             history_index = len(history)
 
         # Move back in history
@@ -144,8 +144,8 @@ class History:
         else:
             # Reached the end, restore original input
             history_index = -1
-            result = self._current_input
-            self._current_input = ""
+            result = self._current_input[mode]
+            self._current_input[mode] = ""
 
         # Update the appropriate history index
         if mode == "ai":
@@ -165,7 +165,7 @@ class History:
         self._python_history_index = -1
         self._ai_history_index = -1
         self._shell_history_index = -1
-        self._current_input = ""
+        self._current_input = {"python": "", "ai": "", "shell": ""}
 
     def load(self) -> None:
         """Load command history from disk."""
