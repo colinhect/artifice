@@ -66,6 +66,24 @@ class InputTextArea(TextArea):
             event.stop()
             self.post_message(TerminalInput.PythonMode())
             return
+        # Up/Down for history navigation when at top/bottom of input
+        if event.key == "up":
+            # Check if cursor is on the first line
+            cursor_row, _ = self.cursor_location
+            if cursor_row == 0:
+                event.prevent_default()
+                event.stop()
+                self.post_message(TerminalInput.HistoryPrevious())
+                return
+        elif event.key == "down":
+            # Check if cursor is on the last line
+            cursor_row, _ = self.cursor_location
+            line_count = self.document.line_count
+            if cursor_row >= line_count - 1:
+                event.prevent_default()
+                event.stop()
+                self.post_message(TerminalInput.HistoryNext())
+                return
         # If input is empty
         if not self.text.strip():
             if event.key == "question_mark":
@@ -91,8 +109,6 @@ class TerminalInput(Static):
     """Input component for the Python REPL."""
 
     BINDINGS = [
-        Binding("alt+up", "history_back", "History Back", show=True),
-        Binding("alt+down", "history_forward", "History Forward", show=True),
         Binding("ctrl+r", "history_search", "History Search", show=True),
     ]
 
@@ -234,6 +250,14 @@ class TerminalInput(Static):
         if self.mode != "shell":
             self.mode = "shell"
             self._update_prompt()
+
+    def on_terminal_input_history_previous(self, event: HistoryPrevious) -> None:
+        """Handle up arrow key press at top of input - navigate to previous history."""
+        self.action_history_back()
+
+    def on_terminal_input_history_next(self, event: HistoryNext) -> None:
+        """Handle down arrow key press at bottom of input - navigate to next history."""
+        self.action_history_forward()
 
     def _update_prompt(self) -> None:
         """Update the prompt display based on current mode."""
