@@ -74,8 +74,8 @@ class CodeInputBlock(BaseBlock):
 class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """
     CodeOutputBlock .code-output {
-        background: $surface-darken-1;
-        color: $text-muted;
+        /*background: $surface-darken-1;*/
+        /*color: $text-muted;*/
         padding-left: 0;
         padding-right: 0;
     }

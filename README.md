@@ -1,31 +1,8 @@
 # Artifice
 
-An interactive coding environment with human-in-the-loop AI assistance. Artifice combines a Python REPL, shell access, and AI agents into a unified terminal user interface (TUI) where you maintain full control over code execution.
+Experimental Python-based terminal user interface for interacting with intelligence models to write and execute code or system commands. Built with [Textual](https://github.com/Textualize/textual).
 
-![Screenshot](screenshot.svg)
-
-## What is Artifice?
-
-Artifice is a prototype terminal-based coding assistant built with [Textual](https://github.com/Textualize/textual). Unlike traditional AI coding tools that execute code automatically, Artifice shows you every action an AI agent wants to take and lets you approve, modify, or reject it before execution. This creates a collaborative environment where AI suggestions enhance your workflow without removing you from the taking skillful actions.
-
-## ⚠️ Security Warning
-
-Artifice executes Python code and shell commands directly on your system. While you must approve each execution:
-- Never use Artifice with untrusted AI agents or prompts
-- Code executions have **full access** to your user account permissions
-- Shell commands run without sandboxing or restrictions
-- Session history may contain sensitive information and is stored in `~/.artifice_history.json`
-- Use Artifice only in trusted development environments
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.8 or higher
-- pip for package installation
-- (Optional) Anthropic API key for AI features
-
-### Installation
+## Installation
 
 Install with AI support:
 ```bash
@@ -37,14 +14,14 @@ For basic usage without AI features:
 pip install -e .
 ```
 
-### Configuration
+## Configuration
 
 Set your API key for AI features:
 ```bash
 export ANTHROPIC_API_KEY="your-api-key-here"
 ```
 
-### Running
+## Running
 
 ```bash
 artifice
@@ -99,7 +76,6 @@ $ git status
 
 ### Block Navigation
 - **Ctrl+Up/Down** - Navigate between previous inputs and outputs (blocks)
-- **Pin Blocks** - Mark important code/response/output blocks for easy reference
 - **Edit Blocks** - Modify and re-execute previous inputs
 - **Save/Restore** - Persist important blocks across sessions
 
@@ -107,16 +83,15 @@ $ git status
 - **Tool Calling** - AI can propose Python code or shell commands
 - **Agentic Loops** - Multiple tool calls in a single conversation
 - **Human Approval** - Review every action before execution
-- **Persistent Context** - AI sees your session state and history
-- **Visual Feedback** - Tool calls and results displayed in the UI
+- **Selective Context** - Mark which blocks should be given as context to AI.
 
 ## Keybindings
 
 - **Ctrl+Up/Down** - Navigate through blocks
 - **Enter** - Execute input
 - **Ctrl+C** - Cancel current operation
-- **Ctrl+D** - Exit application
-- **Ctrl+O** - Toggle markdown rendering on selected block
+- **Ctrl+Q** - Exit application
+- **Ctrl+O** - Toggle markdown rendering (on current block or subsequent blocks)
 - **Ctrl+L** - Clear
 
 ## AI Agent Integration
@@ -141,7 +116,7 @@ This design enables agentic workflows while keeping you fully responsible and in
 ```bash
 git clone <repository-url>
 cd artifice 
-python src/artifice/terminal.py
+python src/artifice/app.py
 ```
 
 ## Roadmap
@@ -154,4 +129,5 @@ Planned features and improvements:
 - [ ] Session export/import
 - [ ] LSP integration with agent
 - [ ] Other programming languages
+- [ ] Export commands to shell history
 
