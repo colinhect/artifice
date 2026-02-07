@@ -52,20 +52,20 @@ class ShellExecutor:
             ExecutionResult with status (SUCCESS/ERROR), output, and any errors.
         """
         result = ExecutionResult(code=command, status=ExecutionStatus.RUNNING)
+        init_file = None
 
         try:
             # Create a pseudo-terminal to make commands think they're in a real terminal
             master_fd, slave_fd = pty.openpty()
-            
+
             # Always use shell mode to preserve working directory changes
             use_shell = True
 
             # Set TERM environment variable to enable color
             env = os.environ.copy()
             env['TERM'] = env.get('TERM', 'xterm-256color')
-            
+
             # Prepare the actual command to execute
-            init_file = None
             if self.init_script and use_shell:
                 # Write a complete script that includes init + command + pwd capture
                 # This is the most reliable way to handle aliases
@@ -151,15 +151,34 @@ class ShellExecutor:
 
             # Start reading output
             read_task = asyncio.create_task(read_pty_output())
-            
-            # Wait for process to complete
-            await process.wait()
-            
-            # Wait for all output to be read
-            await read_task
-            
-            # Close master fd
-            os.close(master_fd)
+
+            try:
+                # Wait for process to complete
+                await process.wait()
+
+                # Wait for all output to be read
+                await read_task
+            except asyncio.CancelledError:
+                # Cancel the read task
+                read_task.cancel()
+                # Terminate the process
+                try:
+                    process.terminate()
+                    await asyncio.wait_for(process.wait(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    process.kill()
+                    await process.wait()
+                result.status = ExecutionStatus.ERROR
+                result.error = "\n[Execution cancelled]\n"
+                if on_error:
+                    on_error(result.error)
+                raise
+            finally:
+                # Close master fd
+                try:
+                    os.close(master_fd)
+                except OSError:
+                    pass  # Already closed
 
             # Collect results
             full_output = "".join(output_buffer)
