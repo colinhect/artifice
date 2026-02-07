@@ -4,6 +4,7 @@ import asyncio
 import os
 import pty
 import shlex
+import tempfile
 import traceback
 from typing import Callable, Optional
 
@@ -20,6 +21,15 @@ class ShellExecutor:
     Security Note: Commands run with full user permissions without sandboxing.
     Only execute commands from trusted sources.
     """
+
+    def __init__(self, init_script: Optional[str] = None) -> None:
+        """Initialize shell executor with optional initialization script.
+        
+        Args:
+            init_script: Shell script to source before each command execution.
+                        Useful for setting aliases, environment variables, etc.
+        """
+        self.init_script = init_script
 
     async def execute(
         self,
@@ -48,15 +58,37 @@ class ShellExecutor:
             # Detect if command contains shell metacharacters
             shell_metachars = {'|', '&', ';', '>', '<', '*', '?', '[', ']', '$', '(', ')', '{', '}', '`', '\n'}
             use_shell = any(char in command for char in shell_metachars)
+            
+            # If we have an init script, we must use shell mode to source it
+            if self.init_script:
+                use_shell = True
 
             # Set TERM environment variable to enable color
             env = os.environ.copy()
             env['TERM'] = env.get('TERM', 'xterm-256color')
             
+            # Prepare the actual command to execute
+            init_file = None
+            if self.init_script and use_shell:
+                # Write a complete script that includes init + command
+                # This is the most reliable way to handle aliases
+                init_file = tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False)
+                init_file.write("#!/bin/bash\n")
+                init_file.write("shopt -s expand_aliases\n")
+                init_file.write(self.init_script)
+                init_file.write("\n")
+                init_file.write(command)
+                init_file.write("\n")
+                init_file.close()
+                os.chmod(init_file.name, 0o700)
+                wrapped_command = init_file.name
+            else:
+                wrapped_command = command
+            
             if use_shell:
                 # Use shell for commands with shell metacharacters
                 process = await asyncio.create_subprocess_shell(
-                    command,
+                    wrapped_command,
                     stdin=slave_fd,
                     stdout=slave_fd,
                     stderr=slave_fd,
@@ -133,5 +165,12 @@ class ShellExecutor:
             result.error = error_text
             if on_error:
                 on_error(error_text)
+        finally:
+            # Clean up temporary init file if created
+            if init_file:
+                try:
+                    os.unlink(init_file.name)
+                except Exception:
+                    pass  # Ignore cleanup errors
 
         return result

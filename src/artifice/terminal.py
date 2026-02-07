@@ -10,6 +10,7 @@ from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widget import Widget
 
+from .config import ArtificeConfig
 from .execution import ExecutionResult, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput
@@ -61,7 +62,10 @@ class ArtificeTerminal(Widget):
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
         self._executor = CodeExecutor()
-        self._shell_executor = ShellExecutor()
+        
+        # Load configuration and create shell executor with init script
+        config = ArtificeConfig.load()
+        self._shell_executor = ShellExecutor(init_script=config.shell_init_script)
 
         # Create history manager
         self._history = History(history_file=history_file, max_history_size=max_history_size)
