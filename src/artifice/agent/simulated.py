@@ -240,7 +240,7 @@ class ScriptedAgent(SimulatedAgent):
             tool_handler: Callback for handling tool calls
             response_delay: Delay between streaming chunks
         """
-        super().__init__(system_prompt, tool_handler, response_delay)
+        super().__init__(system_prompt=system_prompt, tool_handler=tool_handler, response_delay=response_delay)
         self.configure_scenarios(script)
 
     async def send_prompt(
