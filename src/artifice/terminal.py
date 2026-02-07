@@ -23,20 +23,21 @@ class ArtificeTerminal(Widget):
 
     DEFAULT_CSS = """
     ArtificeTerminal {
-        height: 100%;
-        width: 100%;
+        height: auto;
     }
 
     ArtificeTerminal Vertical {
-        height: 100%;
+        height: auto;
     }
 
     ArtificeTerminal TerminalOutput {
-        height: 1fr;
+        height: auto;
+        max-height: 95vh;
+        overflow-y: auto;
     }
 
     ArtificeTerminal TerminalInput {
-        dock: bottom;
+        height: auto;
     }
 
     ArtificeTerminal .highlighted {
@@ -213,9 +214,14 @@ class ArtificeTerminal(Widget):
                 self.output.append_block(agent_output_block)
 
                 prompt = "I executed the shell command that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
+
+                def on_chunk(text):
+                    agent_output_block.append(text)
+                    self.output.call_after_refresh(self.output.auto_scroll)
+
                 response = await self._agent.send_prompt(
                     prompt,
-                    on_chunk=lambda text: agent_output_block.append(text),
+                    on_chunk=on_chunk,
                 )
 
                 if response.error:
@@ -233,10 +239,14 @@ class ArtificeTerminal(Widget):
 
                 prompt = "I executed code that you requested:\n\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
 
+                def on_chunk(text):
+                    agent_output_block.append(text)
+                    self.output.call_after_refresh(self.output.auto_scroll)
+
                 # Send prompt to agent with streaming into the NEW block
                 response = await self._agent.send_prompt(
                     prompt,
-                    on_chunk=lambda text: agent_output_block.append(text),
+                    on_chunk=on_chunk,
                 )
 
                 if response.error:
@@ -259,10 +269,18 @@ class ArtificeTerminal(Widget):
         code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
         self.output.append_block(code_output_block)
 
+        def on_output(text):
+            code_output_block.append_output(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
+        def on_error(text):
+            code_output_block.append_error(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
         result = await self._executor.execute(
             code,
-            on_output=lambda text: code_output_block.append_output(text),
-            on_error=lambda text: code_output_block.append_error(text),
+            on_output=on_output,
+            on_error=on_error,
         )
 
         code_input_block.update_status(result)
@@ -276,11 +294,19 @@ class ArtificeTerminal(Widget):
         code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
         self.output.append_block(code_output_block)
 
+        def on_output(text):
+            code_output_block.append_output(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
+        def on_error(text):
+            code_output_block.append_error(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
         # Execute asynchronously with streaming callbacks
         result = await self._shell_executor.execute(
             command,
-            on_output=lambda text: code_output_block.append_output(text),
-            on_error=lambda text: code_output_block.append_error(text),
+            on_output=on_output,
+            on_error=on_error,
         )
 
         command_input_block.update_status(result)
@@ -347,10 +373,14 @@ class ArtificeTerminal(Widget):
         agent_output_block = AgentOutputBlock()
         self.output.append_block(agent_output_block)
 
+        def on_chunk(text):
+            agent_output_block.append(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
         # Send prompt to agent with streaming
         response = await self._agent.send_prompt(
             prompt,
-            on_chunk=lambda text: agent_output_block.append(text),
+            on_chunk=on_chunk,
         )
 
         if response.error:

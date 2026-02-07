@@ -212,15 +212,13 @@ class AgentOutputBlock(BaseBlock):
         self._status_indicator.update("[red]✗[/]")
 
 class TerminalOutput(VerticalScroll):
-    """Scrollable container for REPL output blocks."""
+    """Container for REPL output blocks."""
 
     DEFAULT_CSS = """
     TerminalOutput {
-        height: 1fr;
         border: none;
         padding: 0;
         margin: 0;
-        align: center bottom;
     }
     """
 
@@ -247,6 +245,17 @@ class TerminalOutput(VerticalScroll):
         self.mount(block)
         self.scroll_end(animate=False)
         return block
+
+    def auto_scroll(self) -> None:
+        """Scroll to end if already at or near the bottom."""
+        # Check if we're already near the bottom (within a few lines)
+        # If so, scroll to the new end. Otherwise, let the user read where they are.
+        max_scroll_y = self.max_scroll_y
+        current_y = self.scroll_y
+
+        # If we're within 3 lines of the bottom, auto-scroll
+        if max_scroll_y - current_y <= 3:
+            self.scroll_end(animate=False)
 
     def clear(self) -> None:
         """Clear all output."""

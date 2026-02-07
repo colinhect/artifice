@@ -11,10 +11,11 @@ class ArtificeApp(App):
     CSS = """
     Screen {
         layout: vertical;
+        height: auto;
     }
 
     ArtificeTerminal {
-        height: 1fr;
+        height: auto;
     }
     """
 
@@ -27,9 +28,9 @@ class ArtificeApp(App):
         super().__init__()
 
     def compose(self) -> ComposeResult:
-        yield Header()
+        #yield Header()
         yield ArtificeTerminal(self)
-        yield Footer()
+        #yield Footer()
 
 
 def main():
@@ -44,7 +45,7 @@ def main():
     args = parser.parse_args()
 
     app = ArtificeApp(args.agent_type)
-    app.run()
+    app.run(inline=True, inline_no_clear=True)
 
 
 if __name__ == "__main__":
