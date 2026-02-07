@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import pty
+import re
 import shlex
 import tempfile
 import traceback
@@ -30,6 +31,7 @@ class ShellExecutor:
                         Useful for setting aliases, environment variables, etc.
         """
         self.init_script = init_script
+        self.working_directory = os.getcwd()
 
     async def execute(
         self,
@@ -55,13 +57,8 @@ class ShellExecutor:
             # Create a pseudo-terminal to make commands think they're in a real terminal
             master_fd, slave_fd = pty.openpty()
             
-            # Detect if command contains shell metacharacters
-            shell_metachars = {'|', '&', ';', '>', '<', '*', '?', '[', ']', '$', '(', ')', '{', '}', '`', '\n'}
-            use_shell = any(char in command for char in shell_metachars)
-            
-            # If we have an init script, we must use shell mode to source it
-            if self.init_script:
-                use_shell = True
+            # Always use shell mode to preserve working directory changes
+            use_shell = True
 
             # Set TERM environment variable to enable color
             env = os.environ.copy()
@@ -70,7 +67,7 @@ class ShellExecutor:
             # Prepare the actual command to execute
             init_file = None
             if self.init_script and use_shell:
-                # Write a complete script that includes init + command
+                # Write a complete script that includes init + command + pwd capture
                 # This is the most reliable way to handle aliases
                 init_file = tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False)
                 init_file.write("#!/bin/bash\n")
@@ -79,11 +76,16 @@ class ShellExecutor:
                 init_file.write("\n")
                 init_file.write(command)
                 init_file.write("\n")
+                init_file.write('echo "###ARTIFICE_PWD###$(pwd)###"\n')
                 init_file.close()
                 os.chmod(init_file.name, 0o700)
                 wrapped_command = init_file.name
             else:
-                wrapped_command = command
+                # Append pwd capture to the command
+                if use_shell:
+                    wrapped_command = f'cd "{self.working_directory}" && {command} ; echo "###ARTIFICE_PWD###$(pwd)###"'
+                else:
+                    wrapped_command = command
             
             if use_shell:
                 # Use shell for commands with shell metacharacters
@@ -93,6 +95,7 @@ class ShellExecutor:
                     stdout=slave_fd,
                     stderr=slave_fd,
                     env=env,
+                    cwd=self.working_directory,
                     start_new_session=True,
                 )
             else:
@@ -116,6 +119,7 @@ class ShellExecutor:
                     stdout=slave_fd,
                     stderr=slave_fd,
                     env=env,
+                    cwd=self.working_directory,
                     start_new_session=True,
                 )
 
@@ -136,8 +140,11 @@ class ShellExecutor:
                             break
                         text = data.decode('utf-8', errors='replace')
                         output_buffer.append(text)
+                        # Filter out the marker from live output
                         if on_output:
-                            on_output(text)
+                            filtered_text = re.sub(r'###ARTIFICE_PWD###[^#]+###\r?\n?', '', text)
+                            if filtered_text:
+                                on_output(filtered_text)
                     except OSError:
                         # PTY closed
                         break
@@ -155,7 +162,20 @@ class ShellExecutor:
             os.close(master_fd)
 
             # Collect results
-            result.output = "".join(output_buffer)
+            full_output = "".join(output_buffer)
+            
+            # Extract and remove the working directory marker
+            # The marker format is: ###ARTIFICE_PWD###/path/to/dir###
+            pwd_match = re.search(r'###ARTIFICE_PWD###([^#]+)###', full_output)
+            if pwd_match:
+                new_pwd = pwd_match.group(1).strip()
+                if new_pwd and os.path.isdir(new_pwd):
+                    self.working_directory = new_pwd
+            
+            # Remove the entire marker line from output (including newlines)
+            full_output = re.sub(r'###ARTIFICE_PWD###[^#]+###\r?\n?', '', full_output)
+            
+            result.output = full_output
             result.status = ExecutionStatus.SUCCESS if process.returncode == 0 else ExecutionStatus.ERROR
 
         except Exception as e:
