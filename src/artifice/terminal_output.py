@@ -38,6 +38,18 @@ class BaseBlock(Static):
         content-align: center top;
         padding: 0;
     }
+
+    BaseBlock .status-success {
+        color: $primary;
+    }
+
+    BaseBlock .status-error {
+        color: $error;
+    }
+
+    BaseBlock .status-pending {
+        color: $secondary;
+    }
     """
 
 class CodeInputBlock(BaseBlock):
@@ -68,9 +80,11 @@ class CodeInputBlock(BaseBlock):
         self._loading_indicator.styles.display = "none"
         prompt = ">" if self._language == "python" else "$"
         if result.status == ExecutionStatus.SUCCESS:
-            self._status_indicator.update(f"[cyan]{prompt}[/]")
+            self._status_indicator.update(prompt)
+            self._status_indicator.add_class("status-success")
         elif result.status == ExecutionStatus.ERROR:
-            self._status_indicator.update(f"[red]{prompt}[/]")
+            self._status_indicator.update(prompt)
+            self._status_indicator.add_class("status-error")
 
     def get_code(self) -> str:
         """Get the original code."""
@@ -202,7 +216,7 @@ class AgentInputBlock(BaseBlock):
 
     def __init__(self, prompt: str, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._status_indicator = Static("[cyan]?[/]", classes="status-indicator")
+        self._status_indicator = Static("?", classes="status-indicator status-pending")
         self._prompt = Static(prompt, classes="prompt")
         self._original_prompt = prompt  # Store original prompt for re-use
 
@@ -264,7 +278,8 @@ class AgentOutputBlock(BaseBlock):
 
     def mark_failed(self) -> None:
         self._loading_indicator.styles.display = "none"
-        self._status_indicator.update("[red]✗[/]")
+        self._status_indicator.update("✗")
+        self._status_indicator.add_class("status-error")
 
 class TerminalOutput(VerticalScroll):
     """Container for REPL output blocks."""
