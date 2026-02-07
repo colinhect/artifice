@@ -32,13 +32,15 @@ class ArtificeApp(App):
 
     def __init__(self, agent_type):
         self.agent_type = agent_type
-        self.footer_visible = True
+        self.footer_visible = False
         super().__init__()
 
     def compose(self) -> ComposeResult:
         #yield Header()
         yield ArtificeTerminal(self)
-        yield Footer()
+        footer = Footer()
+        footer.display = False
+        yield footer
 
     def action_toggle_footer(self) -> None:
         """Toggle the visibility of the footer."""
