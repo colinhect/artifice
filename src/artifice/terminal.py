@@ -13,7 +13,7 @@ from textual.widget import Widget
 from .config import ArtificeConfig
 from .execution import ExecutionResult, CodeExecutor, ShellExecutor
 from .history import History
-from .terminal_input import TerminalInput
+from .terminal_input import TerminalInput, InputTextArea
 from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput
 
 if TYPE_CHECKING:
@@ -414,6 +414,16 @@ class ArtificeTerminal(Widget):
     async def on_pinned_output_unpin_requested(self, event: PinnedOutput.UnpinRequested) -> None:
         """Handle unpin request: remove block from pinned area."""
         await self.pinned_output.remove_pinned_block(event.block)
+
+    async def on_terminal_output_block_activated(self, event: TerminalOutput.BlockActivated) -> None:
+        """Handle block activation: copy code to input with correct mode."""
+        # Set the code in the input
+        self.input.code = event.code
+        # Set the correct mode
+        self.input.mode = event.mode
+        self.input._update_prompt()
+        # Focus the input
+        self.input.query_one("#code-input", InputTextArea).focus()
 
     def action_clear(self) -> None:
         """Clear the output."""

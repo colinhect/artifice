@@ -21,11 +21,14 @@ class HistoryAutoComplete(AutoComplete):
 
     def __init__(self, terminal_input: TerminalInput, search_input: Input, **kwargs) -> None:
         self._terminal_input = terminal_input
+        self._truncated_to_full: dict[str, str] = {}  # Map truncated text to full text
         super().__init__(search_input, **kwargs)
 
     def apply_completion(self, value: str, state: TargetState) -> None:
         """Apply completion by setting the TextArea text and exiting search mode."""
-        self._terminal_input.code = value
+        # Use the original full text if this was a truncated item
+        full_text = self._truncated_to_full.get(value, value)
+        self._terminal_input.code = full_text
         self._terminal_input._exit_search_mode()
 
 
@@ -125,7 +128,7 @@ class TerminalInput(Static):
         margin: 0 !important;
         background: transparent;
     }
-    
+
     TerminalInput TextArea:focus {
         border: none !important;
     }
@@ -140,6 +143,12 @@ class TerminalInput(Static):
 
     TerminalInput Input:focus {
         border: none !important;
+    }
+
+    /* Show up to 8 items in autocomplete dropdown */
+    AutoCompleteList {
+        layer: overlay;
+        height: auto;
     }
     """
 
@@ -321,7 +330,7 @@ class TerminalInput(Static):
         def get_history_candidates(state: TargetState) -> list[DropdownItem]:
             """Get filtered history items based on search input."""
             search_text = state.text.lower()
-            
+
             # Get history for current mode
             if self.mode == "ai":
                 history_list = self._history._ai_history
@@ -329,24 +338,36 @@ class TerminalInput(Static):
                 history_list = self._history._shell_history
             else:
                 history_list = self._history._python_history
-            
+
             # Filter and reverse (most recent first)
+            def truncate_multiline(item: str) -> str:
+                """Truncate multi-line items to first 3 lines with ... if more exist."""
+                lines = item.split('\n')
+                if len(lines) > 3:
+                    truncated = '\n'.join(lines[:2] + [lines[2] + '...'])
+                    # Store mapping from truncated to full
+                    if self._autocomplete is not None:
+                        self._autocomplete._truncated_to_full[truncated] = item
+                    return truncated
+                return item
+
             filtered = [
-                DropdownItem(main=item)
+                DropdownItem(main=truncate_multiline(item))
                 for item in reversed(history_list)
                 if search_text in item.lower()
             ]
-            
+
             return filtered[:50]  # Limit to 50 items
-        
-        # Mount autocomplete
+
+        # Mount autocomplete at screen level to avoid clipping
         self._autocomplete = HistoryAutoComplete(
             terminal_input=self,
             search_input=self._search_input,
             candidates=get_history_candidates
         )
-        horizontal.mount(self._autocomplete)
-        
+        # Mount to screen instead of horizontal container to prevent clipping
+        self.screen.mount(self._autocomplete)
+
         # Focus the search input
         self._search_input.focus()
 

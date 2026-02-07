@@ -55,6 +55,7 @@ class CodeInputBlock(BaseBlock):
         self._status_indicator = Static(classes="status-indicator")
         self._code = Static(highlight.highlight(code, language=language), classes="code")
         self._language = language
+        self._original_code = code  # Store original code for re-execution
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -70,6 +71,14 @@ class CodeInputBlock(BaseBlock):
             self._status_indicator.update(f"[cyan]{prompt}[/]")
         elif result.status == ExecutionStatus.ERROR:
             self._status_indicator.update(f"[red]{prompt}[/]")
+
+    def get_code(self) -> str:
+        """Get the original code."""
+        return self._original_code
+
+    def get_mode(self) -> str:
+        """Get the mode for this code block (python or shell)."""
+        return "shell" if self._language == "bash" else "python"
 
 class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """
@@ -195,12 +204,21 @@ class AgentInputBlock(BaseBlock):
         super().__init__(**kwargs)
         self._status_indicator = Static("[cyan]?[/]", classes="status-indicator")
         self._prompt = Static(prompt, classes="prompt")
+        self._original_prompt = prompt  # Store original prompt for re-use
 
     def compose(self) -> ComposeResult:
         with Horizontal():
             yield self._status_indicator
             with Vertical():
                 yield self._prompt
+
+    def get_prompt(self) -> str:
+        """Get the original prompt."""
+        return self._original_prompt
+
+    def get_mode(self) -> str:
+        """Get the mode for this block (ai)."""
+        return "ai"
 
 class AgentOutputBlock(BaseBlock):
     DEFAULT_CSS = """
@@ -265,10 +283,18 @@ class TerminalOutput(VerticalScroll):
             super().__init__()
             self.block = block
 
+    class BlockActivated(Message):
+        """Posted when the user wants to copy a block to the input."""
+        def __init__(self, code: str, mode: str) -> None:
+            super().__init__()
+            self.code = code
+            self.mode = mode
+
     BINDINGS = [
         Binding("tab", "", "Move to Input", show=True),
         Binding("up", "highlight_previous", "Previous Block", show=True),
         Binding("down", "highlight_next", "Next Block", show=True),
+        Binding("enter", "activate_block", "Copy to Input", show=True),
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown On Block", show=True),
         Binding("ctrl+u", "pin_block", "Pin Block", show=True),
     ]
@@ -329,6 +355,22 @@ class TerminalOutput(VerticalScroll):
         else:
             self._highlighted_index = max(self._highlighted_index - 1, 0)
         self._update_highlight()
+
+    def action_activate_block(self) -> None:
+        """Copy the highlighted block's code to the input with the correct mode."""
+        block = self.get_highlighted_block()
+        if block is None:
+            return
+
+        # Extract code and mode from the block
+        if isinstance(block, CodeInputBlock):
+            code = block.get_code()
+            mode = block.get_mode()
+            self.post_message(self.BlockActivated(code, mode))
+        elif isinstance(block, AgentInputBlock):
+            code = block.get_prompt()
+            mode = block.get_mode()
+            self.post_message(self.BlockActivated(code, mode))
 
     async def action_toggle_block_markdown(self) -> None:
         """Toggle markdown rendering for the currently highlighted block."""
