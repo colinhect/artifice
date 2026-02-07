@@ -8,11 +8,25 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.message import Message
-from textual.widgets import Static, TextArea
+from textual.widgets import Static, TextArea, Input
 from textual import events
+from textual_autocomplete import AutoComplete, DropdownItem, TargetState
 
 if TYPE_CHECKING:
     from .history import History
+
+
+class HistoryAutoComplete(AutoComplete):
+    """Custom AutoComplete that applies completion to a TextArea."""
+
+    def __init__(self, terminal_input: TerminalInput, search_input: Input, **kwargs) -> None:
+        self._terminal_input = terminal_input
+        super().__init__(search_input, **kwargs)
+
+    def apply_completion(self, value: str, state: TargetState) -> None:
+        """Apply completion by setting the TextArea text and exiting search mode."""
+        self._terminal_input.code = value
+        self._terminal_input._exit_search_mode()
 
 
 class InputTextArea(TextArea):
@@ -31,6 +45,12 @@ class InputTextArea(TextArea):
 
     def _on_key(self, event: events.Key) -> None:
         """Intercept key events before TextArea processes them."""
+        # CTRL+R for history search
+        if event.key == "ctrl+r":
+            event.prevent_default()
+            event.stop()
+            self.post_message(TerminalInput.HistorySearchRequested())
+            return
         # Enter submits the code
         if event.key == "enter":
             event.prevent_default()
@@ -70,6 +90,7 @@ class TerminalInput(Static):
     BINDINGS = [
         Binding("alt+up", "history_back", "History Back", show=True),
         Binding("alt+down", "history_forward", "History Forward", show=True),
+        Binding("ctrl+r", "history_search", "History Search", show=True),
     ]
 
     DEFAULT_CSS = """
@@ -108,6 +129,18 @@ class TerminalInput(Static):
     TerminalInput TextArea:focus {
         border: none !important;
     }
+
+    TerminalInput Input {
+        width: 1fr;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: transparent;
+    }
+
+    TerminalInput Input:focus {
+        border: none !important;
+    }
     """
 
     class SubmitRequested(Message):
@@ -129,6 +162,10 @@ class TerminalInput(Static):
 
     class HistoryNext(Message):
         """Message requesting next history item."""
+        pass
+
+    class HistorySearchRequested(Message):
+        """Message requesting history search interface."""
         pass
 
     class Submitted(Message):
@@ -154,6 +191,9 @@ class TerminalInput(Static):
         self._shell_prompt = "$"
         self.mode = "python"
         self._history = history
+        self._search_mode = False
+        self._search_input: Input | None = None
+        self._autocomplete: HistoryAutoComplete | None = None
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -248,3 +288,92 @@ class TerminalInput(Static):
         entry = self._history.navigate_forward(self.mode)
         if entry is not None:
             self.code = entry
+
+    def on_terminal_input_history_search_requested(self, event: HistorySearchRequested) -> None:
+        """Handle CTRL+R to enter history search mode."""
+        self.action_history_search()
+
+    def action_history_search(self) -> None:
+        """Enter history search mode with autocomplete dropdown."""
+        if self._history is None:
+            return
+
+        if self._search_mode:
+            # Already in search mode, exit it
+            self._exit_search_mode()
+            return
+
+        # Enter search mode
+        self._search_mode = True
+        
+        # Get the text area and horizontal container
+        text_area = self.query_one("#code-input", InputTextArea)
+        horizontal = self.query_one(Horizontal)
+        
+        # Hide the text area
+        text_area.display = False
+        
+        # Create search input
+        self._search_input = Input(placeholder="Search history (CTRL+R)...", id="history-search-input")
+        horizontal.mount(self._search_input)
+        
+        # Create autocomplete with history items
+        def get_history_candidates(state: TargetState) -> list[DropdownItem]:
+            """Get filtered history items based on search input."""
+            search_text = state.text.lower()
+            
+            # Get history for current mode
+            if self.mode == "ai":
+                history_list = self._history._ai_history
+            elif self.mode == "shell":
+                history_list = self._history._shell_history
+            else:
+                history_list = self._history._python_history
+            
+            # Filter and reverse (most recent first)
+            filtered = [
+                DropdownItem(main=item)
+                for item in reversed(history_list)
+                if search_text in item.lower()
+            ]
+            
+            return filtered[:50]  # Limit to 50 items
+        
+        # Mount autocomplete
+        self._autocomplete = HistoryAutoComplete(
+            terminal_input=self,
+            search_input=self._search_input,
+            candidates=get_history_candidates
+        )
+        horizontal.mount(self._autocomplete)
+        
+        # Focus the search input
+        self._search_input.focus()
+
+    def _exit_search_mode(self) -> None:
+        """Exit history search mode."""
+        if not self._search_mode:
+            return
+        
+        self._search_mode = False
+        
+        # Remove autocomplete and search input
+        if self._autocomplete is not None:
+            self._autocomplete.remove()
+            self._autocomplete = None
+        
+        if self._search_input is not None:
+            self._search_input.remove()
+            self._search_input = None
+        
+        # Show and focus the text area
+        text_area = self.query_one("#code-input", InputTextArea)
+        text_area.display = True
+        text_area.focus()
+
+    def on_key(self, event: events.Key) -> None:
+        """Handle key events for exiting search mode."""
+        if self._search_mode and event.key == "escape":
+            self._exit_search_mode()
+            event.prevent_default()
+            event.stop()
