@@ -96,6 +96,10 @@ class CodeOutputBlock(BaseBlock):
     CodeOutputBlock .markdown-output MarkdownFence {
         margin: 0 0 1 0;
     }
+
+    CodeOutputBlock .markdown-output MarkdownTable {
+        width: auto;
+    }
     """
 
     def __init__(self, output="", render_markdown=False) -> None:
@@ -184,6 +188,10 @@ class AgentOutputBlock(BaseBlock):
 
     AgentOutputBlock .agent-output MarkdownFence {
         margin: 0 0 1 0;
+    }
+
+    AgentOutputBlock .agent-output MarkdownTable {
+        width: auto;
     }
     """
 
