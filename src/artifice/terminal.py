@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -54,6 +55,7 @@ class ArtificeTerminal(Widget):
     BINDINGS = [
         Binding("ctrl+l", "clear", "Clear Output", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown Output", show=True),
+        Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
     ]
@@ -204,6 +206,7 @@ class ArtificeTerminal(Widget):
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
         self.pinned_output = PinnedOutput(id="pinned")
+        self._current_task: asyncio.Task | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -218,57 +221,70 @@ class ArtificeTerminal(Widget):
         # Clear input
         self.input.clear()
 
-        if event.is_agent_prompt:
-            await self._handle_agent_prompt(code)
-        elif event.is_shell_command:
-            result = await self._handle_shell_execution(code)
+        # Create a task to track execution
+        async def execute():
+            try:
+                if event.is_agent_prompt:
+                    await self._handle_agent_prompt(code)
+                elif event.is_shell_command:
+                    result = await self._handle_shell_execution(code)
 
-            if self._agent_requested_execution:
-                agent_output_block = AgentOutputBlock()
-                self.output.append_block(agent_output_block)
+                    if self._agent_requested_execution:
+                        agent_output_block = AgentOutputBlock()
+                        self.output.append_block(agent_output_block)
 
-                prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
+                        prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
 
-                def on_chunk(text):
-                    agent_output_block.append(text)
-                    self.output.call_after_refresh(self.output.auto_scroll)
+                        def on_chunk(text):
+                            agent_output_block.append(text)
+                            self.output.call_after_refresh(self.output.auto_scroll)
 
-                response = await self._agent.send_prompt(
-                    prompt,
-                    on_chunk=on_chunk,
-                )
+                        response = await self._agent.send_prompt(
+                            prompt,
+                            on_chunk=on_chunk,
+                        )
 
-                if response.error:
-                    agent_output_block.mark_failed()
+                        if response.error:
+                            agent_output_block.mark_failed()
+                        else:
+                            agent_output_block.mark_success()
+
+                        self._agent_requested_execution = False
                 else:
-                    agent_output_block.mark_success()
+                    result = await self._handle_python_execution(code)
 
-                self._agent_requested_execution = False
-        else:
-            result = await self._handle_python_execution(code)
+                    if self._agent_requested_execution:
+                        agent_output_block = AgentOutputBlock()
+                        self.output.append_block(agent_output_block)
 
-            if self._agent_requested_execution:
-                agent_output_block = AgentOutputBlock()
-                self.output.append_block(agent_output_block)
+                        prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
 
-                prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
+                        def on_chunk(text):
+                            agent_output_block.append(text)
+                            self.output.call_after_refresh(self.output.auto_scroll)
 
-                def on_chunk(text):
-                    agent_output_block.append(text)
-                    self.output.call_after_refresh(self.output.auto_scroll)
+                        # Send prompt to agent with streaming into the NEW block
+                        response = await self._agent.send_prompt(
+                            prompt,
+                            on_chunk=on_chunk,
+                        )
 
-                # Send prompt to agent with streaming into the NEW block
-                response = await self._agent.send_prompt(
-                    prompt,
-                    on_chunk=on_chunk,
-                )
+                        if response.error:
+                            agent_output_block.mark_failed()
+                        else:
+                            agent_output_block.mark_success()
 
-                if response.error:
-                    agent_output_block.mark_failed()
-                else:
-                    agent_output_block.mark_success()
+                        self._agent_requested_execution = False
+            except asyncio.CancelledError:
+                # Task was cancelled - show message
+                code_output_block = CodeOutputBlock(render_markdown=False)
+                self.output.append_block(code_output_block)
+                code_output_block.append_error("\n[Cancelled]\n")
+                raise
+            finally:
+                self._current_task = None
 
-                self._agent_requested_execution = False
+        self._current_task = asyncio.create_task(execute())
     
     async def on_terminal_input_decline_requested(self, event: TerminalInput.DeclineRequested) -> None:
         """Handle decline request from input (escape key)."""
@@ -430,6 +446,12 @@ class ArtificeTerminal(Widget):
     def action_clear(self) -> None:
         """Clear the output."""
         self.output.clear()
+
+    def action_cancel_execution(self) -> None:
+        """Cancel the currently executing code or AI prompt."""
+        if self._current_task and not self._current_task.done():
+            self._current_task.cancel()
+            self._current_task = None
 
     async def action_toggle_mode_markdown(self) -> None:
         """Toggle markdown rendering for the current input mode (affects future blocks only)."""

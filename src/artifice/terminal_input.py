@@ -38,7 +38,7 @@ class InputTextArea(TextArea):
     BINDINGS = [
         Binding("ctrl+s", "submit_code", "Submit", show=True, priority=True),
         Binding("ctrl+j", "insert_newline", "New Line", show=False, priority=True),
-        Binding("shift+tab", "", "Move to Output", show=True)
+        Binding("ctrl+k", "clear_input", "Clear Input", show=True, priority=True),
     ]
 
     def __init__(self, **kwargs) -> None:
@@ -52,6 +52,10 @@ class InputTextArea(TextArea):
         """Insert a newline (triggered by Shift+Enter)."""
         # Insert newline at cursor position
         self.insert("\n")
+
+    def action_clear_input(self) -> None:
+        """Clear the input text area (triggered by Ctrl+K)."""
+        self.text = ""
 
     def set_syntax_highlighting(self, language: str) -> None:
         """Enable or disable Python syntax highlighting."""

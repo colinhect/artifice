@@ -81,17 +81,26 @@ class CodeExecutor:
             )
 
             # Poll the queue for output while execution runs
-            while not exec_task.done():
-                # Process any queued output
-                while not output_queue.empty():
-                    stream_type, text = output_queue.get_nowait()
-                    if stream_type == "stdout" and on_output:
-                        on_output(text)
-                    elif stream_type == "stderr" and on_error:
-                        on_error(text)
+            try:
+                while not exec_task.done():
+                    # Process any queued output
+                    while not output_queue.empty():
+                        stream_type, text = output_queue.get_nowait()
+                        if stream_type == "stdout" and on_output:
+                            on_output(text)
+                        elif stream_type == "stderr" and on_error:
+                            on_error(text)
 
-                # Small sleep to avoid busy-waiting
-                await asyncio.sleep(0.01)
+                    # Small sleep to avoid busy-waiting
+                    await asyncio.sleep(0.01)
+            except asyncio.CancelledError:
+                # Cancel the execution task
+                exec_task.cancel()
+                result.status = ExecutionStatus.ERROR
+                result.error = "\n[Execution cancelled]\n"
+                if on_error:
+                    on_error(result.error)
+                raise
 
             # Process any remaining output
             while not output_queue.empty():
