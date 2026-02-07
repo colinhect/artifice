@@ -36,17 +36,28 @@ class InputTextArea(TextArea):
     """Custom TextArea that handles Enter for submission and history navigation."""
 
     BINDINGS = [
+        Binding("ctrl+s", "submit_code", "Submit", show=True, priority=True),
+        Binding("ctrl+j", "insert_newline", "New Line", show=False, priority=True),
         Binding("shift+tab", "", "Move to Output", show=True)
     ]
 
     def __init__(self, **kwargs) -> None:
         super().__init__(language="python", **kwargs)
 
+    def action_submit_code(self) -> None:
+        """Submit the code (triggered by Ctrl+Enter)."""
+        self.post_message(TerminalInput.SubmitRequested())
+
+    def action_insert_newline(self) -> None:
+        """Insert a newline (triggered by Shift+Enter)."""
+        # Insert newline at cursor position
+        self.insert("\n")
+
     def set_syntax_highlighting(self, language: str) -> None:
         """Enable or disable Python syntax highlighting."""
         self.language = language
 
-    def _on_key(self, event: events.Key) -> None:
+    async def _on_key(self, event: events.Key) -> None:
         """Intercept key events before TextArea processes them."""
         # CTRL+R for history search
         if event.key == "ctrl+r":
@@ -54,12 +65,18 @@ class InputTextArea(TextArea):
             event.stop()
             self.post_message(TerminalInput.HistorySearchRequested())
             return
-        # Enter submits the code
+
+        # Plain Enter key (modifiers are handled via Bindings)
         if event.key == "enter":
-            event.prevent_default()
-            event.stop()
-            self.post_message(TerminalInput.SubmitRequested())
-            return
+            # Check if text has multiple lines
+            line_count = self.document.line_count
+            if line_count == 1:
+                # Single line: submit the code
+                event.prevent_default()
+                event.stop()
+                self.post_message(TerminalInput.SubmitRequested())
+                return
+            # Multi-line: let it fall through to insert newline
         # Escape key
         if event.key == "escape":
             event.prevent_default()
@@ -102,7 +119,7 @@ class InputTextArea(TextArea):
                 self.post_message(TerminalInput.PythonMode())
                 return
         # Let parent handle other keys
-        super()._on_key(event)
+        await super()._on_key(event)
 
 
 class TerminalInput(Static):
