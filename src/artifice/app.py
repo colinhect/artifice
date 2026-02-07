@@ -30,7 +30,7 @@ class ArtificeApp(App):
     def compose(self) -> ComposeResult:
         #yield Header()
         yield ArtificeTerminal(self)
-        #yield Footer()
+        yield Footer()
 
 
 def main():

@@ -54,6 +54,8 @@ class ArtificeTerminal(Widget):
     BINDINGS = [
         Binding("ctrl+l", "clear", "Clear Output", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown Output", show=True),
+        Binding("alt+up", "navigate_up", "Navigate Up", show=True),
+        Binding("alt+down", "navigate_down", "Navigate Down", show=True),
     ]
 
     def __init__(
@@ -450,4 +452,27 @@ class ArtificeTerminal(Widget):
         self._executor.reset()
         self.output.clear()
         self._history.clear()
+
+    def action_navigate_up(self) -> None:
+        """Navigate up: from input to output (bottom block), or up through output blocks."""
+        # Check if input has focus
+        input_area = self.input.query_one("#code-input", InputTextArea)
+        if input_area.has_focus:
+            # Move focus to output and highlight the bottom block
+            if self.output._blocks:
+                self.output.focus()
+        elif self.output.has_focus:
+            # Navigate up through blocks
+            self.output.highlight_previous()
+
+    def action_navigate_down(self) -> None:
+        """Navigate down: through output blocks, or from output to input."""
+        # Check if output has focus
+        if self.output.has_focus:
+            # Try to move to next block
+            moved = self.output.highlight_next()
+            if not moved:
+                # At the bottom, move to input
+                self.input.query_one("#code-input", InputTextArea).focus()
+        # If input has focus, do nothing (already at the bottom)
     

@@ -291,9 +291,9 @@ class TerminalOutput(VerticalScroll):
             self.mode = mode
 
     BINDINGS = [
-        Binding("tab", "", "Move to Input", show=True),
-        Binding("up", "highlight_previous", "Previous Block", show=True),
-        Binding("down", "highlight_next", "Next Block", show=True),
+        Binding("end", "", "Input Prompt", show=True),
+        #Binding("up", "highlight_previous", "Previous Block", show=True),
+        #Binding("down", "highlight_next", "Next Block", show=True),
         Binding("enter", "activate_block", "Copy to Input", show=True),
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown On Block", show=True),
         Binding("ctrl+u", "pin_block", "Pin Block", show=True),
