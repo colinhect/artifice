@@ -59,7 +59,6 @@ class ArtificeTerminal(Widget):
         max_history_size: int = 1000,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self._app = app
         self._executor = CodeExecutor()
         self._shell_executor = ShellExecutor()
 
@@ -369,15 +368,15 @@ class ArtificeTerminal(Widget):
         if self.input.mode == "ai":
             self._agent_markdown_enabled = not self._agent_markdown_enabled
             enabled_str = "enabled" if self._agent_markdown_enabled else "disabled"
-            self._app.notify(f"Markdown {enabled_str} for AI agent output")
+            self.app.notify(f"Markdown {enabled_str} for AI agent output")
         elif self.input.mode == "shell":
             self._shell_markdown_enabled = not self._shell_markdown_enabled
             enabled_str = "enabled" if self._shell_markdown_enabled else "disabled"
-            self._app.notify(f"Markdown {enabled_str} for shell command output")
+            self.app.notify(f"Markdown {enabled_str} for shell command output")
         else:
             self._python_markdown_enabled = not self._python_markdown_enabled
             enabled_str = "enabled" if self._python_markdown_enabled else "disabled"
-            self._app.notify(f"Markdown {enabled_str} for Python code output")
+            self.app.notify(f"Markdown {enabled_str} for Python code output")
 
     def reset(self) -> None:
         """Reset the REPL state."""
