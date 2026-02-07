@@ -19,8 +19,7 @@ class ArtificeApp(App):
     }
 
     Footer {
-        background: $panel-darken-3;
-        color: $text-muted;
+        background: $panel-darken-1;
         dock: bottom;
     }
     """
