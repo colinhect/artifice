@@ -7,6 +7,7 @@ from textual import highlight
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.widget import Widget
 from textual.widgets import Static, LoadingIndicator, Markdown
 
 from .execution import ExecutionResult, ExecutionStatus
@@ -157,6 +158,26 @@ class CodeOutputBlock(BaseBlock):
             textual_output = ansi_to_textual(self._full.rstrip('\n'))
             self._output = Static(textual_output, classes="code-output")
             self._contents.mount(self._output)
+
+class WidgetOutputBlock(BaseBlock):
+    """Block that displays an arbitrary Textual widget."""
+
+    DEFAULT_CSS = """
+    WidgetOutputBlock .widget-container {
+        height: auto;
+        width: 1fr;
+    }
+    """
+
+    def __init__(self, widget: Widget, **kwargs):
+        super().__init__(**kwargs)
+        self._widget = widget
+
+    def compose(self) -> ComposeResult:
+        with Horizontal():
+            yield Static("", classes="status-indicator")
+            with Vertical(classes="widget-container"):
+                yield self._widget
 
 class AgentInputBlock(BaseBlock):
     DEFAULT_CSS = """

@@ -14,7 +14,7 @@ from .config import ArtificeConfig
 from .execution import ExecutionResult, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput
-from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock
+from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock
 
 if TYPE_CHECKING:
     from .app import ArtificeApp
@@ -288,6 +288,11 @@ class ArtificeTerminal(Widget):
         )
 
         code_input_block.update_status(result)
+
+        if isinstance(result.result_value, Widget):
+            widget_block = WidgetOutputBlock(result.result_value)
+            self.output.append_block(widget_block)
+
         return result
 
     async def _handle_shell_execution(self, command: str) -> ExecutionResult:
