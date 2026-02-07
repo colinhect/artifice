@@ -73,6 +73,7 @@ $ git status
 - **Markdown Rendering** - AI responses rendered with syntax highlighting
 - **Multiline Input** - Write complex code with Python auto-complete
 - **Command History** - Persistent history across sessions
+- **Textual Integration** - Python commands that result in Textual objects are mounted directly in the output, allowing on-the-fly interface generation
 
 ### Block Navigation
 - **Ctrl+Up/Down** - Navigate between previous inputs and outputs (blocks)
@@ -130,4 +131,7 @@ Planned features and improvements:
 - [ ] LSP integration with agent
 - [ ] Other programming languages
 - [ ] Export commands to shell history
+- [ ] Tab-completion in Python and shell mode
+- [ ] CTRL+R fuzzy history search
+- [ ] Ability to remove history entry or annotate/export
 
