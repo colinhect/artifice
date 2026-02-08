@@ -227,7 +227,7 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+l", "clear", "Clear Output", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown Output", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
-        Binding("ctrl+g", "execute_and_send_to_agent", "Submit & Send to Agent", show=True),
+        Binding("ctrl+g", "toggle_auto_send_to_agent", "Toggle Auto Send to Agent", show=True),
         Binding("ctrl+n", "clear_agent_context", "Clear Agent Context", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
@@ -312,7 +312,7 @@ class ArtificeTerminal(Widget):
             )
         elif app.agent_type:
             raise Exception(f"Unsupported agent {app.agent_type}")
-        self._agent_requested_execution: bool = False
+        self._auto_send_to_agent: bool = False  # Persistent mode for auto-sending execution results
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
@@ -341,14 +341,12 @@ class ArtificeTerminal(Widget):
                 elif event.is_shell_command:
                     result = await self._handle_shell_execution(code)
 
-                    if self._agent_requested_execution:
-                        self._agent_requested_execution = False
+                    if self._auto_send_to_agent:
                         await self._send_execution_result_to_agent(code, result)
                 else:
                     result = await self._handle_python_execution(code)
 
-                    if self._agent_requested_execution:
-                        self._agent_requested_execution = False
+                    if self._auto_send_to_agent:
                         await self._send_execution_result_to_agent(code, result)
             except asyncio.CancelledError:
                 # Task was cancelled - show message
@@ -479,6 +477,11 @@ class ArtificeTerminal(Widget):
 
         await self._stream_agent_response(prompt)
 
+        # After sending a prompt to the agent, enable auto-send mode
+        if not self._auto_send_to_agent:
+            self._auto_send_to_agent = True
+            self.input.add_class("in-context")
+
     async def _send_execution_result_to_agent(self, code: str, result: ExecutionResult) -> None:
         """Send execution results back to the agent and split the response."""
         # Find the most recent code input block and output block to mark as in-context
@@ -568,12 +571,15 @@ class ArtificeTerminal(Widget):
                 self.input.query_one("#code-input", InputTextArea).focus()
         # If input has focus, do nothing (already at the bottom)
 
-    def action_execute_and_send_to_agent(self) -> None:
-        """Execute current code and send command + output to the agent."""
-        # Set flag to send execution results to agent
-        self._agent_requested_execution = True
-        # Trigger submission which will execute and send to agent
-        self.input.action_submit()
+    def action_toggle_auto_send_to_agent(self) -> None:
+        """Toggle auto-send mode - when enabled, all code execution results are sent to agent."""
+        self._auto_send_to_agent = not self._auto_send_to_agent
+
+        # Update visual indicator on input
+        if self._auto_send_to_agent:
+            self.input.add_class("in-context")
+        else:
+            self.input.remove_class("in-context")
 
     def action_clear_agent_context(self) -> None:
         """Clear the agent's conversation context and unhighlight all in-context blocks."""

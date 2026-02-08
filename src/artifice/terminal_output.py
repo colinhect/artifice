@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-from textual import highlight
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
