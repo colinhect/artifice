@@ -83,6 +83,7 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown Output", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
         Binding("ctrl+t", "use_last_agent_code", "Use Agent Code", show=True),
+        Binding("ctrl+g", "execute_and_send_to_agent", "Submit & Send to Agent", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
     ]
@@ -358,7 +359,6 @@ class ArtificeTerminal(Widget):
             self.input.code = code.strip()
             self.input.mode = "python" if lang in ["python", "py"] else "shell"
             self.input._update_prompt()
-            self._agent_requested_execution = True
 
     def action_use_last_agent_code(self) -> None:
         """Load the last code block suggested by the AI agent into the input.
@@ -372,7 +372,6 @@ class ArtificeTerminal(Widget):
             self.input.mode = "python" if lang in ["python", "py"] else "shell"
             self.input._update_prompt()
             self.input.query_one("#code-input", InputTextArea).focus()
-            self._agent_requested_execution = True
 
             # Advance to next code block for next time, wrapping around
             self._last_response_code_index = (self._last_response_code_index + 1) % len(self._last_response_code)
@@ -451,4 +450,11 @@ class ArtificeTerminal(Widget):
                 # At the bottom, move to input
                 self.input.query_one("#code-input", InputTextArea).focus()
         # If input has focus, do nothing (already at the bottom)
-    
+
+    def action_execute_and_send_to_agent(self) -> None:
+        """Execute current code and send command + output to the agent."""
+        # Set flag to send execution results to agent
+        self._agent_requested_execution = True
+        # Trigger submission which will execute and send to agent
+        self.input.action_submit()
+
