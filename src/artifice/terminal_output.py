@@ -60,11 +60,17 @@ class BaseBlock(Static):
 class CodeInputBlock(BaseBlock):
     DEFAULT_CSS = """
     CodeInputBlock {
-        margin: 1 0 0 0;
+        margin: 0;
     }
 
     CodeInputBlock .code {
         background: $background-darken-3;
+        padding: 0;
+        border: none;
+    }
+
+    CodeInputBlock .code-unused {
+        background: $surface-darken-1;
         padding: 0;
         border: none;
     }
@@ -91,10 +97,14 @@ class CodeInputBlock(BaseBlock):
         self._code = Static(highlight.highlight(code if not use_markdown else "", language=language), classes="code")
         if use_markdown:
             # Format code as markdown code fence
+
             markdown_code = f"```{language}\n{code}\n```"
             self._markdown_code = Markdown(markdown_code, classes="markdown-code")
+            self.styles.margin = (0, 0, 0, 0)
+            self._code.classes = "code-unused"
         else:
             self._markdown_code = None
+            self.styles.margin = (1, 0, 0, 0)
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -634,4 +644,3 @@ class PinnedOutput(Vertical):
         if 0 <= self._highlighted_index < len(self._pinned_blocks):
             return self._pinned_blocks[self._highlighted_index]
         return None
-
