@@ -183,6 +183,11 @@ class TerminalInput(Static):
         margin: 0 !important;
     }
 
+    TerminalInput #history-search-input {
+        width: 1fr;
+        height: 9;
+    }
+
     TerminalInput Input:focus {
         border: none !important;
     }
@@ -190,7 +195,7 @@ class TerminalInput(Static):
     /* Show up to 8 items in autocomplete dropdown */
     AutoCompleteList {
         layer: overlay;
-        height: auto;
+        height: 9;
     }
     """
 
@@ -258,6 +263,7 @@ class TerminalInput(Static):
     def on_mount(self) -> None:
         """Focus the text area on mount."""
         self.query_one("#code-input", InputTextArea).focus()
+        self._update_prompt()
 
     def on_terminal_input_submit_requested(self, event: SubmitRequested) -> None:
         """Handle submission request from TextArea."""
@@ -305,15 +311,19 @@ class TerminalInput(Static):
         prompt_widget = self.query_one("#prompt-display", Static)
         text_area = self.query_one("#code-input", InputTextArea)
         
-        if self.mode == "ai":
-            prompt_widget.update(self._ai_prompt)
-            text_area.set_syntax_highlighting(None)
-        elif self.mode == "shell":
-            prompt_widget.update(self._shell_prompt)
-            text_area.set_syntax_highlighting("bash")
-        else:
-            prompt_widget.update(self._python_prompt)
-            text_area.set_syntax_highlighting("python")
+        with self.app.batch_update():
+            if self.mode == "ai":
+                prompt_widget.update(self._ai_prompt)
+                text_area.placeholder = "AI prompt...       (> for python)  ($ for shell)"
+                text_area.set_syntax_highlighting(None)
+            elif self.mode == "shell":
+                prompt_widget.update(self._shell_prompt)
+                text_area.placeholder = "Shell command...   (? for ai)  (> for python)"
+                text_area.set_syntax_highlighting("bash")
+            else:
+                prompt_widget.update(self._python_prompt)
+                text_area.placeholder = "Python code...     (? for ai)  ($ for shell)"
+                text_area.set_syntax_highlighting("python")
 
     @property
     def code(self) -> str:
@@ -388,7 +398,7 @@ class TerminalInput(Static):
         text_area.display = False
         
         # Create search input
-        self._search_input = Input(placeholder="Search history (CTRL+R)...", id="history-search-input")
+        self._search_input = Input(placeholder="Search history...", id="history-search-input")
         horizontal.mount(self._search_input)
         
         # Create autocomplete with history items
