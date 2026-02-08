@@ -332,8 +332,11 @@ class ArtificeTerminal(Widget):
             on_chunk=on_chunk,
         )
 
-        # Split response into text and code blocks
-        #await self._split_agent_response(agent_output_block, response)
+        # Mark the response as complete
+        if response.error:
+            agent_output_block.mark_failed()
+        else:
+            agent_output_block.mark_success()
 
     async def _send_execution_result_to_agent(self, code: str, result: ExecutionResult) -> None:
         """Send execution results back to the agent and split the response."""
@@ -351,7 +354,11 @@ class ArtificeTerminal(Widget):
             on_chunk=on_chunk,
         )
 
-        #await self._split_agent_response(agent_output_block, response)
+        # Mark the response as complete
+        if response.error:
+            agent_output_block.mark_failed()
+        else:
+            agent_output_block.mark_success()
 
     def action_use_last_agent_code(self) -> None:
         """Load the last code block suggested by the AI agent into the input."""
