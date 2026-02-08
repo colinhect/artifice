@@ -18,7 +18,7 @@ from .ansi_handler import ansi_to_textual
 class BaseBlock(Static):
     DEFAULT_CSS = """
     BaseBlock {
-        margin: 0 0 1 0;
+        margin: 0 0 0 0;
         padding: 0;
         padding-left: 1;
     }
@@ -60,13 +60,18 @@ class BaseBlock(Static):
 class CodeInputBlock(BaseBlock):
     DEFAULT_CSS = """
     CodeInputBlock {
-        margin: 0 0 0 0;
+        margin: 1 0 0 0;
     }
 
     CodeInputBlock .code {
-        background: $primary-background-darken-2;
+        background: $background-darken-3;
         padding: 0;
         border: none;
+        layout: stream;
+    }
+
+    CodeInputBlock .code MarkdownFence {
+        margin: 0;
     }
     """
 
@@ -75,9 +80,11 @@ class CodeInputBlock(BaseBlock):
         self._loading_indicator = LoadingIndicator()
         self._show_loading = show_loading
         self._status_indicator = Static(classes="status-indicator")
-        self._code = Static(highlight.highlight(code, language=language), classes="code")
         self._language = language
         self._original_code = code  # Store original code for re-execution
+        # Format code as markdown code fence
+        markdown_code = f"```{language}\n{code}\n```"
+        self._code = Markdown(markdown_code, classes="code")
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -100,7 +107,9 @@ class CodeInputBlock(BaseBlock):
     def update_code(self, code: str) -> None:
         """Update the displayed code (used during streaming)."""
         self._original_code = code
-        self._code.update(highlight.highlight(code, language=self._language))
+        # Format code as markdown code fence and update
+        markdown_code = f"```{self._language}\n{code}\n```"
+        self._code.update(markdown_code)
 
     def get_code(self) -> str:
         """Get the original code."""
@@ -112,6 +121,10 @@ class CodeInputBlock(BaseBlock):
 
 class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """
+    CodeOutputBlock {
+        margin: 0 0 1 0;
+    }
+
     CodeOutputBlock .code-output {
         /*background: $surface-darken-1;*/
         /*color: $text-muted;*/
@@ -224,7 +237,7 @@ class WidgetOutputBlock(BaseBlock):
 class AgentInputBlock(BaseBlock):
     DEFAULT_CSS = """
     AgentInputBlock {
-        margin: 0 0 0 0;
+        margin: 1 0 0 0;
     }
 
     AgentInputBlock .prompt {

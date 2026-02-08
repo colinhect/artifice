@@ -227,7 +227,6 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+l", "clear", "Clear Output", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown Output", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
-        Binding("ctrl+t", "use_last_agent_code", "Use Agent Code", show=True),
         Binding("ctrl+g", "execute_and_send_to_agent", "Submit & Send to Agent", show=True),
         Binding("ctrl+n", "clear_agent_context", "Clear Agent Context", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
@@ -319,8 +318,6 @@ class ArtificeTerminal(Widget):
         self.input = TerminalInput(history=self._history, id="input")
         self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
-        self._last_response_code = None
-        self._last_response_code_index = 0
         self._context_blocks: list[BaseBlock] = []  # Blocks in agent context
 
     def compose(self) -> ComposeResult:
@@ -455,9 +452,6 @@ class ArtificeTerminal(Widget):
         for block in detector.all_blocks:
             self._mark_block_in_context(block)
 
-        self._capture_code_segments(response.text)
-        self._auto_load_first_code_block()
-
         # Mark the first agent output block with success/failure
         if detector.first_agent_block:
             if response.error:
@@ -498,43 +492,6 @@ class ArtificeTerminal(Widget):
         prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
 
         await self._stream_agent_response(prompt)
-
-    def _capture_code_segments(self, response_text):
-        self._last_response_code = []
-        self._last_response_code_index = 0  # Reset index for new response
-        segments = parse_response_segments(response_text)
-        has_code = any(s[0] == 'code' for s in segments)
-        lang = None
-        code = None
-        if has_code:
-            for segment in segments:
-                if segment[0] == 'code':
-                    lang, code = segment[1], segment[2]
-                    self._last_response_code.append((lang, code))
-
-    def _auto_load_first_code_block(self) -> None:
-        """Automatically load the first code block into the input area."""
-        if self._last_response_code:
-            lang, code = self._last_response_code[-1]
-            self.input.code = code.strip()
-            self.input.mode = "python" if lang in ["python", "py"] else "shell"
-            self.input._update_prompt()
-
-    def action_use_last_agent_code(self) -> None:
-        """Load the last code block suggested by the AI agent into the input.
-
-        Cycles through multiple code blocks in the response on repeated presses.
-        """
-        if self._last_response_code:
-            # Get current code block
-            (lang, code) = self._last_response_code[self._last_response_code_index]
-            self.input.code = code.strip()
-            self.input.mode = "python" if lang in ["python", "py"] else "shell"
-            self.input._update_prompt()
-            self.input.query_one("#code-input", InputTextArea).focus()
-
-            # Advance to next code block for next time, wrapping around
-            self._last_response_code_index = (self._last_response_code_index + 1) % len(self._last_response_code)
 
     async def on_terminal_output_pin_requested(self, event: TerminalOutput.PinRequested) -> None:
         """Handle pin request: move widget block from output to pinned area."""
