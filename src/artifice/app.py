@@ -6,6 +6,20 @@ from textual.widgets import Header, Footer
 
 from artifice import ArtificeTerminal
 
+import logging
+
+# Only log agent interactions, not other modules
+
+
+logging.basicConfig(
+  level=logging.INFO,
+  format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+  filename='artifice_agent.log',
+  filemode='a'  # append mode
+)
+
+logging.getLogger('artifice.agent').setLevel(logging.INFO)
+
 class ArtificeApp(App):
     TITLE = "Artifice Terminal"
     CSS = """

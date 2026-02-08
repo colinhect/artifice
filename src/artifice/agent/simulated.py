@@ -1,9 +1,12 @@
 """Simulated AI agent for testing and development."""
 
 import asyncio
+import logging
 from typing import Any, Callable, Optional
 
 from .common import AgentBase, AgentResponse
+
+logger = logging.getLogger(__name__)
 
 
 class SimulatedAgent(AgentBase):
@@ -117,6 +120,7 @@ class SimulatedAgent(AgentBase):
             'role': 'user',
             'content': prompt
         })
+        logger.info(f"[SimulatedAgent] Sending prompt: {prompt}")
 
         # Find matching scenario
         scenario = self._find_matching_scenario(prompt)
@@ -137,6 +141,7 @@ class SimulatedAgent(AgentBase):
             'role': 'assistant',
             'content': response_text
         })
+        logger.info(f"[SimulatedAgent] Received response ({len(response_text)} chars): {response_text}")
 
         return AgentResponse(
             text=response_text,
@@ -234,6 +239,7 @@ class EchoAgent(SimulatedAgent):
         on_chunk: Optional[Callable[[str], None]] = None,
     ) -> AgentResponse:
         """Echo the prompt back with the configured prefix."""
+        logger.info(f"[EchoAgent] Sending prompt: {prompt}")
         response_text = f"{self.prefix}{prompt}"
 
         if on_chunk:
@@ -241,6 +247,7 @@ class EchoAgent(SimulatedAgent):
                 on_chunk(char)
                 await asyncio.sleep(self.response_delay)
 
+        logger.info(f"[EchoAgent] Received response ({len(response_text)} chars): {response_text}")
         return AgentResponse(
             text=response_text,
             stop_reason="end_turn"

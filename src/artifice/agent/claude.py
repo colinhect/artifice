@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from typing import Optional, Callable
 
 from .common import AgentBase, AgentResponse
+
+logger = logging.getLogger(__name__)
 
 class ClaudeAgent(AgentBase):
     """Agent for connecting to Claude via Anthropic API with streaming responses.
@@ -79,6 +82,7 @@ class ClaudeAgent(AgentBase):
             # Add new user message to conversation history (only if non-empty)
             if prompt.strip():
                 self.messages.append({"role": "user", "content": prompt})
+                logger.info(f"[ClaudeAgent] Sending prompt: {prompt}")
 
             def sync_stream():
                 """Synchronously stream from Claude."""
@@ -108,8 +112,9 @@ class ClaudeAgent(AgentBase):
             # Execute streaming in thread pool
             text, stop_reason = await loop.run_in_executor(None, sync_stream)
 
-            # Add assistant's response to conversation history
+            # Log and add assistant's response to conversation history
             if text:
+                logger.info(f"[ClaudeAgent] Received response ({len(text)} chars, stop_reason={stop_reason}): {text}")
                 self.messages.append({"role": "assistant", "content": text})
 
             return AgentResponse(
