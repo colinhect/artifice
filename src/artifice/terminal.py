@@ -161,12 +161,12 @@ class ArtificeTerminal(Widget):
         elif app.agent_type:
             raise Exception(f"Unsupported agent {app.agent_type}")
         self._agent_requested_execution: bool = False
-        self._last_agent_code_block: tuple[str, str] | None = None  # (language, code)
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
         self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
+        self._last_response_code = None
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -270,41 +270,6 @@ class ArtificeTerminal(Widget):
         command_input_block.update_status(result)
         return result
 
-    async def _split_agent_response(self, streaming_block: AgentOutputBlock, response) -> None:
-        """Split an agent response into text and code blocks.
-
-        If the response contains code blocks, removes the streaming block
-        and replaces it with separate text and code blocks.
-        """
-        if response.error:
-            streaming_block.mark_failed()
-            return
-
-        segments = parse_response_segments(response.text)
-        has_code = any(s[0] == 'code' for s in segments)
-
-        if has_code:
-            await streaming_block.remove()
-            self.output._blocks.remove(streaming_block)
-
-            for segment in segments:
-                if segment[0] == 'text':
-                    block = AgentOutputBlock(segment[1])
-                    self.output.append_block(block)
-                    block.mark_success()
-                else:
-                    lang, code = segment[1], segment[2]
-                    code_text = code.rstrip('\n')
-                    code_block = CodeInputBlock(code_text, language=lang)
-                    self.output.append_block(code_block)
-                    code_block._loading_indicator.styles.display = "none"
-                    prompt_char = ">" if lang == "python" else "$"
-                    code_block._status_indicator.update(prompt_char)
-                    code_block._status_indicator.add_class("status-pending")
-                    self._last_agent_code_block = (lang, code_text)
-        else:
-            streaming_block.mark_success()
-
     async def _handle_agent_prompt(self, prompt: str) -> None:
         """Handle AI agent prompt with code block detection."""
         # Create a block showing the prompt
@@ -332,6 +297,8 @@ class ArtificeTerminal(Widget):
             on_chunk=on_chunk,
         )
 
+        self._capture_code_segments(response.text)
+
         # Mark the response as complete
         if response.error:
             agent_output_block.mark_failed()
@@ -354,22 +321,35 @@ class ArtificeTerminal(Widget):
             on_chunk=on_chunk,
         )
 
+        self._capture_code_segments(response.text)
+
         # Mark the response as complete
         if response.error:
             agent_output_block.mark_failed()
         else:
             agent_output_block.mark_success()
 
+    def _capture_code_segments(self, response_text):
+        self._last_response_code = []
+        segments = parse_response_segments(response_text)
+        has_code = any(s[0] == 'code' for s in segments)
+        lang = None
+        code = None
+        if has_code:
+            for segment in segments:
+                if segment[0] != 'text':
+                    lang, code = segment[1], segment[2]
+                    self._last_response_code.append((lang, code))
+
     def action_use_last_agent_code(self) -> None:
         """Load the last code block suggested by the AI agent into the input."""
-        if self._last_agent_code_block is None:
-            return
-        language, code = self._last_agent_code_block
-        self._agent_requested_execution = True
-        self.input.code = code
-        self.input.mode = "python" if language == "python" else "shell"
-        self.input._update_prompt()
-        self.input.query_one("#code-input", InputTextArea).focus()
+
+        if self._last_response_code:
+            (lang, code) = self._last_response_code[0]
+            self.input.code = code
+            self.input.mode = "python" if lang in ["python", "py"] else "shell"
+            self.input._update_prompt()
+            self.input.query_one("#code-input", InputTextArea).focus()
 
     async def on_terminal_output_pin_requested(self, event: TerminalOutput.PinRequested) -> None:
         """Handle pin request: move widget block from output to pinned area."""
