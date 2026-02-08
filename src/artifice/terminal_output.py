@@ -233,6 +233,10 @@ class CodeOutputBlock(BaseBlock):
             if self._output:
                 self._output.remove_class("code-output")
                 self._output.add_class("error-output")
+            elif self._markdown:
+                # Apply error styling to markdown output as well
+                self._markdown.remove_class("markdown-output")
+                self._markdown.add_class("error-output")
 
     def toggle_markdown(self) -> None:
         self._render_markdown = not self._render_markdown

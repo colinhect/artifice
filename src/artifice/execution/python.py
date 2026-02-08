@@ -8,6 +8,9 @@ from io import StringIO
 from queue import Queue
 from typing import Any, Callable, Optional
 
+import logging
+logger = logging.getLogger(__name__)
+
 from .common import ExecutionStatus, ExecutionResult
 
 class StreamCapture(StringIO):
@@ -67,6 +70,7 @@ class CodeExecutor:
             ExecutionResult with status, output, and any errors.
         """
         result = ExecutionResult(code=code, status=ExecutionStatus.RUNNING)
+        logger.info(f"[CodeExecutor] execute(): {code}")
 
         # Create queue for thread-safe communication
         output_queue: Queue = Queue()
@@ -137,21 +141,26 @@ class CodeExecutor:
             sys.stdout = captured_stdout
             sys.stderr = captured_stderr
 
+            result_value = None
             try:
                 # Try to compile as expression first (for return value)
                 try:
                     compiled = compile(code, "<repl>", "eval")
                     result_value = eval(compiled, self._globals, self._locals)
                 except SyntaxError:
-                    # Not an expression, execute as statements
-                    compiled = compile(code, "<repl>", "exec")
-                    exec(compiled, self._globals, self._locals)
-                    result_value = None
+                    # Not an expression, try as statements
+                    try:
+                        compiled = compile(code, "<repl>", "exec")
+                        exec(compiled, self._globals, self._locals)
+                    except Exception as exec_error:
+                        # Error during exec - re-raise without showing the eval attempt
+                        raise exec_error from None
 
                 return result_value, captured_stdout.getvalue(), captured_stderr.getvalue()
-            except Exception:
-                # Runtime error - capture traceback in stderr
-                traceback.print_exc(file=captured_stderr)
+            except Exception as e:
+                # Any error - capture traceback in stderr
+                captured_stderr.write(str(e))
+                #traceback.print_exc(file=captured_stderr)
                 return None, captured_stdout.getvalue(), captured_stderr.getvalue()
             finally:
                 sys.stdout, sys.stderr = old_stdout, old_stderr
