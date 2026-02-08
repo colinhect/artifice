@@ -270,140 +270,88 @@ class ArtificeTerminal(Widget):
         command_input_block.update_status(result)
         return result
 
-    async def _stream_agent_response(self, prompt: str) -> None:
-        """Stream an agent response with real-time code block detection.
+    async def _split_agent_response(self, streaming_block: AgentOutputBlock, response) -> None:
+        """Split an agent response into text and code blocks.
 
-        Creates AgentOutputBlock for text and CodeInputBlock for code blocks
-        as they are detected during streaming.
+        If the response contains code blocks, removes the streaming block
+        and replaces it with separate text and code blocks.
         """
-        initial_block = AgentOutputBlock()
-        self.output.append_block(initial_block)
+        if response.error:
+            streaming_block.mark_failed()
+            return
 
-        state = {
-            'text_block': initial_block,
-            'text_has_content': False,
-            'in_code': False,
-            'code_block': None,
-            'code_language': None,
-            'code_accum': '',
-            'buf': '',
-        }
+        segments = parse_response_segments(response.text)
+        has_code = any(s[0] == 'code' for s in segments)
 
-        def flush_text(text):
-            if text:
-                state['text_has_content'] = True
-                state['text_block'].append(text)
-                self.output.call_after_refresh(self.output.auto_scroll)
+        if has_code:
+            await streaming_block.remove()
+            self.output._blocks.remove(streaming_block)
 
-        def start_code(language):
-            if state['text_has_content']:
-                state['text_block'].mark_success()
-            else:
-                state['text_block'].remove()
-                self.output._blocks.remove(state['text_block'])
-
-            code_block = CodeInputBlock('', language=language)
-            self.output.append_block(code_block)
-            code_block._loading_indicator.styles.display = 'none'
-            prompt_char = '>' if language == 'python' else '$'
-            code_block._status_indicator.update(prompt_char)
-            code_block._status_indicator.add_class('status-pending')
-
-            state['code_block'] = code_block
-            state['code_language'] = language
-            state['code_accum'] = ''
-            state['text_block'] = None
-            state['text_has_content'] = False
-            state['in_code'] = True
-
-        def append_code(text):
-            state['code_accum'] += text
-            if state['code_block']:
-                state['code_block'].update_code(state['code_accum'].rstrip('\n'))
-                self.output.call_after_refresh(self.output.auto_scroll)
-
-        def end_code():
-            code_text = state['code_accum'].rstrip('\n')
-            if state['code_block']:
-                state['code_block'].update_code(code_text)
-            if state['code_language']:
-                self._last_agent_code_block = (state['code_language'], code_text)
-
-            text_block = AgentOutputBlock()
-            self.output.append_block(text_block)
-            state['text_block'] = text_block
-            state['text_has_content'] = False
-            state['in_code'] = False
-            state['code_block'] = None
-
-        def on_chunk(chunk):
-            state['buf'] += chunk
-
-            while '\n' in state['buf']:
-                nl = state['buf'].index('\n')
-                line = state['buf'][:nl]
-                state['buf'] = state['buf'][nl + 1:]
-
-                if not state['in_code']:
-                    stripped = line.strip()
-                    if stripped in ('```python', '```bash'):
-                        start_code(stripped[3:])
-                    else:
-                        flush_text(line + '\n')
+            for segment in segments:
+                if segment[0] == 'text':
+                    block = AgentOutputBlock(segment[1])
+                    self.output.append_block(block)
+                    block.mark_success()
                 else:
-                    stripped = line.strip()
-                    if stripped == '```':
-                        end_code()
-                    else:
-                        append_code(line + '\n')
-
-        response = await self._agent.send_prompt(prompt, on_chunk=on_chunk)
-
-        # Flush remaining buffer
-        if state['buf']:
-            if state['in_code']:
-                # Check if the remaining buffer is just the closing ```
-                if state['buf'].strip() == '```':
-                    end_code()
-                    state['buf'] = ''
-                else:
-                    append_code(state['buf'])
-            else:
-                flush_text(state['buf'])
-
-        # Finalize last block
-        if state['in_code']:
-            code_text = state['code_accum'].rstrip('\n')
-            if state['code_block']:
-                state['code_block'].update_code(code_text)
-            if state['code_language'] and code_text:
-                self._last_agent_code_block = (state['code_language'], code_text)
-        elif state['text_block']:
-            if response.error:
-                state['text_block'].mark_failed()
-            elif state['text_has_content']:
-                state['text_block'].mark_success()
-            else:
-                state['text_block'].remove()
-                self.output._blocks.remove(state['text_block'])
+                    lang, code = segment[1], segment[2]
+                    code_text = code.rstrip('\n')
+                    code_block = CodeInputBlock(code_text, language=lang)
+                    self.output.append_block(code_block)
+                    code_block._loading_indicator.styles.display = "none"
+                    prompt_char = ">" if lang == "python" else "$"
+                    code_block._status_indicator.update(prompt_char)
+                    code_block._status_indicator.add_class("status-pending")
+                    self._last_agent_code_block = (lang, code_text)
+        else:
+            streaming_block.mark_success()
 
     async def _handle_agent_prompt(self, prompt: str) -> None:
         """Handle AI agent prompt with code block detection."""
+        # Create a block showing the prompt
         agent_input_block = AgentInputBlock(prompt)
         self.output.append_block(agent_input_block)
 
         if self._agent is None:
+            # No agent configured, show error
             agent_output_block = AgentOutputBlock("No AI agent configured.")
             self.output.append_block(agent_output_block)
             agent_output_block.mark_failed()
             return
 
-        await self._stream_agent_response(prompt)
+        # Create a separate block for the agent's response
+        agent_output_block = AgentOutputBlock()
+        self.output.append_block(agent_output_block)
+
+        def on_chunk(text):
+            agent_output_block.append(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
+        # Send prompt to agent with streaming
+        response = await self._agent.send_prompt(
+            prompt,
+            on_chunk=on_chunk,
+        )
+
+        # Split response into text and code blocks
+        #await self._split_agent_response(agent_output_block, response)
 
     async def _send_execution_result_to_agent(self, code: str, result: ExecutionResult) -> None:
-        """Send execution results back to the agent with streaming code block detection."""
+        """Send execution results back to the agent and split the response."""
+        agent_output_block = AgentOutputBlock()
+        self.output.append_block(agent_output_block)
+
         prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
-        await self._stream_agent_response(prompt)
+
+        def on_chunk(text):
+            agent_output_block.append(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
+        response = await self._agent.send_prompt(
+            prompt,
+            on_chunk=on_chunk,
+        )
+
+        #await self._split_agent_response(agent_output_block, response)
 
     def action_use_last_agent_code(self) -> None:
         """Load the last code block suggested by the AI agent into the input."""
