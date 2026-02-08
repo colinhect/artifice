@@ -81,6 +81,12 @@ class InputTextArea(TextArea):
                 self.post_message(TerminalInput.SubmitRequested())
                 return
             # Multi-line: let it fall through to insert newline
+        # Insert key - cycle through modes
+        if event.key == "insert":
+            event.prevent_default()
+            event.stop()
+            self.post_message(TerminalInput.CycleMode())
+            return
         # Escape key
         if event.key == "escape":
             event.prevent_default()
@@ -202,6 +208,10 @@ class TerminalInput(Static):
     class PythonMode(Message):
         pass
 
+    class CycleMode(Message):
+        """Message requesting to cycle through modes."""
+        pass
+
     class HistoryPrevious(Message):
         """Message requesting previous history item."""
         pass
@@ -271,6 +281,17 @@ class TerminalInput(Static):
         if self.mode != "shell":
             self.mode = "shell"
             self._update_prompt()
+
+    def on_terminal_input_cycle_mode(self, event: CycleMode) -> None:
+        """Handle Insert key press - cycle through modes while keeping input."""
+        # Cycle: python -> ai -> shell -> python
+        if self.mode == "python":
+            self.mode = "ai"
+        elif self.mode == "ai":
+            self.mode = "shell"
+        else:  # shell
+            self.mode = "python"
+        self._update_prompt()
 
     def on_terminal_input_history_previous(self, event: HistoryPrevious) -> None:
         """Handle up arrow key press at top of input - navigate to previous history."""
