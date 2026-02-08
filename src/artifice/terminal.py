@@ -29,14 +29,16 @@ def parse_response_segments(text: str) -> list[tuple]:
     - ('text', content) for text segments
     - ('code', language, code) for code blocks (python or bash)
     """
-    pattern = r'```(py|python|bash|shell)\n(.*?)```'
+    pattern = r'```(py|python|bash|shell)?\n(.*?)```'
     segments = []
     last_end = 0
     for match in re.finditer(pattern, text, re.DOTALL):
         before = text[last_end:match.start()].strip()
         if before:
             segments.append(('text', before))
-        segments.append(('code', match.group(1), match.group(2)))
+        # Default to 'python' if no language specified
+        lang = match.group(1) or 'python'
+        segments.append(('code', lang, match.group(2)))
         last_end = match.end()
     after = text[last_end:].strip()
     if after:
@@ -112,8 +114,12 @@ class ArtificeTerminal(Widget):
         # System prompt to guide the agent's behavior
         system_prompt = (
             "You are a coding assistant with Python and shell access. To run code, end your "
-            "response with a fenced code block tagged `python` or `bash`. The user will "
-            "review and may execute it. Be brief."
+            "response with a fenced code demarcated by:\n"
+            "```python\n"
+            "for python commands, or:\n"
+            "```shell\n"
+            "for shell commands.\n"
+            "Ending with ```\n"
         )
         
         def on_agent_connect(agent_name):
@@ -337,7 +343,7 @@ class ArtificeTerminal(Widget):
         code = None
         if has_code:
             for segment in segments:
-                if segment[0] != 'text':
+                if segment[0] == 'code':
                     lang, code = segment[1], segment[2]
                     self._last_response_code.append((lang, code))
 
@@ -350,6 +356,7 @@ class ArtificeTerminal(Widget):
             self.input.mode = "python" if lang in ["python", "py"] else "shell"
             self.input._update_prompt()
             self.input.query_one("#code-input", InputTextArea).focus()
+            self._agent_requested_execution = True
 
     async def on_terminal_output_pin_requested(self, event: TerminalOutput.PinRequested) -> None:
         """Handle pin request: move widget block from output to pinned area."""
