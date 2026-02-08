@@ -86,6 +86,11 @@ class CodeInputBlock(BaseBlock):
             self._status_indicator.update(prompt)
             self._status_indicator.add_class("status-error")
 
+    def update_code(self, code: str) -> None:
+        """Update the displayed code (used during streaming)."""
+        self._original_code = code
+        self._code.update(highlight.highlight(code, language=self._language))
+
     def get_code(self) -> str:
         """Get the original code."""
         return self._original_code
