@@ -52,6 +52,9 @@ class BaseBlock(Static):
         color: $error;
     }
 
+    BaseBlock .status-unexecuted {
+    }
+
     BaseBlock .status-pending {
         color: $secondary;
     }
@@ -91,8 +94,11 @@ class CodeInputBlock(BaseBlock):
         super().__init__(**kwargs)
         self._loading_indicator = LoadingIndicator()
         self._show_loading = show_loading
-        self._status_indicator = Static(classes="status-indicator")
         self._language = language
+        # Always show the prompt based on language
+        prompt = ">" if language == "python" else "$"
+        self._status_indicator = Static(prompt, classes="status-indicator")
+        self._status_indicator.add_class("status-unexecuted")
         self._original_code = code  # Store original code for re-execution
         self._code = Static(highlight.highlight(code if not use_markdown else "", language=language), classes="code")
         if use_markdown:
@@ -152,6 +158,24 @@ class CodeInputBlock(BaseBlock):
     def get_mode(self) -> str:
         """Get the mode for this code block (python or shell)."""
         return "shell" if self._language == "bash" else "python"
+
+    def cycle_language(self) -> None:
+        """Cycle to the next language (python -> bash -> python)."""
+        if self._language == "python":
+            self._language = "bash"
+        else:
+            self._language = "python"
+
+        # Update the prompt
+        prompt = ">" if self._language == "python" else "$"
+        self._status_indicator.update(prompt)
+
+        # Update syntax highlighting and markdown
+        if self._markdown_code:
+            markdown_code = f"```{self._language}\n{self._original_code}\n```"
+            self._markdown_code.update(markdown_code)
+        else:
+            self._code.update(highlight.highlight(self._original_code, language=self._language))
 
 class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """
@@ -418,10 +442,11 @@ class TerminalOutput(VerticalScroll):
         Binding("end", "", "Input Prompt", show=True),
         #Binding("up", "highlight_previous", "Previous Block", show=True),
         #Binding("down", "highlight_next", "Next Block", show=True),
-        Binding("enter", "activate_block", "Copy to Input", show=True),
-        Binding("ctrl+s", "execute_block", "Execute Block", show=True),
+        Binding("ctrl+s", "activate_block", "Copy to Input", show=True),
+        Binding("enter", "execute_block", "Execute Block", show=True),
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown On Block", show=True),
         Binding("ctrl+u", "pin_block", "Pin Block", show=True),
+        Binding("insert", "cycle_language", "Cycle Language", show=True),
     ]
 
     def __init__(
@@ -512,6 +537,12 @@ class TerminalOutput(VerticalScroll):
         block = self.get_highlighted_block()
         if block and isinstance(block, (CodeOutputBlock, AgentOutputBlock)):
             block.toggle_markdown()
+
+    def action_cycle_language(self) -> None:
+        """Cycle the language of the highlighted CodeInputBlock."""
+        block = self.get_highlighted_block()
+        if block and isinstance(block, CodeInputBlock):
+            block.cycle_language()
 
     def action_pin_block(self) -> None:
         """Pin the currently highlighted widget block."""
