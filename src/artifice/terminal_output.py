@@ -127,6 +127,14 @@ class CodeInputBlock(BaseBlock):
             self._status_indicator.update(prompt)
             self._status_indicator.add_class("status-error")
 
+    def show_loading(self) -> None:
+        """Show the loading indicator (for re-execution)."""
+        self._loading_indicator.styles.display = "block"
+        # Clear any previous status styling
+        self._status_indicator.remove_class("status-success")
+        self._status_indicator.remove_class("status-error")
+        self._status_indicator.update("")
+
     def update_code(self, code: str) -> None:
         """Update the displayed code (used during streaming)."""
         self._original_code = code
@@ -400,11 +408,18 @@ class TerminalOutput(VerticalScroll):
             self.code = code
             self.mode = mode
 
+    class BlockExecuteRequested(Message):
+        """Posted when the user wants to execute a code block."""
+        def __init__(self, block: CodeInputBlock) -> None:
+            super().__init__()
+            self.block = block
+
     BINDINGS = [
         Binding("end", "", "Input Prompt", show=True),
         #Binding("up", "highlight_previous", "Previous Block", show=True),
         #Binding("down", "highlight_next", "Next Block", show=True),
         Binding("enter", "activate_block", "Copy to Input", show=True),
+        Binding("ctrl+s", "execute_block", "Execute Block", show=True),
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown On Block", show=True),
         Binding("ctrl+u", "pin_block", "Pin Block", show=True),
     ]
@@ -481,6 +496,16 @@ class TerminalOutput(VerticalScroll):
             code = block.get_prompt()
             mode = block.get_mode()
             self.post_message(self.BlockActivated(code, mode))
+
+    def action_execute_block(self) -> None:
+        """Execute the highlighted code block."""
+        block = self.get_highlighted_block()
+        if block is None:
+            return
+
+        # Only execute CodeInputBlock
+        if isinstance(block, CodeInputBlock):
+            self.post_message(self.BlockExecuteRequested(block))
 
     async def action_toggle_block_markdown(self) -> None:
         """Toggle markdown rendering for the currently highlighted block."""

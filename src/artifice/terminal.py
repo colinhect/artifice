@@ -271,7 +271,9 @@ class ArtificeTerminal(Widget):
             "for python commands, or:\n"
             "```shell\n"
             "for shell commands.\n"
-            "Ending with ```\n"
+            "Ending with ```\n\n"
+            "Put explainations before the code or command. "
+            "Only give one code or command per response and always at the end."
         )
         
         def on_agent_connect(agent_name):
@@ -401,6 +403,33 @@ class ArtificeTerminal(Widget):
 
         return result
 
+    async def _execute_block_python(self, code_input_block: CodeInputBlock, code: str) -> ExecutionResult:
+        """Execute Python code from an existing block."""
+        code_output_block = CodeOutputBlock(render_markdown=self._agent_markdown_enabled)
+        self.output.append_block(code_output_block)
+
+        def on_output(text):
+            code_output_block.append_output(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
+        def on_error(text):
+            code_output_block.append_error(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
+        result = await self._executor.execute(
+            code,
+            on_output=on_output,
+            on_error=on_error,
+        )
+
+        code_input_block.update_status(result)
+
+        if isinstance(result.result_value, Widget):
+            widget_block = WidgetOutputBlock(result.result_value)
+            self.output.append_block(widget_block)
+
+        return result
+
     async def _handle_shell_execution(self, command: str) -> ExecutionResult:
         """Execute shell command."""
         command_input_block = CodeInputBlock(command, language="bash")
@@ -425,6 +454,29 @@ class ArtificeTerminal(Widget):
         )
 
         command_input_block.update_status(result)
+        return result
+
+    async def _execute_block_shell(self, code_input_block: CodeInputBlock, command: str) -> ExecutionResult:
+        """Execute shell command from an existing block."""
+        code_output_block = CodeOutputBlock(render_markdown=self._agent_markdown_enabled)
+        self.output.append_block(code_output_block)
+
+        def on_output(text):
+            code_output_block.append_output(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
+        def on_error(text):
+            code_output_block.append_error(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
+        # Execute asynchronously with streaming callbacks
+        result = await self._shell_executor.execute(
+            command,
+            on_output=on_output,
+            on_error=on_error,
+        )
+
+        code_input_block.update_status(result)
         return result
 
     def _mark_block_in_context(self, block: BaseBlock) -> None:
@@ -523,6 +575,36 @@ class ArtificeTerminal(Widget):
         self.input._update_prompt()
         # Focus the input
         self.input.query_one("#code-input", InputTextArea).focus()
+
+    async def on_terminal_output_block_execute_requested(self, event: TerminalOutput.BlockExecuteRequested) -> None:
+        """Handle block execution: execute code from a block and send output to agent."""
+        block = event.block
+        code = block.get_code()
+        mode = block.get_mode()
+
+        # Show loading indicator on the block
+        block.show_loading()
+
+        # Create a task to track execution
+        async def execute():
+            try:
+                if mode == "shell":
+                    result = await self._execute_block_shell(block, code)
+                else:  # python
+                    result = await self._execute_block_python(block, code)
+
+                # Always send to agent for block execution
+                await self._send_execution_result_to_agent(code, result)
+            except asyncio.CancelledError:
+                # Task was cancelled
+                code_output_block = CodeOutputBlock(render_markdown=False)
+                self.output.append_block(code_output_block)
+                code_output_block.append_error("\n[Cancelled]\n")
+                raise
+            finally:
+                self._current_task = None
+
+        self._current_task = asyncio.create_task(execute())
 
     def action_clear(self) -> None:
         """Clear the output."""
