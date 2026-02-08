@@ -17,7 +17,8 @@ class ClaudeAgent(AgentBase):
 
     def __init__(
         self,
-        model: str = "claude-sonnet-4-5-20250929",
+        #model: str = "claude-sonnet-4-5-20250929",
+        model: str = "claude-haiku-4-5-20251001",
         system_prompt: str | None = None,
         on_connect: Callable | None = None,
     ):
