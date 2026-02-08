@@ -29,7 +29,7 @@ def parse_response_segments(text: str) -> list[tuple]:
     - ('text', content) for text segments
     - ('code', language, code) for code blocks (python or bash)
     """
-    pattern = r'```(python|bash)\n(.*?)```'
+    pattern = r'```(py|python|bash|shell)\n(.*?)```'
     segments = []
     last_end = 0
     for match in re.finditer(pattern, text, re.DOTALL):

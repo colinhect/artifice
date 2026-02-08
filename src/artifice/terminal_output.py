@@ -259,23 +259,40 @@ class AgentOutputBlock(BaseBlock):
     AgentOutputBlock .agent-output MarkdownTable {
         width: auto;
     }
+
+    AgentOutputBlock .text-output {
+        background: $surface-darken-1;
+        padding-left: 0;
+        padding-right: 0;
+    }
     """
 
-    def __init__(self, output="") -> None:
+    def __init__(self, output="", render_markdown=True) -> None:
         super().__init__()
         self._loading_indicator = LoadingIndicator()
         self._status_indicator = Static(classes="status-indicator")
-        self._output = Markdown(output, classes="agent-output")
+        self._output = Static(output, classes="text-output") if not render_markdown else None
+        self._markdown = Markdown(output, classes="agent-output") if render_markdown else None
+        self._full = output
+        self._render_markdown = render_markdown
+        self._contents = Horizontal()
 
     def compose(self) -> ComposeResult:
-        with Horizontal():
+        with self._contents:
             with Vertical(classes="status-indicator"):
                 yield self._loading_indicator
                 yield self._status_indicator
-            yield self._output
+            if self._markdown:
+                yield self._markdown
+            elif self._output is not None:
+                yield self._output
 
     def append(self, response) -> None:
-        self._output.append(response)
+        self._full += response
+        if self._markdown:
+            self._markdown.append(response)
+        elif self._output:
+            self._output.update(self._full)
 
     def mark_success(self) -> None:
         self._loading_indicator.styles.display = "none"
@@ -285,6 +302,21 @@ class AgentOutputBlock(BaseBlock):
         self._loading_indicator.styles.display = "none"
         self._status_indicator.update("✗")
         self._status_indicator.add_class("status-error")
+
+    def toggle_markdown(self) -> None:
+        self._render_markdown = not self._render_markdown
+        if self._render_markdown:
+            if self._output:
+                self._output.remove()
+                self._output = None
+            self._markdown = Markdown(self._full, classes="agent-output")
+            self._contents.mount(self._markdown)
+        else:
+            if self._markdown:
+                self._markdown.remove()
+                self._markdown = None
+            self._output = Static(self._full, classes="text-output")
+            self._contents.mount(self._output)
 
 class TerminalOutput(VerticalScroll):
     """Container for REPL output blocks."""
@@ -395,7 +427,7 @@ class TerminalOutput(VerticalScroll):
     async def action_toggle_block_markdown(self) -> None:
         """Toggle markdown rendering for the currently highlighted block."""
         block = self.get_highlighted_block()
-        if block and isinstance(block, CodeOutputBlock):
+        if block and isinstance(block, (CodeOutputBlock, AgentOutputBlock)):
             block.toggle_markdown()
 
     def action_pin_block(self) -> None:
