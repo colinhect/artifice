@@ -18,7 +18,7 @@ from .ansi_handler import ansi_to_textual
 class BaseBlock(Static):
     DEFAULT_CSS = """
     BaseBlock {
-        margin: 0 0 0 0;
+        margin: 0;
         padding: 0;
         padding-left: 1;
     }
@@ -90,7 +90,7 @@ class CodeInputBlock(BaseBlock):
     }
     """
 
-    def __init__(self, code: str, language: str, show_loading: bool = True, use_markdown=False, **kwargs) -> None:
+    def __init__(self, code: str, language: str, show_loading: bool = True, in_context=False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._loading_indicator = LoadingIndicator()
         self._show_loading = show_loading
@@ -100,18 +100,9 @@ class CodeInputBlock(BaseBlock):
         self._status_indicator = Static(prompt, classes="status-indicator")
         self._status_indicator.add_class("status-unexecuted")
         self._original_code = code  # Store original code for re-execution
-        use_markdown = False
-        self._code = Static(highlight.highlight(code if not use_markdown else "", language=language), classes="code")
-        if use_markdown:
-            # Format code as markdown code fence
-
-            markdown_code = f"```{language}\n{code}\n```"
-            self._markdown_code = Markdown(markdown_code, classes="markdown-code")
-            self.styles.margin = (0, 0, 0, 0)
-            self._code.classes = "code-unused"
-        else:
-            self._markdown_code = None
-            self.styles.margin = (1, 0, 0, 0)
+        self._code = Static(highlight.highlight(code, language=language), classes="code")
+        if in_context:
+            self.add_class("in-context")
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -119,10 +110,7 @@ class CodeInputBlock(BaseBlock):
                 if self._show_loading:
                     yield self._loading_indicator
                 yield self._status_indicator
-            with Vertical():
-                yield self._code
-                if self._markdown_code:
-                    yield self._markdown_code
+            yield self._code
 
     def update_status(self, result: ExecutionResult) -> None:
         self._loading_indicator.styles.display = "none"
@@ -145,12 +133,7 @@ class CodeInputBlock(BaseBlock):
     def update_code(self, code: str) -> None:
         """Update the displayed code (used during streaming)."""
         self._original_code = code
-        if self._markdown_code:
-            # Format code as markdown code fence and update
-            markdown_code = f"```{self._language}\n{code}\n```"
-            self._markdown_code.update(markdown_code)
-        else:
-            self._code.update(highlight.highlight(code, language=self._language))
+        self._code.update(highlight.highlight(code, language=self._language))
 
     def get_code(self) -> str:
         """Get the original code."""
@@ -172,11 +155,7 @@ class CodeInputBlock(BaseBlock):
         self._status_indicator.update(prompt)
 
         # Update syntax highlighting and markdown
-        if self._markdown_code:
-            markdown_code = f"```{self._language}\n{self._original_code}\n```"
-            self._markdown_code.update(markdown_code)
-        else:
-            self._code.update(highlight.highlight(self._original_code, language=self._language))
+        self._code.update(highlight.highlight(self._original_code, language=self._language))
 
 class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """
@@ -297,7 +276,7 @@ class WidgetOutputBlock(BaseBlock):
 class AgentInputBlock(BaseBlock):
     DEFAULT_CSS = """
     AgentInputBlock {
-        margin: 1 0 0 0;
+        margin: 0;
     }
 
     AgentInputBlock .prompt {

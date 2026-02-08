@@ -91,7 +91,7 @@ class StreamingFenceDetector:
         self.first_agent_block: AgentOutputBlock | None = None
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
-        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=False, use_markdown=True)
+        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=False, in_context=True)
 
     def start(self) -> None:
         """Create the initial AgentOutputBlock for streaming prose."""
@@ -324,16 +324,6 @@ class ArtificeTerminal(Widget):
             "You are collaborating with the user to interface with his Linux system with access to a bash shell and a Python session. "
             "Any Python code or shell commands in your responses are interpreted as requests by you to execute that code. Make one request at a time. "
             "Do not over explain unless asked to. Always use ```python or ```shell to mark code or shell command."
-
-            #"You are a coding assistant with Python and shell access. To run code, end your "
-            #"response with a fenced code demarcated by:\n"
-            #"```python\n"
-            #"for python commands, or:\n"
-            #"```shell\n"
-            #"for shell commands.\n"
-            ##"Ending with ```\n\n"
-            #"Put explainations before the code or command. "
-            #"Only give one code or command per response and always at the end."
         )
         
         def on_agent_connect(agent_name):
