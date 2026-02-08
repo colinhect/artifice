@@ -8,9 +8,6 @@ from io import StringIO
 from queue import Queue
 from typing import Any, Callable, Optional
 
-import logging
-logger = logging.getLogger(__name__)
-
 from .common import ExecutionStatus, ExecutionResult
 
 class StreamCapture(StringIO):
@@ -70,7 +67,6 @@ class CodeExecutor:
             ExecutionResult with status, output, and any errors.
         """
         result = ExecutionResult(code=code, status=ExecutionStatus.RUNNING)
-        logger.info(f"[CodeExecutor] execute(): {code}")
 
         # Create queue for thread-safe communication
         output_queue: Queue = Queue()
