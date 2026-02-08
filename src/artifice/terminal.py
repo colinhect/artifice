@@ -12,6 +12,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widget import Widget
+from textual.widgets import Static
 
 from .config import ArtificeConfig
 from .execution import ExecutionResult, CodeExecutor, ShellExecutor
@@ -201,7 +202,7 @@ class ArtificeTerminal(Widget):
 
     ArtificeTerminal TerminalOutput {
         height: auto;
-        max-height: 95vh;
+        max-height: 90vh;
         overflow-y: auto;
     }
 
@@ -328,6 +329,7 @@ class ArtificeTerminal(Widget):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield self.output
+            yield Static(id="flash")
             yield self.input
             yield self.pinned_output
 

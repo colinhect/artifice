@@ -134,7 +134,7 @@ class CodeInputBlock(BaseBlock):
 class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """
     CodeOutputBlock {
-        margin: 0 0 1 0;
+        margin: 0 0 0 0;
     }
 
     CodeOutputBlock .code-output {
@@ -163,7 +163,7 @@ class CodeOutputBlock(BaseBlock):
     }
 
     CodeOutputBlock .markdown-output MarkdownFence {
-        margin: 0 0 1 0;
+        margin: 0 0 0 0;
     }
 
     CodeOutputBlock .markdown-output MarkdownTable {
@@ -293,7 +293,7 @@ class AgentOutputBlock(BaseBlock):
     }
 
     AgentOutputBlock .agent-output MarkdownFence {
-        margin: 0 0 1 0;
+        margin: 0 0 0 0;
     }
 
     AgentOutputBlock .agent-output MarkdownTable {
@@ -316,6 +316,7 @@ class AgentOutputBlock(BaseBlock):
         self._full = output
         self._render_markdown = render_markdown
         self._contents = Horizontal()
+        self.add_class("in-context")
         if not activity:
             self.mark_success()
 
