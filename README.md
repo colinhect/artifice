@@ -16,13 +16,38 @@ pip install -e .
 
 ## Configuration
 
-Set your API key for AI features:
+### Claude (Anthropic)
+Set your API key for Claude:
 ```bash
 export ANTHROPIC_API_KEY="your-api-key-here"
 ```
 
+### Ollama (Local Models)
+Install and run Ollama locally:
+```bash
+# Install Ollama from https://ollama.ai
+ollama pull llama3.1  # or any other model
+ollama serve  # runs on localhost:11434 by default
+```
+
+Optionally set custom Ollama host:
+```bash
+export OLLAMA_HOST="http://localhost:11434"
+```
+
 ## Running
 
+Run with Claude:
+```bash
+artifice --agent-type claude
+```
+
+Run with Ollama:
+```bash
+artifice --agent-type ollama
+```
+
+Run without AI:
 ```bash
 artifice
 ```
@@ -129,6 +154,7 @@ This design enables agentic workflows while keeping you fully responsible and in
 ### Supported Agents
 
 - **Claude** (via Anthropic API) - Streaming support with tool calling
+- **Ollama** (local models) - Run models locally with streaming support
 - Custom agents via `AgentBase` subclass
 
 ### Running from Source
@@ -145,7 +171,7 @@ Planned features and improvements:
 
 - [ ] VIM keybinding mode for text editing
 - [ ] GitHub Copilot integration
-- [ ] Additional AI provider support (OpenAI, local models)
+- [ ] Additional AI provider support (OpenAI, Gemini)
 - [ ] Session export/import
 - [ ] LSP integration with agent
 - [ ] Other programming languages

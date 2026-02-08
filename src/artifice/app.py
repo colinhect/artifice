@@ -53,9 +53,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--agent-type",
-        choices=["claude", "simulated"],
+        choices=["claude", "ollama", "simulated"],
         default="",
-        help="Type of agent to use (claude or simulated). Defaults to empty."
+        help="Type of agent to use (claude, ollama, or simulated). Defaults to empty."
     )
     args = parser.parse_args()
 

@@ -152,6 +152,12 @@ class ArtificeTerminal(Widget):
             ])
 
             self._agent.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
+        elif app.agent_type.lower() == "ollama":
+            from .agent import OllamaAgent
+            self._agent = OllamaAgent(
+                system_prompt=system_prompt,
+                on_connect=on_agent_connect,
+            )
         elif app.agent_type:
             raise Exception(f"Unsupported agent {app.agent_type}")
         self._agent_requested_execution: bool = False
