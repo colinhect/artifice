@@ -4,18 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
-
-
-@dataclass
-class ToolCall:
-    """Tool call made by the agent."""
-    
-    id: str
-    name: str
-    input: dict[str, Any]
-    output: str | None = None
-    error: str | None = None
+from typing import Callable, Optional
 
 
 @dataclass

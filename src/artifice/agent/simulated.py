@@ -3,15 +3,14 @@
 import asyncio
 from typing import Any, Callable, Optional
 
-from .common import AgentBase, AgentResponse, ToolCall
+from .common import AgentBase, AgentResponse
 
 
 class SimulatedAgent(AgentBase):
-    """A simulated AI agent that can be configured with predefined responses and tool calls.
+    """A simulated AI agent that can be configured with predefined responses.
 
     This agent is useful for:
     - Testing the agent interaction flow without API costs
-    - Demonstrating tool calling behavior
     - Development and debugging
     - Creating reproducible test scenarios
     """
@@ -19,7 +18,6 @@ class SimulatedAgent(AgentBase):
     def __init__(
         self,
         system_prompt: Optional[str] = None,
-        tool_handler: Optional[Callable] = None,
         on_connect: Optional[Callable] = None,
         response_delay: float = 0.05,
     ):
@@ -27,18 +25,17 @@ class SimulatedAgent(AgentBase):
 
         Args:
             system_prompt: System prompt (not used by simulated agent but kept for API compatibility)
-            tool_handler: Callback for handling tool calls
+            on_connect: Optional callback called on initialization
             response_delay: Delay between streaming chunks (seconds) to simulate typing
         """
         self.system_prompt = system_prompt
-        self.tool_handler = tool_handler
         self.response_delay = response_delay
         self.conversation_history: list[dict[str, Any]] = []
 
         # Configuration for responses
         self.scenarios: list[dict[str, Any]] = []
         self.current_scenario_index = 0
-        self.default_response = "I'm a simulated AI agent. I can be configured with custom responses and tool calls."
+        self.default_response = "I'm a simulated AI agent. I can be configured with custom responses."
 
         if on_connect:
             on_connect("Artifice")
@@ -48,8 +45,6 @@ class SimulatedAgent(AgentBase):
 
         Each scenario is a dict with:
         - 'response': str - The text response to stream
-        - 'tools': list[dict] - Optional list of tool calls to make
-          Each tool call has: 'name', 'input' (dict)
         - 'pattern': str - Optional regex pattern to match against prompts
 
         Example:
@@ -60,30 +55,22 @@ class SimulatedAgent(AgentBase):
                 },
                 {
                     'pattern': r'calculate|sum',
-                    'response': 'Let me calculate that for you.',
-                    'tools': [
-                        {
-                            'name': 'python',
-                            'input': {'code': 'result = 2 + 2\nprint(result)'}
-                        }
-                    ]
+                    'response': 'Let me calculate that for you.\\n\\n```python\\nresult = 2 + 2\\nprint(result)\\n```',
                 }
             ])
         """
         self.scenarios = scenarios
         self.current_scenario_index = 0
 
-    def add_scenario(self, response: str, tools: Optional[list[dict]] = None, pattern: Optional[str] = None) -> None:
+    def add_scenario(self, response: str, pattern: Optional[str] = None) -> None:
         """Add a single scenario to the configuration.
 
         Args:
             response: The text response to stream
-            tools: Optional list of tool calls
             pattern: Optional regex pattern to match against prompts
         """
         self.scenarios.append({
             'response': response,
-            'tools': tools or [],
             'pattern': pattern
         })
 
@@ -136,10 +123,8 @@ class SimulatedAgent(AgentBase):
 
         if scenario:
             response_text = scenario['response']
-            tools_to_call = scenario.get('tools', [])
         else:
             response_text = self.default_response
-            tools_to_call = []
 
         # Stream the response text
         if on_chunk:
@@ -152,56 +137,6 @@ class SimulatedAgent(AgentBase):
             'role': 'assistant',
             'content': response_text
         })
-
-        # Handle tool calls if any
-        tool_calls = []
-        if tools_to_call and self.tool_handler:
-            for i, tool_config in enumerate(tools_to_call):
-                tool_name = tool_config['name']
-                tool_input = tool_config['input']
-                tool_id = f"sim_{id(tool_config)}_{i}"
-
-                # Create tool call
-                tool_call = ToolCall(
-                    id=tool_id,
-                    name=tool_name,
-                    input=tool_input,
-                    output=None,
-                    error=None
-                )
-
-                # Execute tool via handler (matches ClaudeAgent signature)
-                try:
-                    result = await self.tool_handler(tool_name, tool_input)
-                    tool_call.output = str(result)
-                except Exception as e:
-                    tool_call.error = str(e)
-
-                tool_calls.append(tool_call)
-
-                # Add tool use and result to conversation
-                self.conversation_history.append({
-                    'role': 'assistant',
-                    'content': [
-                        {
-                            'type': 'tool_use',
-                            'id': tool_id,
-                            'name': tool_name,
-                            'input': tool_input
-                        }
-                    ]
-                })
-
-                self.conversation_history.append({
-                    'role': 'user',
-                    'content': [
-                        {
-                            'type': 'tool_result',
-                            'tool_use_id': tool_id,
-                            'content': tool_call.output if tool_call.output else str(tool_call.error)
-                        }
-                    ]
-                })
 
         return AgentResponse(
             text=response_text,
@@ -229,18 +164,16 @@ class ScriptedAgent(SimulatedAgent):
         self,
         script: list[dict[str, Any]],
         system_prompt: Optional[str] = None,
-        tool_handler: Optional[Callable] = None,
         response_delay: float = 0.05,
     ):
         """Initialize the scripted agent.
 
         Args:
-            script: List of script entries, each with 'response' and optional 'tools'
+            script: List of script entries, each with 'response'
             system_prompt: System prompt (for API compatibility)
-            tool_handler: Callback for handling tool calls
             response_delay: Delay between streaming chunks
         """
-        super().__init__(system_prompt=system_prompt, tool_handler=tool_handler, response_delay=response_delay)
+        super().__init__(system_prompt=system_prompt, response_delay=response_delay)
         self.configure_scenarios(script)
 
     async def send_prompt(
@@ -281,16 +214,14 @@ class EchoAgent(SimulatedAgent):
         self,
         prefix: str = "You said: ",
         system_prompt: Optional[str] = None,
-        tool_handler: Optional[Callable] = None,
     ):
         """Initialize the echo agent.
 
         Args:
             prefix: Prefix to add before echoing the input
             system_prompt: System prompt (for API compatibility)
-            tool_handler: Callback for handling tool calls
         """
-        super().__init__(system_prompt, tool_handler)
+        super().__init__(system_prompt)
         self.prefix = prefix
 
     async def send_prompt(

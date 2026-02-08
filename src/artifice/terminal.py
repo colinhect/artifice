@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,6 +20,18 @@ from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, 
 
 if TYPE_CHECKING:
     from .app import ArtificeApp
+
+
+def extract_trailing_code_block(text: str) -> tuple[str, str] | None:
+    """Extract language and code from a trailing fenced code block.
+
+    Returns (language, code) or None if no trailing block found.
+    """
+    match = re.search(r'```(python|bash)\n(.*?)```\s*$', text, re.DOTALL)
+    if match:
+        return match.group(1), match.group(2)
+    return None
+
 
 class ArtificeTerminal(Widget):
     """Primary widget for interacting with Artifice."""
@@ -84,74 +97,11 @@ class ArtificeTerminal(Widget):
         self._agent_markdown_enabled = True    # Default: markdown for agent responses
         self._shell_markdown_enabled = False   # Default: no markdown for shell output
 
-        # Define Python execution request tool (user confirmation required)
-        python_tool = {
-            "name": "request_execute_python",
-            "description": (
-                "Request execution of Python code in the REPL environment. "
-                "The code will be presented to the user in the input prompt where they will choose to:\n"
-                "- Execute the code as-is\n"
-                "- Edit the code and execute the modified version\n"
-                "- Decline execution\n\n"
-                "After the user's action, you will receive either:\n"
-                "- The executed code (possibly modified) and its output/result\n"
-                "- A message that the user declined to execute the code\n\n"
-                "Use this to run Python commands, perform calculations, test code snippets, "
-                "or explore Python functionality. The code runs in a persistent Python session, "
-                "so variables and imports persist across executions."
-            ),
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "code": {
-                        "type": "string",
-                        "description": "The Python code to request execution for",
-                    }
-                },
-                "required": ["code"],
-            },
-        }
-
-        # Define Shell execution request tool (user confirmation required)
-        shell_tool = {
-            "name": "request_execute_shell",
-            "description": (
-                "Request execution of a shell command. "
-                "The command will be presented to the user in the input prompt where they will choose to:\n"
-                "- Execute the command as-is\n"
-                "- Edit the command and execute the modified version\n"
-                "- Decline execution\n\n"
-                "After the user's action, you will receive either:\n"
-                "- The executed command (possibly modified) and its output\n"
-                "- A message that the user declined to execute the command\n\n"
-                "Use this to run shell commands, check system state, run scripts, "
-                "or perform file system operations."
-            ),
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "The shell command to request execution for",
-                    }
-                },
-                "required": ["command"],
-            },
-        }
-        
         # System prompt to guide the agent's behavior
         system_prompt = (
-            "You are a minimal AI assistant in an interactive Python coding environment with shell access. "
-            "Your primary goal is to help the user write and execute Python code or shell commands to accomplish what the user asks for. "
-            "Provide the shortest possible code, do not overprovide examples unless asked to. "
-            "Focus on action, not explanation:\n\n"
-            "- Write the code or command that solves the user's problem\n"
-            "- Use the request_execute_python tool to run Python code\n"
-            "- Use the request_execute_shell tool to run shell commands\n"
-            "- Provide a brief explanation of the code or shell commands you request\n"
-            "- Keep responses concise and code-focused\n"
-            "- If code produces an error, explain what is wrong and how to fix it, fix it and try again\n\n"
-            "Remember: Code/command execution, not explanation, is your primary mode of operation."
+            "You are a coding assistant with Python and shell access. To run code, end your "
+            "response with a fenced code block tagged `python` or `bash`. The user will "
+            "review and may execute it. Be brief."
         )
         
         def on_agent_connect(agent_name):
@@ -163,8 +113,6 @@ class ArtificeTerminal(Widget):
         if app.agent_type.lower() == "claude":
             from .agent import ClaudeAgent
             self._agent = ClaudeAgent(
-                tools=[python_tool, shell_tool],
-                tool_handler=self._handle_tool_call,
                 system_prompt=system_prompt,
                 on_connect=on_agent_connect,
             )
@@ -172,9 +120,8 @@ class ArtificeTerminal(Widget):
             from artifice.agent.simulated import SimulatedAgent
             self._agent = SimulatedAgent(
                 response_delay=0.01,
-                tool_handler=self._handle_tool_call,
                 on_connect=on_agent_connect,
-             )
+            )
 
             # Configure scenarios with pattern matching
             self._agent.configure_scenarios([
@@ -184,13 +131,7 @@ class ArtificeTerminal(Widget):
                 },
                 {
                     'pattern': r'calculate|math|sum|add',
-                    'response': 'I can help with that calculation!',
-                    'tools': [
-                        {
-                            'name': 'request_execute_python',
-                            'input': {'code': 'result = 10 + 5\nprint(f"The result is: {result}")'}
-                        }
-                    ]
+                    'response': 'I can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```',
                 },
                 {
                     'pattern': r'goodbye|bye|exit',
@@ -347,52 +288,8 @@ class ArtificeTerminal(Widget):
         command_input_block.update_status(result)
         return result
 
-    async def _handle_tool_call(self, tool_name: str, tool_input: dict) -> str:
-        """Handle tool calls from the agent.
-
-        Args:
-            tool_name: Name of the tool to execute.
-            tool_input: Input parameters for the tool.
-
-        Returns:
-            String result from the tool execution.
-        """
-        if tool_name == "request_execute_python":
-            code = tool_input.get("code", "")
-            if not code:
-                return "Error: No code provided"
-            code = code.strip()
-
-            self._agent_requested_execution = True
-
-            # Populate the input field with the code for user review
-            self.input.code = code
-            # Switch to Python mode
-            self.input.mode = "python"
-            self.input._update_prompt()
-
-            return "I will respond after requested code has been executed."
-
-        elif tool_name == "request_execute_shell":
-            command = tool_input.get("command", "")
-            if not command:
-                return "Error: No command provided"
-            command = command.strip()
-
-            self._agent_requested_execution = True
-
-            # Populate the input field with the command for user review
-            self.input.code = command
-            # Switch to Shell mode
-            self.input.mode = "shell"
-            self.input._update_prompt()
-
-            return "I will respond after requested command has been executed."
-
-        return f"Error: Unknown tool '{tool_name}'"
-
     async def _handle_agent_prompt(self, prompt: str) -> None:
-        """Handle AI agent prompt with tool support."""
+        """Handle AI agent prompt with code block detection."""
         # Create a block showing the prompt
         agent_input_block = AgentInputBlock(prompt)
         self.output.append_block(agent_input_block)
@@ -422,6 +319,15 @@ class ArtificeTerminal(Widget):
             agent_output_block.mark_failed()
         else:
             agent_output_block.mark_success()
+
+        # Detect trailing code block in the response
+        result = extract_trailing_code_block(response.text)
+        if result:
+            language, code = result
+            self._agent_requested_execution = True
+            self.input.code = code
+            self.input.mode = "python" if language == "python" else "shell"
+            self.input._update_prompt()
 
     async def on_terminal_output_pin_requested(self, event: TerminalOutput.PinRequested) -> None:
         """Handle pin request: move widget block from output to pinned area."""
