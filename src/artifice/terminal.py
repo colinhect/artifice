@@ -22,15 +22,26 @@ if TYPE_CHECKING:
     from .app import ArtificeApp
 
 
-def extract_trailing_code_block(text: str) -> tuple[str, str] | None:
-    """Extract language and code from a trailing fenced code block.
+def parse_response_segments(text: str) -> list[tuple]:
+    """Parse response text into text and code block segments.
 
-    Returns (language, code) or None if no trailing block found.
+    Returns list of tuples:
+    - ('text', content) for text segments
+    - ('code', language, code) for code blocks (python or bash)
     """
-    match = re.search(r'```(python|bash)\n(.*?)```\s*$', text, re.DOTALL)
-    if match:
-        return match.group(1), match.group(2)
-    return None
+    pattern = r'```(python|bash)\n(.*?)```'
+    segments = []
+    last_end = 0
+    for match in re.finditer(pattern, text, re.DOTALL):
+        before = text[last_end:match.start()].strip()
+        if before:
+            segments.append(('text', before))
+        segments.append(('code', match.group(1), match.group(2)))
+        last_end = match.end()
+    after = text[last_end:].strip()
+    if after:
+        segments.append(('text', after))
+    return segments
 
 
 class ArtificeTerminal(Widget):
@@ -69,6 +80,7 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+l", "clear", "Clear Output", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown Output", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
+        Binding("ctrl+t", "use_last_agent_code", "Use Agent Code", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
     ]
@@ -108,7 +120,7 @@ class ArtificeTerminal(Widget):
             pass
             #app.notify(f"Connected to {agent_name}")
 
-        # Create agent with tool support
+        # Create agent
         self._agent = None
         if app.agent_type.lower() == "claude":
             from .agent import ClaudeAgent
@@ -143,6 +155,7 @@ class ArtificeTerminal(Widget):
         elif app.agent_type:
             raise Exception(f"Unsupported agent {app.agent_type}")
         self._agent_requested_execution: bool = False
+        self._last_agent_code_block: tuple[str, str] | None = None  # (language, code)
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
@@ -171,51 +184,14 @@ class ArtificeTerminal(Widget):
                     result = await self._handle_shell_execution(code)
 
                     if self._agent_requested_execution:
-                        agent_output_block = AgentOutputBlock()
-                        self.output.append_block(agent_output_block)
-
-                        prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
-
-                        def on_chunk(text):
-                            agent_output_block.append(text)
-                            self.output.call_after_refresh(self.output.auto_scroll)
-
-                        response = await self._agent.send_prompt(
-                            prompt,
-                            on_chunk=on_chunk,
-                        )
-
-                        if response.error:
-                            agent_output_block.mark_failed()
-                        else:
-                            agent_output_block.mark_success()
-
                         self._agent_requested_execution = False
+                        await self._send_execution_result_to_agent(code, result)
                 else:
                     result = await self._handle_python_execution(code)
 
                     if self._agent_requested_execution:
-                        agent_output_block = AgentOutputBlock()
-                        self.output.append_block(agent_output_block)
-
-                        prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
-
-                        def on_chunk(text):
-                            agent_output_block.append(text)
-                            self.output.call_after_refresh(self.output.auto_scroll)
-
-                        # Send prompt to agent with streaming into the NEW block
-                        response = await self._agent.send_prompt(
-                            prompt,
-                            on_chunk=on_chunk,
-                        )
-
-                        if response.error:
-                            agent_output_block.mark_failed()
-                        else:
-                            agent_output_block.mark_success()
-
                         self._agent_requested_execution = False
+                        await self._send_execution_result_to_agent(code, result)
             except asyncio.CancelledError:
                 # Task was cancelled - show message
                 code_output_block = CodeOutputBlock(render_markdown=False)
@@ -288,6 +264,41 @@ class ArtificeTerminal(Widget):
         command_input_block.update_status(result)
         return result
 
+    async def _split_agent_response(self, streaming_block: AgentOutputBlock, response) -> None:
+        """Split an agent response into text and code blocks.
+
+        If the response contains code blocks, removes the streaming block
+        and replaces it with separate text and code blocks.
+        """
+        if response.error:
+            streaming_block.mark_failed()
+            return
+
+        segments = parse_response_segments(response.text)
+        has_code = any(s[0] == 'code' for s in segments)
+
+        if has_code:
+            await streaming_block.remove()
+            self.output._blocks.remove(streaming_block)
+
+            for segment in segments:
+                if segment[0] == 'text':
+                    block = AgentOutputBlock(segment[1])
+                    self.output.append_block(block)
+                    block.mark_success()
+                else:
+                    lang, code = segment[1], segment[2]
+                    code_text = code.rstrip('\n')
+                    code_block = CodeInputBlock(code_text, language=lang)
+                    self.output.append_block(code_block)
+                    code_block._loading_indicator.styles.display = "none"
+                    prompt_char = ">" if lang == "python" else "$"
+                    code_block._status_indicator.update(prompt_char)
+                    code_block._status_indicator.add_class("status-pending")
+                    self._last_agent_code_block = (lang, code_text)
+        else:
+            streaming_block.mark_success()
+
     async def _handle_agent_prompt(self, prompt: str) -> None:
         """Handle AI agent prompt with code block detection."""
         # Create a block showing the prompt
@@ -315,19 +326,37 @@ class ArtificeTerminal(Widget):
             on_chunk=on_chunk,
         )
 
-        if response.error:
-            agent_output_block.mark_failed()
-        else:
-            agent_output_block.mark_success()
+        # Split response into text and code blocks
+        await self._split_agent_response(agent_output_block, response)
 
-        # Detect trailing code block in the response
-        result = extract_trailing_code_block(response.text)
-        if result:
-            language, code = result
-            self._agent_requested_execution = True
-            self.input.code = code
-            self.input.mode = "python" if language == "python" else "shell"
-            self.input._update_prompt()
+    async def _send_execution_result_to_agent(self, code: str, result: ExecutionResult) -> None:
+        """Send execution results back to the agent and split the response."""
+        agent_output_block = AgentOutputBlock()
+        self.output.append_block(agent_output_block)
+
+        prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
+
+        def on_chunk(text):
+            agent_output_block.append(text)
+            self.output.call_after_refresh(self.output.auto_scroll)
+
+        response = await self._agent.send_prompt(
+            prompt,
+            on_chunk=on_chunk,
+        )
+
+        await self._split_agent_response(agent_output_block, response)
+
+    def action_use_last_agent_code(self) -> None:
+        """Load the last code block suggested by the AI agent into the input."""
+        if self._last_agent_code_block is None:
+            return
+        language, code = self._last_agent_code_block
+        self._agent_requested_execution = True
+        self.input.code = code
+        self.input.mode = "python" if language == "python" else "shell"
+        self.input._update_prompt()
+        self.input.query_one("#code-input", InputTextArea).focus()
 
     async def on_terminal_output_pin_requested(self, event: TerminalOutput.PinRequested) -> None:
         """Handle pin request: move widget block from output to pinned area."""
