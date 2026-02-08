@@ -59,6 +59,10 @@ class BaseBlock(Static):
 
 class CodeInputBlock(BaseBlock):
     DEFAULT_CSS = """
+    CodeInputBlock {
+        margin: 0 0 0 0;
+    }
+
     CodeInputBlock .code {
         background: $primary-background-darken-2;
         padding: 0;
@@ -217,6 +221,10 @@ class WidgetOutputBlock(BaseBlock):
 
 class AgentInputBlock(BaseBlock):
     DEFAULT_CSS = """
+    AgentInputBlock {
+        margin: 0 0 0 0;
+    }
+
     AgentInputBlock .prompt {
         background: $primary-background-darken-2;
         padding: 0;
