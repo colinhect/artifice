@@ -78,7 +78,7 @@ class StreamingFenceDetector:
         self.all_blocks: list[BaseBlock] = []
         self.first_agent_block: AgentOutputBlock | None = None
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
-        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=False)
+        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=False, use_markdown=True)
 
     def start(self) -> None:
         """Create the display block for real-time streaming feedback."""

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 
+from textual import highlight
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -66,24 +67,33 @@ class CodeInputBlock(BaseBlock):
         background: $background-darken-3;
         padding: 0;
         border: none;
+    }
+
+    CodeInputBlock .markdown-code {
+        background: $background-darken-3;
+        padding: 0;
+        border: none;
         layout: stream;
     }
 
-    CodeInputBlock .code MarkdownFence {
+    CodeInputBlock .markdown-code MarkdownFence {
         margin: 0;
     }
     """
 
-    def __init__(self, code: str, language: str, show_loading: bool = True, **kwargs) -> None:
+    def __init__(self, code: str, language: str, show_loading: bool = True, use_markdown=False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._loading_indicator = LoadingIndicator()
         self._show_loading = show_loading
         self._status_indicator = Static(classes="status-indicator")
         self._language = language
         self._original_code = code  # Store original code for re-execution
-        # Format code as markdown code fence
-        markdown_code = f"```{language}\n{code}\n```"
-        self._code = Markdown(markdown_code, classes="code")
+        if use_markdown:
+            # Format code as markdown code fence
+            markdown_code = f"```{language}\n{code}\n```"
+            self._code = Markdown(markdown_code, classes="markdown-code")
+        else:
+            self._code = Static(highlight.highlight(code, language=language), classes="code")
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -106,9 +116,12 @@ class CodeInputBlock(BaseBlock):
     def update_code(self, code: str) -> None:
         """Update the displayed code (used during streaming)."""
         self._original_code = code
-        # Format code as markdown code fence and update
-        markdown_code = f"```{self._language}\n{code}\n```"
-        self._code.update(markdown_code)
+        if isinstance(self._code, Markdown):
+            # Format code as markdown code fence and update
+            markdown_code = f"```{self._language}\n{code}\n```"
+            self._code.update(markdown_code)
+        else:
+            self._code.update(highlight.highlight(code, language=self._language))
 
     def get_code(self) -> str:
         """Get the original code."""
