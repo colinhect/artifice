@@ -95,14 +95,15 @@ class CodeInputBlock(BaseBlock):
         self._loading_indicator = LoadingIndicator()
         self._show_loading = show_loading
         self._language = language
-        # Always show the prompt based on language
-        prompt = ">" if language == "python" else "$"
-        self._status_indicator = Static(prompt, classes="status-indicator")
+        self._status_indicator = Static(self._get_prompt(), classes="status-indicator")
         self._status_indicator.add_class("status-unexecuted")
         self._original_code = code  # Store original code for re-execution
         self._code = Static(highlight.highlight(code, language=language), classes="code")
         if in_context:
             self.add_class("in-context")
+
+    def _get_prompt(self) -> str:
+        return "]" if self._language == "python" else "$"
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -114,12 +115,11 @@ class CodeInputBlock(BaseBlock):
 
     def update_status(self, result: ExecutionResult) -> None:
         self._loading_indicator.styles.display = "none"
-        prompt = ">" if self._language == "python" else "$"
         if result.status == ExecutionStatus.SUCCESS:
-            self._status_indicator.update(prompt)
+            self._status_indicator.update(self._get_prompt())
             self._status_indicator.add_class("status-success")
         elif result.status == ExecutionStatus.ERROR:
-            self._status_indicator.update(prompt)
+            self._status_indicator.update(self._get_prompt())
             self._status_indicator.add_class("status-error")
 
     def show_loading(self) -> None:
@@ -150,9 +150,7 @@ class CodeInputBlock(BaseBlock):
         else:
             self._language = "python"
 
-        # Update the prompt
-        prompt = ">" if self._language == "python" else "$"
-        self._status_indicator.update(prompt)
+        self._status_indicator.update(self._get_prompt())
 
         # Update syntax highlighting and markdown
         self._code.update(highlight.highlight(self._original_code, language=self._language))

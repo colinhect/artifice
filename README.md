@@ -58,22 +58,22 @@ artifice
 
 Artifice has three input modes. Switch modes by typing a special character when the input is empty:
 
-- `?` - **AI Agent mode** - Ask questions and get AI assistance
-- `>` - **Python mode** - Execute Python code interactively
+- `>` - **AI Agent mode** - Ask questions and get AI assistance
+- `]` - **Python mode** - Execute Python code interactively
 - `$` - **Shell mode** - Run shell commands
 
 ### Example: Python Session
 
 ```
-> x = [1, 2, 3, 4, 5]
-> sum(x)
+] x = [1, 2, 3, 4, 5]
+] sum(x)
 15
 ```
 
 ### Example: AI Interaction
 
 ```
-? What's the average of the list x?
+> What's the average of the list x?
 ```
 
 The AI might suggest:
@@ -129,9 +129,9 @@ $ git status
 - **Escape** - Exit search mode / Return to Python mode
 
 ### Mode Switching (when input is empty)
-- **?** - Switch to AI Agent mode
+- **>** - Switch to AI Agent mode
 - **$** - Switch to Shell mode
-- **>** - Switch to Python mode
+- **]** - Switch to Python mode
 
 ### Application
 - **Ctrl+Q** - Exit application
@@ -170,13 +170,12 @@ python src/artifice/app.py
 Planned features and improvements:
 
 - [ ] VIM keybinding mode for text editing
-- [ ] GitHub Copilot integration
 - [ ] Additional AI provider support (OpenAI, Gemini)
+    - [ ] GitHub Copilot integration
 - [ ] Session export/import
 - [ ] LSP integration with agent
 - [ ] Other programming languages
 - [ ] Export commands to shell history
 - [ ] Tab-completion in Python and shell mode
-- [ ] CTRL+R fuzzy history search
 - [ ] Ability to remove history entry or annotate/export
 

@@ -113,7 +113,7 @@ class InputTextArea(TextArea):
                 return
         # If input is empty
         if not self.text.strip():
-            if event.key == "question_mark":
+            if event.key == "greater_than_sign":
                 event.prevent_default()
                 event.stop()
                 self.post_message(TerminalInput.AgentMode())
@@ -123,7 +123,7 @@ class InputTextArea(TextArea):
                 event.stop()
                 self.post_message(TerminalInput.ShellMode())
                 return
-            if event.key == "greater_than_sign":
+            if event.key == "right_square_bracket":
                 event.prevent_default()
                 event.stop()
                 self.post_message(TerminalInput.PythonMode())
@@ -246,10 +246,10 @@ class TerminalInput(Static):
         classes: str | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self._python_prompt = ">"
-        self._ai_prompt = "?"
+        self._ai_prompt = ">"
+        self._python_prompt = "]"
         self._shell_prompt = "$"
-        self.mode = "python"
+        self.mode = "ai"
         self._history = history
         self._search_mode = False
         self._search_input: Input | None = None
@@ -314,15 +314,15 @@ class TerminalInput(Static):
         with self.app.batch_update():
             if self.mode == "ai":
                 prompt_widget.update(self._ai_prompt)
-                text_area.placeholder = "AI prompt...       (> for python)  ($ for shell)"
+                text_area.placeholder = "ai prompt...       [cyan]][/] python  [cyan]$[/] shell"
                 text_area.set_syntax_highlighting(None)
             elif self.mode == "shell":
                 prompt_widget.update(self._shell_prompt)
-                text_area.placeholder = "Shell command...   (? for ai)  (> for python)"
+                text_area.placeholder = "shell command...   [cyan]>[/] ai  [cyan]][/] python"
                 text_area.set_syntax_highlighting("bash")
             else:
                 prompt_widget.update(self._python_prompt)
-                text_area.placeholder = "Python code...     (? for ai)  ($ for shell)"
+                text_area.placeholder = "python code...     [cyan]>[/] ai  [cyan]$[/] shell"
                 text_area.set_syntax_highlighting("python")
 
     @property
