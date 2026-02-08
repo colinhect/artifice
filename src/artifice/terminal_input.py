@@ -45,16 +45,16 @@ class InputTextArea(TextArea):
         super().__init__(language="python", **kwargs)
 
     def action_submit_code(self) -> None:
-        """Submit the code (triggered by Ctrl+Enter)."""
+        """Submit the code."""
         self.post_message(TerminalInput.SubmitRequested())
 
     def action_insert_newline(self) -> None:
-        """Insert a newline (triggered by Shift+Enter)."""
+        """Insert a newline."""
         # Insert newline at cursor position
         self.insert("\n")
 
     def action_clear_input(self) -> None:
-        """Clear the input text area (triggered by Ctrl+K)."""
+        """Clear the input text area."""
         self.text = ""
 
     def set_syntax_highlighting(self, language: str) -> None:
@@ -270,19 +270,19 @@ class TerminalInput(Static):
         self.action_submit()
 
     def on_terminal_input_agent_mode(self, event: AgentMode) -> None:
-        """Handle ? key press when input is empty - switch to AI mode."""
+        """Handle > key press when input is empty - switch to AI mode."""
         if self.mode != "ai":
             self.mode = "ai"
             self._update_prompt()
 
     def on_terminal_input_python_mode(self, event: PythonMode) -> None:
-        """Handle > key press when input is empty - switch to Python mode."""
+        """Handle ] key press when input is empty - switch to Python mode."""
         if self.mode != "python":
             self.mode = "python"
             self._update_prompt()
 
     def on_terminal_input_shell_mode(self, event: ShellMode) -> None:
-        """Handle ! key press when input is empty - switch to Shell mode."""
+        """Handle $ key press when input is empty - switch to Shell mode."""
         if self.mode != "shell":
             self.mode = "shell"
             self._update_prompt()

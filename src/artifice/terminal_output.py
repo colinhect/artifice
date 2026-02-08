@@ -286,7 +286,7 @@ class AgentInputBlock(BaseBlock):
 
     def __init__(self, prompt: str, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._status_indicator = Static("?", classes="status-indicator status-pending")
+        self._status_indicator = Static(">", classes="status-indicator status-pending")
         self._prompt = Static(prompt, classes="prompt")
         self._original_prompt = prompt  # Store original prompt for re-use
 
@@ -420,11 +420,11 @@ class TerminalOutput(VerticalScroll):
         Binding("end", "", "Input Prompt", show=True),
         #Binding("up", "highlight_previous", "Previous Block", show=True),
         #Binding("down", "highlight_next", "Next Block", show=True),
-        Binding("ctrl+s", "activate_block", "Copy to Input", show=True),
-        Binding("enter", "execute_block", "Execute Block", show=True),
-        Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown On Block", show=True),
-        Binding("ctrl+u", "pin_block", "Pin Block", show=True),
-        Binding("insert", "cycle_language", "Cycle Language", show=True),
+        Binding("ctrl+c", "activate_block", "Copy as Input", show=True),
+        Binding("enter", "execute_block", "Execute", show=True),
+        Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown", show=True),
+        #Binding("ctrl+u", "pin_block", "Pin Block", show=True),
+        Binding("insert", "cycle_language", "Mode", show=True),
     ]
 
     def __init__(
