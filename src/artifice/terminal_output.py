@@ -88,12 +88,13 @@ class CodeInputBlock(BaseBlock):
         self._status_indicator = Static(classes="status-indicator")
         self._language = language
         self._original_code = code  # Store original code for re-execution
+        self._code = Static(highlight.highlight(code if not use_markdown else "", language=language), classes="code")
         if use_markdown:
             # Format code as markdown code fence
             markdown_code = f"```{language}\n{code}\n```"
-            self._code = Markdown(markdown_code, classes="markdown-code")
+            self._markdown_code = Markdown(markdown_code, classes="markdown-code")
         else:
-            self._code = Static(highlight.highlight(code, language=language), classes="code")
+            self._markdown_code = None
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -101,7 +102,10 @@ class CodeInputBlock(BaseBlock):
                 if self._show_loading:
                     yield self._loading_indicator
                 yield self._status_indicator
-            yield self._code
+            with Vertical():
+                yield self._code
+                if self._markdown_code:
+                    yield self._markdown_code
 
     def update_status(self, result: ExecutionResult) -> None:
         self._loading_indicator.styles.display = "none"
@@ -116,10 +120,10 @@ class CodeInputBlock(BaseBlock):
     def update_code(self, code: str) -> None:
         """Update the displayed code (used during streaming)."""
         self._original_code = code
-        if isinstance(self._code, Markdown):
+        if self._markdown_code:
             # Format code as markdown code fence and update
             markdown_code = f"```{self._language}\n{code}\n```"
-            self._code.update(markdown_code)
+            self._markdown_code.update(markdown_code)
         else:
             self._code.update(highlight.highlight(code, language=self._language))
 
@@ -138,6 +142,7 @@ class CodeOutputBlock(BaseBlock):
     }
 
     CodeOutputBlock .code-output {
+        background: $surface-darken-1;
         /*background: $surface-darken-1;*/
         /*color: $text-muted;*/
         padding-left: 0;

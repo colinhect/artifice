@@ -169,7 +169,7 @@ class TerminalInput(Static):
         border: none !important;
         padding: 0 !important;
         margin: 0 !important;
-        background: transparent;
+        background: $background-darken-3;
     }
 
     TerminalInput TextArea:focus {
@@ -181,7 +181,6 @@ class TerminalInput(Static):
         border: none !important;
         padding: 0 !important;
         margin: 0 !important;
-        background: transparent;
     }
 
     TerminalInput Input:focus {

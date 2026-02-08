@@ -301,7 +301,7 @@ class ArtificeTerminal(Widget):
                 },
                 {
                     'pattern': r'calculate|math|sum|add',
-                    'response': 'I can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```',
+                    'response': 'I can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
                 },
                 {
                     'pattern': r'goodbye|bye|exit',
@@ -451,18 +451,19 @@ class ArtificeTerminal(Widget):
             detector.feed(text)
 
         response = await self._agent.send_prompt(prompt, on_chunk=on_chunk)
-        detector.finish()
+        with self.app.batch_update():
+            detector.finish()
 
-        # Mark all blocks as in context
-        for block in detector.all_blocks:
-            self._mark_block_in_context(block)
+            # Mark all blocks as in context
+            for block in detector.all_blocks:
+                self._mark_block_in_context(block)
 
-        # Mark the first agent output block with success/failure
-        if detector.first_agent_block:
-            if response.error:
-                detector.first_agent_block.mark_failed()
-            else:
-                detector.first_agent_block.mark_success()
+            # Mark the first agent output block with success/failure
+            if detector.first_agent_block:
+                if response.error:
+                    detector.first_agent_block.mark_failed()
+                else:
+                    detector.first_agent_block.mark_success()
 
         return detector, response
 
