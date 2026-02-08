@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
+from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 
@@ -54,15 +55,26 @@ class _FenceState(enum.Enum):
     CODE = "code"
 
 
+class StreamChunk(Message):
+    """Message posted when a chunk of streamed text arrives."""
+
+    def __init__(self, text: str) -> None:
+        super().__init__()
+        self.text = text
+
+
+class StreamComplete(Message):
+    """Message posted when streaming is complete."""
+    pass
+
+
 class StreamingFenceDetector:
-    """Detects code fences in streaming text and splits into blocks.
+    """Detects code fences in streaming text and splits into blocks in real-time.
 
     Processes chunks character-by-character using a 3-state machine:
     PROSE -> LANG_LINE (on ```) -> CODE (on newline) -> PROSE (on closing ```)
 
-    During streaming, all text is displayed via a single AgentOutputBlock.
-    When streaming ends, the display block is replaced with split
-    AgentOutputBlock (prose) and CodeInputBlock (code) blocks.
+    Creates blocks as fences are detected, accumulating text to update once per chunk.
     """
 
     def __init__(self, output: TerminalOutput, auto_scroll) -> None:
@@ -71,27 +83,33 @@ class StreamingFenceDetector:
         self._state = _FenceState.PROSE
         self._backtick_count = 0
         self._lang_buffer = ""
-        self._code_buffer = ""
-        self._prose_buffer = ""
+        self._pending_buffer = ""  # Text to add to current block
+        self._chunk_buffer = ""  # Accumulates text for current chunk to display
         self._current_lang = "python"
-        self._segments: list[tuple] = []
-        self._display_block = None
+        self._current_block: BaseBlock | None = None  # The block we're currently appending to
         self.all_blocks: list[BaseBlock] = []
         self.first_agent_block: AgentOutputBlock | None = None
+        # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
         self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=False, use_markdown=True)
 
     def start(self) -> None:
-        """Create the display block for real-time streaming feedback."""
-        self._display_block = self._make_prose_block(activity=True)
-        self._output.append_block(self._display_block)
+        """Create the initial AgentOutputBlock for streaming prose."""
+        self._current_block = self._make_prose_block(activity=True)
+        self._output.append_block(self._current_block)
+        self.all_blocks.append(self._current_block)
+        self.first_agent_block = self._current_block
 
     def feed(self, text: str) -> None:
-        """Process a chunk of streaming text."""
+        """Process a chunk of streaming text, creating blocks as needed."""
+        self._chunk_buffer = ""  # Reset for this chunk
         for ch in text:
             self._feed_char(ch)
-        # Update display block for real-time feedback
-        self._display_block.append(text)
+        # Flush any pending text to the chunk buffer for display
+        self._flush_pending_to_chunk()
+        # Update current block with accumulated chunk text
+        if self._chunk_buffer and self._current_block:
+            self._update_current_block_with_chunk()
         self._output.call_after_refresh(self._auto_scroll)
 
     def _feed_char(self, ch: str) -> None:
@@ -103,20 +121,28 @@ class StreamingFenceDetector:
             self._feed_code(ch)
 
     def _feed_prose(self, ch: str) -> None:
+        """Process prose text, looking for opening fence."""
         if ch == '`':
             self._backtick_count += 1
             if self._backtick_count == 3:
+                # Found opening fence - flush pending prose and transition
+                # Flush pending without the backticks
+                self._flush_pending_to_chunk()
                 self._backtick_count = 0
                 self._lang_buffer = ""
                 self._state = _FenceState.LANG_LINE
         else:
+            # Not a fence marker
             if self._backtick_count > 0:
-                self._prose_buffer += '`' * self._backtick_count
+                # We had some backticks that weren't a fence
+                self._pending_buffer += '`' * self._backtick_count
                 self._backtick_count = 0
-            self._prose_buffer += ch
+            self._pending_buffer += ch
 
     def _feed_lang_line(self, ch: str) -> None:
+        """Process language line after opening fence."""
         if ch == '\n':
+            # Language line complete - start code block
             lang = self._lang_buffer.strip()
             if not lang:
                 lang = "python"
@@ -125,67 +151,97 @@ class StreamingFenceDetector:
                 lang = "python"
             elif lang in ("shell", "sh", "zsh"):
                 lang = "bash"
-            # Flush prose segment
-            if self._prose_buffer:
-                self._segments.append(('prose', self._prose_buffer))
-                self._prose_buffer = ""
-            self._code_buffer = ""
             self._current_lang = lang
+
+            # Update current block with accumulated chunk
+            if self._chunk_buffer and self._current_block:
+                self._update_current_block_with_chunk()
+                self._chunk_buffer = ""
+
+            # End current prose block (mark as no longer active)
+            if hasattr(self._current_block, 'mark_success'):
+                self._current_block.mark_success()
+
+            # Create new code block
+            self._current_block = self._make_code_block("", lang)
+            self._output.append_block(self._current_block)
+            self.all_blocks.append(self._current_block)
+
+            self._pending_buffer = ""
             self._state = _FenceState.CODE
         else:
             self._lang_buffer += ch
 
     def _feed_code(self, ch: str) -> None:
+        """Process code text, looking for closing fence."""
         if ch == '`':
             self._backtick_count += 1
             if self._backtick_count == 3:
+                # Found closing fence - flush pending code and transition
+                self._flush_pending_to_chunk()
+
+                # Update code block with accumulated chunk
+                if self._chunk_buffer and self._current_block:
+                    self._update_current_block_with_chunk()
+                    self._chunk_buffer = ""
+
                 self._backtick_count = 0
-                self._segments.append(('code', self._current_lang, self._code_buffer))
-                self._code_buffer = ""
+
+                # Start new prose block
+                self._current_block = self._make_prose_block(activity=True)
+                self._output.append_block(self._current_block)
+                self.all_blocks.append(self._current_block)
+
                 self._state = _FenceState.PROSE
         else:
+            # Not a fence marker
             if self._backtick_count > 0:
-                self._code_buffer += '`' * self._backtick_count
+                # We had some backticks that weren't a fence
+                self._pending_buffer += '`' * self._backtick_count
                 self._backtick_count = 0
-            self._code_buffer += ch
+            self._pending_buffer += ch
+
+    def _flush_pending_to_chunk(self) -> None:
+        """Move pending buffer to chunk buffer."""
+        self._chunk_buffer += self._pending_buffer
+        self._pending_buffer = ""
+
+    def _update_current_block_with_chunk(self) -> None:
+        """Update the current block with the chunk buffer."""
+        if self._chunk_buffer and self._current_block:
+            if hasattr(self._current_block, 'update_code'):
+                # Code block - update with accumulated code
+                existing = self._current_block.get_code()
+                self._current_block.update_code(existing + self._chunk_buffer)
+            elif hasattr(self._current_block, 'append'):
+                # Prose block - append text
+                self._current_block.append(self._chunk_buffer)
 
     def finish(self) -> None:
-        """Flush state, remove display block, and create split blocks."""
-        # Flush remaining state
+        """Flush any remaining state at end of stream."""
+        # Handle incomplete fences
         if self._state == _FenceState.LANG_LINE:
-            self._prose_buffer += '```' + self._lang_buffer
+            # Incomplete opening fence - treat as prose
+            self._pending_buffer = '```' + self._lang_buffer
+            self._state = _FenceState.PROSE
         elif self._state == _FenceState.CODE:
+            # Incomplete closing fence - flush what we have
             if self._backtick_count > 0:
-                self._code_buffer += '`' * self._backtick_count
+                self._pending_buffer += '`' * self._backtick_count
                 self._backtick_count = 0
-            self._segments.append(('code', self._current_lang, self._code_buffer))
         elif self._state == _FenceState.PROSE:
             if self._backtick_count > 0:
-                self._prose_buffer += '`' * self._backtick_count
+                self._pending_buffer += '`' * self._backtick_count
                 self._backtick_count = 0
 
-        # Flush any remaining prose
-        if self._prose_buffer:
-            self._segments.append(('prose', self._prose_buffer))
+        # Flush any remaining text
+        self._flush_pending_to_chunk()
+        if self._chunk_buffer and self._current_block:
+            self._update_current_block_with_chunk()
 
-        # Remove display block
-        if self._display_block in self._output._blocks:
-            self._output._blocks.remove(self._display_block)
-        self._display_block.remove()
-
-        # Create blocks from accumulated segments
-        for seg in self._segments:
-            if seg[0] == 'prose':
-                block = self._make_prose_block(activity=False)
-                self._output.append_block(block)
-                block.append(seg[1])
-                self.all_blocks.append(block)
-                if self.first_agent_block is None:
-                    self.first_agent_block = block
-            elif seg[0] == 'code':
-                block = self._make_code_block(seg[2], seg[1])
-                self._output.append_block(block)
-                self.all_blocks.append(block)
+        # Mark the last block as complete
+        if self._current_block and hasattr(self._current_block, 'mark_success'):
+            self._current_block.mark_success()
 
 
 class ArtificeTerminal(Widget):
@@ -265,15 +321,19 @@ class ArtificeTerminal(Widget):
 
         # System prompt to guide the agent's behavior
         system_prompt = (
-            "You are a coding assistant with Python and shell access. To run code, end your "
-            "response with a fenced code demarcated by:\n"
-            "```python\n"
-            "for python commands, or:\n"
-            "```shell\n"
-            "for shell commands.\n"
-            "Ending with ```\n\n"
-            "Put explainations before the code or command. "
-            "Only give one code or command per response and always at the end."
+            "You are collaborating with the user to interface with his Linux system with access to a bash shell and a Python session. "
+            "Any Python code or shell commands in your responses are interpreted as requests by you to execute that code. Make one request at a time. "
+            "Do not over explain unless asked to. Always use ```python or ```shell to mark code or shell command."
+
+            #"You are a coding assistant with Python and shell access. To run code, end your "
+            #"response with a fenced code demarcated by:\n"
+            #"```python\n"
+            #"for python commands, or:\n"
+            #"```shell\n"
+            #"for shell commands.\n"
+            ##"Ending with ```\n\n"
+            #"Put explainations before the code or command. "
+            #"Only give one code or command per response and always at the end."
         )
         
         def on_agent_connect(agent_name):
@@ -327,6 +387,7 @@ class ArtificeTerminal(Widget):
         self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
         self._context_blocks: list[BaseBlock] = []  # Blocks in agent context
+        self._current_detector: StreamingFenceDetector | None = None  # Active streaming detector
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -496,27 +557,36 @@ class ArtificeTerminal(Widget):
 
         Returns the detector (with all_blocks, first_agent_block) and the AgentResponse.
         """
-        detector = StreamingFenceDetector(self.output, self.output.auto_scroll)
-        detector.start()
+        # Create detector and store it so message handlers can access it
+        self._current_detector = StreamingFenceDetector(self.output, self.output.auto_scroll)
+        self._current_detector.start()
 
+        # Post messages from streaming callback (runs in background thread)
         def on_chunk(text):
-            detector.feed(text)
+            self.post_message(StreamChunk(text))
 
         response = await self._agent.send_prompt(prompt, on_chunk=on_chunk)
-        with self.app.batch_update():
-            detector.finish()
 
+        # Post completion message
+        self.post_message(StreamComplete())
+
+        # Wait a moment for messages to be processed
+        await asyncio.sleep(0.01)
+
+        with self.app.batch_update():
             # Mark all blocks as in context
-            for block in detector.all_blocks:
+            for block in self._current_detector.all_blocks:
                 self._mark_block_in_context(block)
 
             # Mark the first agent output block with success/failure
-            if detector.first_agent_block:
+            if self._current_detector.first_agent_block:
                 if response.error:
-                    detector.first_agent_block.mark_failed()
+                    self._current_detector.first_agent_block.mark_failed()
                 else:
-                    detector.first_agent_block.mark_success()
+                    self._current_detector.first_agent_block.mark_success()
 
+        detector = self._current_detector
+        self._current_detector = None
         return detector, response
 
     async def _handle_agent_prompt(self, prompt: str) -> None:
@@ -605,6 +675,16 @@ class ArtificeTerminal(Widget):
                 self._current_task = None
 
         self._current_task = asyncio.create_task(execute())
+
+    def on_stream_chunk(self, event: StreamChunk) -> None:
+        """Handle streaming chunk message - process text and update blocks in real-time."""
+        if self._current_detector:
+            self._current_detector.feed(event.text)
+
+    def on_stream_complete(self, event: StreamComplete) -> None:
+        """Handle stream completion message - finalize the detector state."""
+        if self._current_detector:
+            self._current_detector.finish()
 
     def action_clear(self) -> None:
         """Clear the output."""

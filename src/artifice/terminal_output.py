@@ -100,6 +100,7 @@ class CodeInputBlock(BaseBlock):
         self._status_indicator = Static(prompt, classes="status-indicator")
         self._status_indicator.add_class("status-unexecuted")
         self._original_code = code  # Store original code for re-execution
+        use_markdown = False
         self._code = Static(highlight.highlight(code if not use_markdown else "", language=language), classes="code")
         if use_markdown:
             # Format code as markdown code fence
