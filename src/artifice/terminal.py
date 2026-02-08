@@ -207,6 +207,11 @@ class ArtificeTerminal(Widget):
 
     ArtificeTerminal TerminalInput {
         height: auto;
+        padding-left: 1;
+    }
+
+    ArtificeTerminal TerminalInput.in-context {
+        padding-left: 0;
     }
 
     ArtificeTerminal .highlighted {
