@@ -286,11 +286,11 @@ class ArtificeTerminal(Widget):
     """
 
     BINDINGS = [
-        Binding("ctrl+l", "clear", "Clear Output", show=True),
-        Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown Output", show=True),
+        Binding("ctrl+l", "clear", "Clear", show=True),
+        Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
-        Binding("ctrl+g", "toggle_auto_send_to_agent", "Toggle Auto Send to Agent", show=True),
-        Binding("ctrl+n", "clear_agent_context", "Clear Agent Context", show=True),
+        Binding("ctrl+g", "toggle_auto_send_to_agent", "Toggle Agent", show=True),
+        Binding("ctrl+n", "clear_agent_context", "Clear Context", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
     ]
