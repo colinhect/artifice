@@ -70,9 +70,10 @@ class CodeInputBlock(BaseBlock):
     }
     """
 
-    def __init__(self, code: str, language: str, **kwargs) -> None:
+    def __init__(self, code: str, language: str, show_loading: bool = True, **kwargs) -> None:
         super().__init__(**kwargs)
         self._loading_indicator = LoadingIndicator()
+        self._show_loading = show_loading
         self._status_indicator = Static(classes="status-indicator")
         self._code = Static(highlight.highlight(code, language=language), classes="code")
         self._language = language
@@ -81,7 +82,8 @@ class CodeInputBlock(BaseBlock):
     def compose(self) -> ComposeResult:
         with Horizontal():
             with Vertical(classes="status-indicator"):
-                yield self._loading_indicator
+                if self._show_loading:
+                    yield self._loading_indicator
                 yield self._status_indicator
             yield self._code
 
@@ -280,7 +282,7 @@ class AgentOutputBlock(BaseBlock):
     }
     """
 
-    def __init__(self, output="", render_markdown=True) -> None:
+    def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__()
         self._loading_indicator = LoadingIndicator()
         self._status_indicator = Static(classes="status-indicator")
@@ -289,6 +291,8 @@ class AgentOutputBlock(BaseBlock):
         self._full = output
         self._render_markdown = render_markdown
         self._contents = Horizontal()
+        if not activity:
+            self.mark_success()
 
     def compose(self) -> ComposeResult:
         with self._contents:
