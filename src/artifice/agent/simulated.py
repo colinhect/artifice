@@ -148,6 +148,10 @@ class SimulatedAgent(AgentBase):
         self.conversation_history.clear()
         self.current_scenario_index = 0
 
+    def clear_conversation(self) -> None:
+        """Clear the conversation history (alias for reset without resetting scenario index)."""
+        self.conversation_history.clear()
+
     def get_conversation_history(self) -> list[dict[str, Any]]:
         """Get the conversation history."""
         return self.conversation_history.copy()

@@ -20,6 +20,11 @@ class BaseBlock(Static):
     BaseBlock {
         margin: 0 0 1 0;
         padding: 0;
+        padding-left: 1;
+    }
+
+    BaseBlock.in-context {
+        padding-left: 0;
     }
 
     BaseBlock Horizontal {

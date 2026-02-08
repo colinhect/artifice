@@ -16,7 +16,7 @@ from .config import ArtificeConfig
 from .execution import ExecutionResult, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
-from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput
+from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput, BaseBlock
 
 if TYPE_CHECKING:
     from .app import ArtificeApp
@@ -72,6 +72,10 @@ class ArtificeTerminal(Widget):
         background: $surface-lighten-2;
     }
 
+    ArtificeTerminal .in-context {
+        border-left: solid $primary;
+    }
+
     ArtificeTerminal PinnedOutput {
         height: auto;
         max-height: 30vh;
@@ -84,6 +88,7 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
         Binding("ctrl+t", "use_last_agent_code", "Use Agent Code", show=True),
         Binding("ctrl+g", "execute_and_send_to_agent", "Submit & Send to Agent", show=True),
+        Binding("ctrl+n", "clear_agent_context", "Clear Agent Context", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
     ]
@@ -175,6 +180,7 @@ class ArtificeTerminal(Widget):
         self._current_task: asyncio.Task | None = None
         self._last_response_code = None
         self._last_response_code_index = 0
+        self._context_blocks: list[BaseBlock] = []  # Blocks in agent context
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -278,11 +284,26 @@ class ArtificeTerminal(Widget):
         command_input_block.update_status(result)
         return result
 
+    def _mark_block_in_context(self, block: BaseBlock) -> None:
+        """Mark a block as being in the agent's context."""
+        if block not in self._context_blocks:
+            self._context_blocks.append(block)
+            block.add_class("in-context")
+
+    def _clear_all_context_highlights(self) -> None:
+        """Remove in-context highlighting from all blocks."""
+        for block in self._context_blocks:
+            block.remove_class("in-context")
+        self._context_blocks.clear()
+
     async def _handle_agent_prompt(self, prompt: str) -> None:
         """Handle AI agent prompt with code block detection."""
         # Create a block showing the prompt
         agent_input_block = AgentInputBlock(prompt)
         self.output.append_block(agent_input_block)
+
+        # Mark the prompt as in context
+        self._mark_block_in_context(agent_input_block)
 
         if self._agent is None:
             # No agent configured, show error
@@ -305,6 +326,9 @@ class ArtificeTerminal(Widget):
             on_chunk=on_chunk,
         )
 
+        # Mark the agent response as in context
+        self._mark_block_in_context(agent_output_block)
+
         self._capture_code_segments(response.text)
         self._auto_load_first_code_block()
 
@@ -316,6 +340,14 @@ class ArtificeTerminal(Widget):
 
     async def _send_execution_result_to_agent(self, code: str, result: ExecutionResult) -> None:
         """Send execution results back to the agent and split the response."""
+        # Find the most recent code input block and output block to mark as in-context
+        if len(self.output._blocks) >= 2:
+            # The last two blocks should be the code input and code output
+            code_input_block = self.output._blocks[-2]
+            code_output_block = self.output._blocks[-1]
+            self._mark_block_in_context(code_input_block)
+            self._mark_block_in_context(code_output_block)
+
         agent_output_block = AgentOutputBlock()
         self.output.append_block(agent_output_block)
 
@@ -329,6 +361,9 @@ class ArtificeTerminal(Widget):
             prompt,
             on_chunk=on_chunk,
         )
+
+        # Mark the agent response as in context
+        self._mark_block_in_context(agent_output_block)
 
         self._capture_code_segments(response.text)
         self._auto_load_first_code_block()
@@ -457,4 +492,12 @@ class ArtificeTerminal(Widget):
         self._agent_requested_execution = True
         # Trigger submission which will execute and send to agent
         self.input.action_submit()
+
+    def action_clear_agent_context(self) -> None:
+        """Clear the agent's conversation context and unhighlight all in-context blocks."""
+        if self._agent and hasattr(self._agent, "clear_conversation"):
+            self._agent.clear_conversation()
+
+        # Remove highlighting from all context blocks
+        self._clear_all_context_highlights()
 
