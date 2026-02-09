@@ -20,8 +20,9 @@ A minimal Python-based terminal user interface for interacting with intelligence
 - **Save/Restore** - Persist important blocks across sessions
 
 ### AI Agent Integration
-- **Human Approval** - Review every action before execution
-- **Selective Context** - Mark which blocks should be given as context to AI.
+- **Code/command Execution** - AI can propose Python code or shell commands
+- **Human Approval** - Review/edit actions before execution
+- **Selective Context** - Mark which blocks should be given as context to AI
 
 ## Installation
 
