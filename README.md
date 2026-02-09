@@ -6,50 +6,14 @@ Experimental Python-based terminal user interface for interacting with intellige
 
 ## Installation
 
-Install with AI support:
-```bash
-pip install -e ".[ai]"
-```
-
-For basic usage without AI features:
+Instal:
 ```bash
 pip install -e .
 ```
 
-## Configuration
-
-### Claude (Anthropic)
-Set your API key for Claude:
-```bash
-export ANTHROPIC_API_KEY="your-api-key-here"
-```
-
-### Ollama (Local Models)
-Install and run Ollama locally:
-```bash
-# Install Ollama from https://ollama.ai
-ollama pull llama3.1  # or any other model
-ollama serve  # runs on localhost:11434 by default
-```
-
-Optionally set custom Ollama host:
-```bash
-export OLLAMA_HOST="http://localhost:11434"
-```
-
 ## Running
 
-Run with Claude:
-```bash
-artifice --agent-type claude
-```
-
-Run with Ollama:
-```bash
-artifice --agent-type ollama
-```
-
-Run without AI:
+Run in current directory:
 ```bash
 artifice
 ```
@@ -60,44 +24,18 @@ artifice
 
 Artifice has three input modes. Switch modes by typing a special character when the input is empty:
 
-- `>` - **AI Agent mode** - Ask questions and get AI assistance
-- `]` - **Python mode** - Execute Python code interactively
+- `>` - **AI prompt mode** - Prompt the intellegence model
+- `]` - **Python mode** - Execute Python code
 - `$` - **Shell mode** - Run shell commands
-
-### Example: Python Session
-
-```
-] x = [1, 2, 3, 4, 5]
-] sum(x)
-15
-```
-
-### Example: AI Interaction
-
-```
-> What's the average of the list x?
-```
-
-The AI might suggest:
-```python
-sum(x) / len(x)
-```
-
-You'll see the proposed code and can choose to execute it, modify it, or skip it.
-
-### Example: Shell Commands
-
-```
-$ ls -la
-$ git status
-```
 
 ## Features
 
 ### Core Features
+- **Minimal Interface to AI Models** - Uses concise simple prompting without using MCP or ACP
 - **Interactive Python Console** - Full REPL with persistent session
 - **Interactive Shell** - Execute shell commands without leaving the environment
 - **Markdown Rendering** - AI responses rendered with syntax highlighting
+    - Output from Python or shell commands can be rendered as markdown
 - **Multiline Input** - Write complex code with Python auto-complete
 - **Command History** - Persistent history across sessions
 - **Textual Integration** - Python commands that result in Textual objects are mounted directly in the output, allowing on-the-fly interface generation
@@ -165,6 +103,27 @@ This design enables agentic workflows while keeping you fully responsible and in
 git clone <repository-url>
 cd artifice 
 python src/artifice/app.py
+```
+
+## Configuration
+
+### Claude (Anthropic)
+Set your API key for Claude:
+```bash
+export ANTHROPIC_API_KEY="your-api-key-here"
+```
+
+### Ollama (Local Models)
+Install and run Ollama locally:
+```bash
+# Install Ollama from https://ollama.ai
+ollama pull llama3.1  # or any other model
+ollama serve  # runs on localhost:11434 by default
+```
+
+Optionally set custom Ollama host:
+```bash
+export OLLAMA_HOST="http://localhost:11434"
 ```
 
 ## Roadmap

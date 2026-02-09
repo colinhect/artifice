@@ -283,6 +283,11 @@ class ArtificeTerminal(Widget):
         height: auto;
         max-height: 30vh;
     }
+
+    ArtificeTerminal #flash {
+        height: 0;
+        display: none;
+    }
     """
 
     BINDINGS = [
@@ -391,12 +396,13 @@ class ArtificeTerminal(Widget):
 
     def on_mount(self) -> None:
         """Add ASCII art banner when the terminal is mounted."""
-        banner = """┌─┐┬─┐┌┬┐┬┌─┐┬┌─┐┌─┐
-├─┤├┬┘ │ │├┤ ││  ├┤
-┴ ┴┴└─ ┴ ┴└  ┴└─┘└─┘"""
-        banner_block = BaseBlock()
-        banner_block.update(banner)
-        self.output.append_block(banner_block)
+        pass
+#        banner = """┌─┐┬─┐┌┬┐┬┌─┐┬┌─┐┌─┐
+#├─┤├┬┘ │ │├┤ ││  ├┤
+#┴ ┴┴└─ ┴ ┴└  ┴└─┘└─┘"""
+#        banner_block = BaseBlock()
+#        banner_block.update(banner)
+#        self.output.append_block(banner_block)
 
     async def on_terminal_input_submitted(self, event: TerminalInput.Submitted) -> None:
         """Handle code submission from input."""
