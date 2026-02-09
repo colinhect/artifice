@@ -2,28 +2,6 @@
 
 Experimental Python-based terminal user interface for interacting with intelligence models to write and execute code or system commands. Built with [Textual](https://github.com/Textualize/textual).
 
-## Installation
-
-```bash
-pip install -e .
-```
-
-## Running
-
-```bash
-artifice
-```
-
-## Usage
-
-### Mode Switching
-
-Artifice has three input modes. Switch modes by typing a special character when the input is empty:
-
-- `>` - **AI prompt mode** - Prompt the intellegence model
-- `]` - **Python mode** - Execute Python code
-- `$` - **Shell mode** - Run shell commands
-
 ## Features
 
 ### Core Features
@@ -46,6 +24,28 @@ Artifice has three input modes. Switch modes by typing a special character when 
 - **Agentic Loops** - Multiple tool calls in a single conversation
 - **Human Approval** - Review every action before execution
 - **Selective Context** - Mark which blocks should be given as context to AI.
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+## Running
+
+```bash
+artifice
+```
+
+## Usage
+
+### Mode Switching
+
+Artifice has three input modes. Switch modes by typing a special character when the input is empty:
+
+- `>` - **AI prompt mode** - Prompt the intellegence model
+- `]` - **Python mode** - Execute Python code
+- `$` - **Shell mode** - Run shell commands
 
 ## Keybindings
 
