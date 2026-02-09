@@ -76,28 +76,17 @@ Artifice has three input modes. Switch modes by typing a special character when 
 
 ## AI Agent Integration
 
-### Architecture
-
-Artifice decouples AI suggestions from execution. When an AI agent makes a tool call to execute Python or shell commands, you are prompted to review the proposed action. You can:
-
-1. **Execute** - Run the code as suggested
-2. **Edit** - Modify the code before running
-3. **Skip** - Reject the suggestion and continue
-
-This design enables agentic workflows while keeping you fully responsible and in control of all code execution.
-
 ### Supported Agents
 
 - **Claude** (via Anthropic API) - Streaming support with tool calling
 - **Ollama** (local models) - Run models locally with streaming support
-- Custom agents via `AgentBase` subclass
 
 ### Running from Source
 
 ```bash
 git clone <repository-url>
-cd artifice 
-python src/artifice/app.py
+cd artifice/src
+python artifice/app.py
 ```
 
 ## Configuration
