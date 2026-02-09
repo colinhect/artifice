@@ -1,6 +1,6 @@
 # Artifice
 
-Experimental Python-based terminal user interface for interacting with intelligence models to write and execute code or system commands. Built with [Textual](https://github.com/Textualize/textual).
+A minimal Python-based terminal user interface for interacting with intelligence models to write and execute code or system commands. Built with [Textual](https://github.com/Textualize/textual).
 
 ## Features
 
@@ -20,8 +20,6 @@ Experimental Python-based terminal user interface for interacting with intellige
 - **Save/Restore** - Persist important blocks across sessions
 
 ### AI Agent Integration
-- **Tool Calling** - AI can propose Python code or shell commands
-- **Agentic Loops** - Multiple tool calls in a single conversation
 - **Human Approval** - Review every action before execution
 - **Selective Context** - Mark which blocks should be given as context to AI.
 
