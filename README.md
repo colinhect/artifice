@@ -4,14 +4,12 @@ Experimental Python-based terminal user interface for interacting with intellige
 
 ## Installation
 
-Instal:
 ```bash
 pip install -e .
 ```
 
 ## Running
 
-Run in current directory:
 ```bash
 artifice
 ```
