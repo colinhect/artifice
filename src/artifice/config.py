@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -16,6 +15,7 @@ class ArtificeConfig:
     def __init__(self) -> None:
         """Initialize empty configuration."""
         self.shell_init_script: Optional[str] = None
+        self.use_simple_subprocess: bool = True
         
     @classmethod
     def load(cls) -> ArtificeConfig:

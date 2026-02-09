@@ -2,6 +2,8 @@
 
 Experimental Python-based terminal user interface for interacting with intelligence models to write and execute code or system commands. Built with [Textual](https://github.com/Textualize/textual).
 
+![Screenshot](./screenshot.svg)
+
 ## Installation
 
 Install with AI support:

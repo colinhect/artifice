@@ -309,7 +309,10 @@ class ArtificeTerminal(Widget):
         
         # Load configuration and create shell executor with init script
         config = ArtificeConfig.load()
-        self._shell_executor = ShellExecutor(init_script=config.shell_init_script)
+        self._shell_executor = ShellExecutor(
+            init_script=config.shell_init_script,
+            use_simple_subprocess=config.use_simple_subprocess
+        )
 
         # Create history manager
         self._history = History(history_file=history_file, max_history_size=max_history_size)
@@ -386,6 +389,15 @@ class ArtificeTerminal(Widget):
             yield self.input
             yield self.pinned_output
 
+    def on_mount(self) -> None:
+        """Add ASCII art banner when the terminal is mounted."""
+        banner = """┌─┐┬─┐┌┬┐┬┌─┐┬┌─┐┌─┐
+├─┤├┬┘ │ │├┤ ││  ├┤
+┴ ┴┴└─ ┴ ┴└  ┴└─┘└─┘"""
+        banner_block = BaseBlock()
+        banner_block.update(banner)
+        self.output.append_block(banner_block)
+
     async def on_terminal_input_submitted(self, event: TerminalInput.Submitted) -> None:
         """Handle code submission from input."""
         code = event.code
@@ -456,7 +468,7 @@ class ArtificeTerminal(Widget):
 
     async def _execute_block_python(self, code_input_block: CodeInputBlock, code: str) -> ExecutionResult:
         """Execute Python code from an existing block."""
-        code_output_block = CodeOutputBlock(render_markdown=self._agent_markdown_enabled)
+        code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
         self.output.append_block(code_output_block)
 
         def on_output(text):
@@ -509,7 +521,7 @@ class ArtificeTerminal(Widget):
 
     async def _execute_block_shell(self, code_input_block: CodeInputBlock, command: str) -> ExecutionResult:
         """Execute shell command from an existing block."""
-        code_output_block = CodeOutputBlock(render_markdown=self._agent_markdown_enabled)
+        code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
         self.output.append_block(code_output_block)
 
         def on_output(text):
@@ -691,16 +703,16 @@ class ArtificeTerminal(Widget):
         # Determine current mode and toggle its setting
         if self.input.mode == "ai":
             self._agent_markdown_enabled = not self._agent_markdown_enabled
-            #enabled_str = "enabled" if self._agent_markdown_enabled else "disabled"
-            #self.app.notify(f"Markdown {enabled_str} for AI agent output")
+            enabled_str = "enabled" if self._agent_markdown_enabled else "disabled"
+            self.app.notify(f"Markdown {enabled_str} for AI agent output")
         elif self.input.mode == "shell":
             self._shell_markdown_enabled = not self._shell_markdown_enabled
-            #enabled_str = "enabled" if self._shell_markdown_enabled else "disabled"
-            #self.app.notify(f"Markdown {enabled_str} for shell command output")
+            enabled_str = "enabled" if self._shell_markdown_enabled else "disabled"
+            self.app.notify(f"Markdown {enabled_str} for shell command output")
         else:
             self._python_markdown_enabled = not self._python_markdown_enabled
-            #enabled_str = "enabled" if self._python_markdown_enabled else "disabled"
-            #self.app.notify(f"Markdown {enabled_str} for Python code output")
+            enabled_str = "enabled" if self._python_markdown_enabled else "disabled"
+            self.app.notify(f"Markdown {enabled_str} for Python code output")
 
     def reset(self) -> None:
         """Reset the REPL state."""

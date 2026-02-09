@@ -23,14 +23,17 @@ class ShellExecutor:
     Only execute commands from trusted sources.
     """
 
-    def __init__(self, init_script: Optional[str] = None) -> None:
+    def __init__(self, init_script: Optional[str] = None, use_simple_subprocess: bool = True) -> None:
         """Initialize shell executor with optional initialization script.
-        
+
         Args:
             init_script: Shell script to source before each command execution.
                         Useful for setting aliases, environment variables, etc.
+            use_simple_subprocess: If True (default), use simple subprocess without PTY.
+                                  If False, use PTY for terminal emulation (preserves colors).
         """
         self.init_script = init_script
+        self.use_simple_subprocess = use_simple_subprocess
         self.working_directory = os.getcwd()
 
     async def execute(
@@ -40,6 +43,149 @@ class ShellExecutor:
         on_error: Optional[Callable[[str], None]] = None,
     ) -> ExecutionResult:
         """Execute a shell command asynchronously with streaming output.
+
+        Args:
+            command: The shell command string to execute.
+            on_output: Optional callback invoked for each stdout line.
+            on_error: Optional callback invoked for each stderr line.
+
+        Returns:
+            ExecutionResult with status (SUCCESS/ERROR), output, and any errors.
+        """
+        if self.use_simple_subprocess:
+            return await self._execute_simple(command, on_output, on_error)
+        else:
+            return await self._execute_pty(command, on_output, on_error)
+
+    async def _execute_simple(
+        self,
+        command: str,
+        on_output: Optional[Callable[[str], None]] = None,
+        on_error: Optional[Callable[[str], None]] = None,
+    ) -> ExecutionResult:
+        """Execute a shell command using simple subprocess without PTY.
+
+        This is simpler and more reliable but doesn't preserve terminal colors.
+
+        Args:
+            command: The shell command string to execute.
+            on_output: Optional callback invoked for stdout data.
+            on_error: Optional callback invoked for stderr data.
+
+        Returns:
+            ExecutionResult with status (SUCCESS/ERROR), output, and any errors.
+        """
+        result = ExecutionResult(code=command, status=ExecutionStatus.RUNNING)
+        init_file = None
+        process = None
+
+        try:
+            # Prepare the command with init script if provided
+            if self.init_script:
+                init_file = tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False)
+                init_file.write("#!/bin/bash\n")
+                init_file.write("shopt -s expand_aliases\n")
+                init_file.write(self.init_script)
+                init_file.write("\n")
+                init_file.write(command)
+                init_file.write("\n")
+                init_file.write('echo "###ARTIFICE_PWD###$(pwd)###"\n')
+                init_file.close()
+                os.chmod(init_file.name, 0o700)
+                wrapped_command = init_file.name
+            else:
+                # Append pwd capture to the command
+                wrapped_command = f'cd "{self.working_directory}" && {command} ; echo "###ARTIFICE_PWD###$(pwd)###"'
+
+            # Create subprocess with pipes for stdout and stderr
+            process = await asyncio.create_subprocess_shell(
+                wrapped_command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=self.working_directory,
+            )
+
+            # Collect output
+            stdout_lines = []
+            stderr_lines = []
+
+            async def read_stream(stream, lines_list, callback):
+                """Read from a stream and collect lines."""
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+                    text = line.decode('utf-8', errors='replace')
+                    lines_list.append(text)
+                    # Filter out the marker from live output
+                    filtered_text = re.sub(r'###ARTIFICE_PWD###[^#]+###\r?\n?', '', text)
+                    if filtered_text and callback:
+                        callback(filtered_text)
+
+            # Read stdout and stderr concurrently
+            await asyncio.gather(
+                read_stream(process.stdout, stdout_lines, on_output),
+                read_stream(process.stderr, stderr_lines, on_error),
+            )
+
+            # Wait for process to complete
+            returncode = await process.wait()
+
+            # Collect results
+            full_output = "".join(stdout_lines)
+            full_error = "".join(stderr_lines)
+
+            # Extract and remove the working directory marker
+            pwd_match = re.search(r'###ARTIFICE_PWD###([^#]+)###', full_output)
+            if pwd_match:
+                new_pwd = pwd_match.group(1).strip()
+                if new_pwd and os.path.isdir(new_pwd):
+                    self.working_directory = new_pwd
+
+            # Remove the marker from output
+            full_output = re.sub(r'###ARTIFICE_PWD###[^#]+###\r?\n?', '', full_output)
+
+            result.output = full_output
+            result.error = full_error
+            result.status = ExecutionStatus.SUCCESS if returncode == 0 else ExecutionStatus.ERROR
+
+        except asyncio.CancelledError:
+            result.status = ExecutionStatus.ERROR
+            result.error = "\n[Execution cancelled]\n"
+            if on_error:
+                on_error(result.error)
+            if process:
+                try:
+                    process.terminate()
+                    await asyncio.wait_for(process.wait(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    process.kill()
+                    await process.wait()
+            raise
+        except Exception as e:
+            result.status = ExecutionStatus.ERROR
+            result.exception = e
+            error_text = f"Failed to execute command: {str(e)}\n{traceback.format_exc()}"
+            result.error = error_text
+            if on_error:
+                on_error(error_text)
+        finally:
+            # Clean up temporary init file if created
+            if init_file:
+                try:
+                    os.unlink(init_file.name)
+                except Exception:
+                    pass
+
+        return result
+
+    async def _execute_pty(
+        self,
+        command: str,
+        on_output: Optional[Callable[[str], None]] = None,
+        on_error: Optional[Callable[[str], None]] = None,
+    ) -> ExecutionResult:
+        """Execute a shell command using PTY for terminal emulation.
 
         The command is executed with a pseudo-TTY to ensure color output is preserved.
 

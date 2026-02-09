@@ -219,9 +219,8 @@ class CodeOutputBlock(BaseBlock):
         if self._markdown:
             self._markdown.append(output)
         elif self._output:
-            # Convert ANSI escape codes to Textual markup
-            textual_output = ansi_to_textual(self._full.rstrip('\n'))
-            self._output.update(textual_output)
+            #textual_output = ansi_to_textual(self._full.rstrip('\n'))
+            self._output.update(self._full.rstrip('\n'))
 
     def append_error(self, output) -> None:
         self.append_output(output)
