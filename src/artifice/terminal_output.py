@@ -550,8 +550,8 @@ class TerminalOutput(VerticalScroll):
             self.app.query_one("#code-input", InputTextArea).focus()
 
     def on_focus(self) -> None:
-        """When focusing on TerminalOutput, highlight the newest block."""
-        if self._blocks:
+        """When focusing on TerminalOutput, highlight the newest block if none is highlighted."""
+        if self._blocks and self._highlighted_index is None:
             self._highlighted_index = len(self._blocks) - 1
             self._update_highlight()
 

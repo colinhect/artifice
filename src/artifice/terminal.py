@@ -593,6 +593,26 @@ class ArtificeTerminal(Widget):
                 else:
                     self._current_detector.first_agent_block.mark_success()
 
+        # Auto-highlight the last CodeInputBlock from this agent response
+        # Search backward through the blocks created in this response
+        last_code_block = None
+        for block in reversed(self._current_detector.all_blocks):
+            if isinstance(block, CodeInputBlock):
+                last_code_block = block
+                break
+
+        if last_code_block is not None:
+            # Find its index in the output blocks
+            try:
+                last_code_block_index = self.output._blocks.index(last_code_block)
+                # Set the index BEFORE focusing to avoid on_focus overwriting it
+                self.output._highlighted_index = last_code_block_index
+                self.output._update_highlight()
+                self.output.focus()
+            except ValueError:
+                # Block not found in output (shouldn't happen, but be safe)
+                pass
+
         detector = self._current_detector
         self._current_detector = None
         return detector, response
