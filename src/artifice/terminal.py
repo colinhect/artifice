@@ -532,6 +532,8 @@ class ArtificeTerminal(Widget):
             nonlocal code_output_block
             if code_output_block is None:
                 code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled, in_context=in_context)
+                if in_context:
+                    self._context_blocks.append(code_output_block)
                 self.output.append_block(code_output_block)
             code_output_block.append_output(text)
             self.output.scroll_end(animate=False)
@@ -540,6 +542,8 @@ class ArtificeTerminal(Widget):
             nonlocal code_output_block
             if code_output_block is None:
                 code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled, in_context=in_context)
+                if in_context:
+                    self._context_blocks.append(code_output_block)
                 self.output.append_block(code_output_block)
             code_output_block.append_error(text)
             self.output.scroll_end(animate=False)
@@ -599,6 +603,8 @@ class ArtificeTerminal(Widget):
             nonlocal code_output_block
             if code_output_block is None:
                 code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled, in_context=in_context)
+                if in_context:
+                    self._context_blocks.append(code_output_block)
                 self.output.append_block(code_output_block)
             code_output_block.append_output(text)
             self.output.scroll_end(animate=False)
@@ -607,6 +613,8 @@ class ArtificeTerminal(Widget):
             nonlocal code_output_block
             if code_output_block is None:
                 code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled, in_context=in_context)
+                if in_context:
+                    self._context_blocks.append(code_output_block)
                 self.output.append_block(code_output_block)
             code_output_block.append_error(text)
             self.output.scroll_end(animate=False)
@@ -743,9 +751,13 @@ class ArtificeTerminal(Widget):
         block = event.block
         code = block.get_code()
         mode = block.get_mode()
-        self.output.append_block(AgentInputBlock("Executed:", in_context=True))
+        executed_input_block = AgentInputBlock("Executed:", in_context=True)
+        self._context_blocks.append(executed_input_block)
+        self.output.append_block(executed_input_block)
         code_input_block = CodeInputBlock(code, language="bash" if mode=="shell" else "python", show_loading=True, in_context=True)
+        self._context_blocks.append(code_input_block)
         self.output.append_block(code_input_block)
+
 
         # Show loading indicator on the block
         #block.show_loading()
