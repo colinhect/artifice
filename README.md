@@ -46,29 +46,26 @@ Artifice has three input modes. Switch modes by typing a special character when 
 - `]` - **Python mode** - Execute Python code
 - `$` - **Shell mode** - Run shell commands
 
-## Keybindings
-
 ### Navigation
+
 - **Alt+Up/Down** - Navigate through output blocks
 - **Up/Down** - Navigate command history (when cursor is at top/bottom of input)
 
 ### Execution
+
 - **Enter** - Execute input (single-line) or insert newline (multi-line)
 - **Ctrl+S** - Submit code/command
 - **Ctrl+C** - Cancel current operation
 
 ### Input Editing
+
 - **Ctrl+J** - Insert newline
 - **Ctrl+K** - Clear input
 - **Ctrl+R** - History search with autocomplete
 - **Escape** - Exit search mode / Return to Python mode
 
-### Mode Switching (when input is empty)
-- **>** - Switch to AI Agent mode
-- **$** - Switch to Shell mode
-- **]** - Switch to Python mode
-
 ### Application
+
 - **Ctrl+Q** - Exit application
 - **Ctrl+O** - Toggle markdown rendering (on current block or subsequent blocks)
 - **Ctrl+L** - Clear output
