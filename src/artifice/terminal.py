@@ -157,8 +157,23 @@ class StreamingFenceDetector:
                 self._update_current_block_with_chunk()
                 self._chunk_buffer = ""
 
-            # End current prose block (mark as no longer active)
-            if hasattr(self._current_block, 'mark_success'):
+            # Check if the current prose block is empty and remove it if so
+            current_is_empty = False
+            if isinstance(self._current_block, AgentOutputBlock):
+                if hasattr(self._current_block, '_full') and not self._current_block._full.strip():
+                    current_is_empty = True
+                    # Remove from all_blocks and output
+                    if self._current_block in self.all_blocks:
+                        self.all_blocks.remove(self._current_block)
+                    if self._current_block in self._output._blocks:
+                        self._output._blocks.remove(self._current_block)
+                    # Update first_agent_block if we're removing it
+                    if self._current_block is self.first_agent_block:
+                        self.first_agent_block = None
+                    self._current_block.remove()
+
+            # End current prose block (mark as no longer active) only if not removed
+            if not current_is_empty and hasattr(self._current_block, 'mark_success'):
                 self._current_block.mark_success()
 
             # Create new code block
@@ -241,6 +256,25 @@ class StreamingFenceDetector:
         # Mark the last block as complete
         if self._current_block and hasattr(self._current_block, 'mark_success'):
             self._current_block.mark_success()
+
+        # Remove remaining empty AgentOutputBlocks
+        # Note: first_agent_block may be None if it was removed during splitting
+        # We keep first_agent_block if it still exists (to preserve status indicator)
+        # but remove all other empty prose blocks
+        blocks_to_remove = []
+        for block in self.all_blocks:
+            if isinstance(block, AgentOutputBlock) and block is not self.first_agent_block:
+                # Check if the block is empty (whitespace only)
+                if hasattr(block, '_full') and not block._full.strip():
+                    blocks_to_remove.append(block)
+
+        # Remove empty blocks from both lists and from the output
+        for block in blocks_to_remove:
+            if block in self.all_blocks:
+                self.all_blocks.remove(block)
+            if block in self._output._blocks:
+                self._output._blocks.remove(block)
+            block.remove()
 
 
 class ArtificeTerminal(Widget):
@@ -448,14 +482,21 @@ class ArtificeTerminal(Widget):
         code_input_block = CodeInputBlock(code, language="python")
         self.output.append_block(code_input_block)
 
-        code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
-        self.output.append_block(code_output_block)
+        code_output_block = None
 
         def on_output(text):
+            nonlocal code_output_block
+            if code_output_block is None:
+                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
+                self.output.append_block(code_output_block)
             code_output_block.append_output(text)
             self.output.call_after_refresh(self.output.auto_scroll)
 
         def on_error(text):
+            nonlocal code_output_block
+            if code_output_block is None:
+                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
+                self.output.append_block(code_output_block)
             code_output_block.append_error(text)
             self.output.call_after_refresh(self.output.auto_scroll)
 
@@ -475,14 +516,21 @@ class ArtificeTerminal(Widget):
 
     async def _execute_block_python(self, code_input_block: CodeInputBlock, code: str) -> ExecutionResult:
         """Execute Python code from an existing block."""
-        code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
-        self.output.append_block(code_output_block)
+        code_output_block = None
 
         def on_output(text):
+            nonlocal code_output_block
+            if code_output_block is None:
+                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
+                self.output.append_block(code_output_block)
             code_output_block.append_output(text)
             self.output.call_after_refresh(self.output.auto_scroll)
 
         def on_error(text):
+            nonlocal code_output_block
+            if code_output_block is None:
+                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
+                self.output.append_block(code_output_block)
             code_output_block.append_error(text)
             self.output.call_after_refresh(self.output.auto_scroll)
 
@@ -505,14 +553,21 @@ class ArtificeTerminal(Widget):
         command_input_block = CodeInputBlock(command, language="bash")
         self.output.append_block(command_input_block)
 
-        code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
-        self.output.append_block(code_output_block)
+        code_output_block = None
 
         def on_output(text):
+            nonlocal code_output_block
+            if code_output_block is None:
+                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
+                self.output.append_block(code_output_block)
             code_output_block.append_output(text)
             self.output.call_after_refresh(self.output.auto_scroll)
 
         def on_error(text):
+            nonlocal code_output_block
+            if code_output_block is None:
+                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
+                self.output.append_block(code_output_block)
             code_output_block.append_error(text)
             self.output.call_after_refresh(self.output.auto_scroll)
 
@@ -528,14 +583,21 @@ class ArtificeTerminal(Widget):
 
     async def _execute_block_shell(self, code_input_block: CodeInputBlock, command: str) -> ExecutionResult:
         """Execute shell command from an existing block."""
-        code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
-        self.output.append_block(code_output_block)
+        code_output_block = None
 
         def on_output(text):
+            nonlocal code_output_block
+            if code_output_block is None:
+                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
+                self.output.append_block(code_output_block)
             code_output_block.append_output(text)
             self.output.call_after_refresh(self.output.auto_scroll)
 
         def on_error(text):
+            nonlocal code_output_block
+            if code_output_block is None:
+                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
+                self.output.append_block(code_output_block)
             code_output_block.append_error(text)
             self.output.call_after_refresh(self.output.auto_scroll)
 

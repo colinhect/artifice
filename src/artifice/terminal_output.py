@@ -298,13 +298,15 @@ class AgentOutputBlock(BaseBlock):
         margin-top: 1;
     }
 
+    /*
     AgentOutputBlock .agent-output MarkdownBlock:last-child {
-        /*margin-bottom: 0;*/
+        margin-bottom: 1;
     }
 
     AgentOutputBlock .agent-output MarkdownFence {
-        /*margin: 0;*/
+        margin: 0;
     }
+    */
 
     AgentOutputBlock .agent-output MarkdownTable {
         width: auto;
