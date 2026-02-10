@@ -30,7 +30,7 @@ class ArtificeHeader(Static):
         padding: 0;
         margin: 0;
         background: $background;
-        content-align: left middle;
+        content-align: left top;
     }
 
     ArtificeHeader .header-bar {
@@ -68,10 +68,20 @@ class ArtificeApp(App):
     Screen {
         layout: vertical;
         height: auto;
+        padding: 0;
+        margin: 0;
+        border: none;
+        overflow-y: auto;
+    }
+
+    ArtificeHeader {
+        dock: top;
     }
 
     ArtificeTerminal {
         height: auto;
+        margin-top: 0;
+        padding-top: 0;
     }
 
     Footer {
