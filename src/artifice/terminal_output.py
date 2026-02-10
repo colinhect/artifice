@@ -184,7 +184,7 @@ class CodeOutputBlock(BaseBlock):
     }
     """
 
-    def __init__(self, output="", render_markdown=False) -> None:
+    def __init__(self, output="", render_markdown=False, in_context=False) -> None:
         super().__init__()
         self._status_indicator = Static(classes="status-indicator")
         self._output = Static(output, classes="code-output") if not render_markdown else None
@@ -193,6 +193,8 @@ class CodeOutputBlock(BaseBlock):
         self._render_markdown= render_markdown
         self._has_error = False
         self._contents = Horizontal()
+        if in_context:
+            self.add_class("in-context")
 
     def compose(self) -> ComposeResult:
         with self._contents:
@@ -271,11 +273,13 @@ class AgentInputBlock(BaseBlock):
     }
     """
 
-    def __init__(self, prompt: str, **kwargs) -> None:
+    def __init__(self, prompt: str, in_context=False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._status_indicator = Static(">", classes="status-indicator status-pending")
         self._prompt = Static(prompt, classes="prompt")
         self._original_prompt = prompt  # Store original prompt for re-use
+        if in_context:
+            self.add_class("in-context")
 
     def compose(self) -> ComposeResult:
         with Horizontal():

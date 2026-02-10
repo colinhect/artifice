@@ -15,7 +15,7 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 
-from .execution import ExecutionResult, CodeExecutor, ShellExecutor
+from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
 from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput, BaseBlock
@@ -390,7 +390,7 @@ class ArtificeTerminal(Widget):
         elif app.agent_type.lower() == "simulated":
             from artifice.agent.simulated import SimulatedAgent
             self._agent = SimulatedAgent(
-                response_delay=0.1,
+                response_delay=0.001,
                 on_connect=on_agent_connect,
             )
 
@@ -524,14 +524,14 @@ class ArtificeTerminal(Widget):
 
         return result
 
-    async def _execute_block_python(self, code_input_block: CodeInputBlock, code: str) -> ExecutionResult:
+    async def _execute_block_python(self, code_input_block: CodeInputBlock, code: str, in_context=False) -> ExecutionResult:
         """Execute Python code from an existing block."""
         code_output_block = None
 
         def on_output(text):
             nonlocal code_output_block
             if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
+                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled, in_context=in_context)
                 self.output.append_block(code_output_block)
             code_output_block.append_output(text)
             self.output.scroll_end(animate=False)
@@ -539,7 +539,7 @@ class ArtificeTerminal(Widget):
         def on_error(text):
             nonlocal code_output_block
             if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
+                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled, in_context=in_context)
                 self.output.append_block(code_output_block)
             code_output_block.append_error(text)
             self.output.scroll_end(animate=False)
@@ -591,14 +591,14 @@ class ArtificeTerminal(Widget):
         command_input_block.update_status(result)
         return result
 
-    async def _execute_block_shell(self, code_input_block: CodeInputBlock, command: str) -> ExecutionResult:
+    async def _execute_block_shell(self, code_input_block: CodeInputBlock, command: str, in_context=False) -> ExecutionResult:
         """Execute shell command from an existing block."""
         code_output_block = None
 
         def on_output(text):
             nonlocal code_output_block
             if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
+                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled, in_context=in_context)
                 self.output.append_block(code_output_block)
             code_output_block.append_output(text)
             self.output.scroll_end(animate=False)
@@ -606,7 +606,7 @@ class ArtificeTerminal(Widget):
         def on_error(text):
             nonlocal code_output_block
             if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
+                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled, in_context=in_context)
                 self.output.append_block(code_output_block)
             code_output_block.append_error(text)
             self.output.scroll_end(animate=False)
@@ -715,16 +715,7 @@ class ArtificeTerminal(Widget):
 
     async def _send_execution_result_to_agent(self, code: str, result: ExecutionResult) -> None:
         """Send execution results back to the agent and split the response."""
-        # Find the most recent code input block and output block to mark as in-context
-        if len(self.output._blocks) >= 2:
-            # The last two blocks should be the code input and code output
-            code_input_block = self.output._blocks[-2]
-            code_output_block = self.output._blocks[-1]
-            self._mark_block_in_context(code_input_block)
-            self._mark_block_in_context(code_output_block)
-
-        prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n```\n" + result.output + result.error + "\n```\n"
-
+        prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n" + result.output + result.error + "\n"
         await self._stream_agent_response(prompt)
 
     async def on_terminal_output_pin_requested(self, event: TerminalOutput.PinRequested) -> None:
@@ -752,18 +743,22 @@ class ArtificeTerminal(Widget):
         block = event.block
         code = block.get_code()
         mode = block.get_mode()
+        self.output.append_block(AgentInputBlock("Executed:", in_context=True))
+        code_input_block = CodeInputBlock(code, language="bash" if mode=="shell" else "python", show_loading=True, in_context=True)
+        self.output.append_block(code_input_block)
 
         # Show loading indicator on the block
-        block.show_loading()
+        #block.show_loading()
 
         # Create a task to track execution
         async def execute():
+            result = ExecutionResult(code=code, status=ExecutionStatus.ERROR)
             try:
                 if mode == "shell":
-                    result = await self._execute_block_shell(block, code)
+                    result = await self._execute_block_shell(block, code, in_context=self._auto_send_to_agent)
                 else:  # python
-                    result = await self._execute_block_python(block, code)
-
+                    result = await self._execute_block_python(block, code, in_context=self._auto_send_to_agent)
+                code_input_block.update_status(result)
                 # Always send to agent for block execution
                 await self._send_execution_result_to_agent(code, result)
             except asyncio.CancelledError:
@@ -773,6 +768,8 @@ class ArtificeTerminal(Widget):
                 code_output_block.append_error("\n[Cancelled]\n")
                 raise
             finally:
+                if result:
+                    code_input_block.update_status(result)
                 self._current_task = None
 
         self._current_task = asyncio.create_task(execute())
