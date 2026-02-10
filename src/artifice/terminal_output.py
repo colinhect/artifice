@@ -345,9 +345,9 @@ class AgentOutputBlock(BaseBlock):
     def append(self, response) -> None:
         self._full += response
         if self._markdown:
-            self._markdown.append(response)
+            #self._markdown.append(response)
             # Use full re-render instead of incremental append to avoid duplication bugs
-            #self._markdown.update(self._full)
+            self._markdown.update(self._full)
         elif self._output:
             self._output.update(self._full)
 
@@ -434,15 +434,8 @@ class TerminalOutput(VerticalScroll):
         return block
 
     def auto_scroll(self) -> None:
-        """Scroll to end if already at or near the bottom."""
-        # Check if we're already near the bottom (within a few lines)
-        # If so, scroll to the new end. Otherwise, let the user read where they are.
-        max_scroll_y = self.max_scroll_y
-        current_y = self.scroll_y
-
-        # If we're within 3 lines of the bottom, auto-scroll
-        if max_scroll_y - current_y <= 3:
-            self.scroll_end(animate=False)
+        """Scroll to the bottom without animation."""
+        self.scroll_end(animate=False)
 
     def clear(self) -> None:
         """Clear all output."""

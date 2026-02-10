@@ -109,7 +109,8 @@ class StreamingFenceDetector:
         # Update current block with accumulated chunk text
         if self._chunk_buffer and self._current_block:
             self._update_current_block_with_chunk()
-        self._output.call_after_refresh(self._auto_scroll)
+        # Scroll to bottom immediately after updating content
+        self._output.scroll_end(animate=False)
 
     def _feed_char(self, ch: str) -> None:
         if self._state == _FenceState.PROSE:
@@ -490,7 +491,7 @@ class ArtificeTerminal(Widget):
                 code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
                 self.output.append_block(code_output_block)
             code_output_block.append_output(text)
-            self.output.call_after_refresh(self.output.auto_scroll)
+            self.output.scroll_end(animate=False)
 
         def on_error(text):
             nonlocal code_output_block
@@ -498,7 +499,7 @@ class ArtificeTerminal(Widget):
                 code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
                 self.output.append_block(code_output_block)
             code_output_block.append_error(text)
-            self.output.call_after_refresh(self.output.auto_scroll)
+            self.output.scroll_end(animate=False)
 
         result = await self._executor.execute(
             code,
@@ -524,7 +525,7 @@ class ArtificeTerminal(Widget):
                 code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
                 self.output.append_block(code_output_block)
             code_output_block.append_output(text)
-            self.output.call_after_refresh(self.output.auto_scroll)
+            self.output.scroll_end(animate=False)
 
         def on_error(text):
             nonlocal code_output_block
@@ -532,7 +533,7 @@ class ArtificeTerminal(Widget):
                 code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
                 self.output.append_block(code_output_block)
             code_output_block.append_error(text)
-            self.output.call_after_refresh(self.output.auto_scroll)
+            self.output.scroll_end(animate=False)
 
         result = await self._executor.execute(
             code,
@@ -561,7 +562,7 @@ class ArtificeTerminal(Widget):
                 code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
                 self.output.append_block(code_output_block)
             code_output_block.append_output(text)
-            self.output.call_after_refresh(self.output.auto_scroll)
+            self.output.scroll_end(animate=False)
 
         def on_error(text):
             nonlocal code_output_block
@@ -569,7 +570,7 @@ class ArtificeTerminal(Widget):
                 code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
                 self.output.append_block(code_output_block)
             code_output_block.append_error(text)
-            self.output.call_after_refresh(self.output.auto_scroll)
+            self.output.scroll_end(animate=False)
 
         # Execute asynchronously with streaming callbacks
         result = await self._shell_executor.execute(
@@ -591,7 +592,7 @@ class ArtificeTerminal(Widget):
                 code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
                 self.output.append_block(code_output_block)
             code_output_block.append_output(text)
-            self.output.call_after_refresh(self.output.auto_scroll)
+            self.output.scroll_end(animate=False)
 
         def on_error(text):
             nonlocal code_output_block
@@ -599,7 +600,7 @@ class ArtificeTerminal(Widget):
                 code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
                 self.output.append_block(code_output_block)
             code_output_block.append_error(text)
-            self.output.call_after_refresh(self.output.auto_scroll)
+            self.output.scroll_end(animate=False)
 
         # Execute asynchronously with streaming callbacks
         result = await self._shell_executor.execute(
