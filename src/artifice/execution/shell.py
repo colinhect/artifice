@@ -14,26 +14,13 @@ from .common import ExecutionStatus, ExecutionResult
 class ShellExecutor:
     """Executes shell commands asynchronously with streaming output.
 
-    Commands are parsed using shlex.split() and executed via subprocess
-    without shell interpretation, reducing shell injection risks.
-
     Stdout and stderr are streamed concurrently with real-time callbacks.
 
     Security Note: Commands run with full user permissions without sandboxing.
     Only execute commands from trusted sources.
     """
 
-    def __init__(self, init_script: Optional[str] = None, use_simple_subprocess: bool = True) -> None:
-        """Initialize shell executor with optional initialization script.
-
-        Args:
-            init_script: Shell script to source before each command execution.
-                        Useful for setting aliases, environment variables, etc.
-            use_simple_subprocess: If True (default), use simple subprocess without PTY.
-                                  If False, use PTY for terminal emulation (preserves colors).
-        """
-        self.init_script = init_script
-        self.use_simple_subprocess = use_simple_subprocess
+    def __init__(self) -> None:
         self.working_directory = os.getcwd()
 
     async def execute(
@@ -52,10 +39,7 @@ class ShellExecutor:
         Returns:
             ExecutionResult with status (SUCCESS/ERROR), output, and any errors.
         """
-        if self.use_simple_subprocess:
-            return await self._execute_simple(command, on_output, on_error)
-        else:
-            return await self._execute_pty(command, on_output, on_error)
+        return await self._execute_simple(command, on_output, on_error)
 
     async def _execute_simple(
         self,
@@ -63,46 +47,16 @@ class ShellExecutor:
         on_output: Optional[Callable[[str], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
     ) -> ExecutionResult:
-        """Execute a shell command using simple subprocess without PTY.
-
-        This is simpler and more reliable but doesn't preserve terminal colors.
-
-        Args:
-            command: The shell command string to execute.
-            on_output: Optional callback invoked for stdout data.
-            on_error: Optional callback invoked for stderr data.
-
-        Returns:
-            ExecutionResult with status (SUCCESS/ERROR), output, and any errors.
-        """
         result = ExecutionResult(code=command, status=ExecutionStatus.RUNNING)
-        init_file = None
         process = None
 
         try:
-            # Prepare the command with init script if provided
-            if self.init_script:
-                init_file = tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False)
-                init_file.write("#!/bin/bash\n")
-                init_file.write("shopt -s expand_aliases\n")
-                init_file.write(self.init_script)
-                init_file.write("\n")
-                init_file.write(command)
-                init_file.write("\n")
-                init_file.write('echo "###ARTIFICE_PWD###$(pwd)###"\n')
-                init_file.close()
-                os.chmod(init_file.name, 0o700)
-                wrapped_command = init_file.name
-            else:
-                # Append pwd capture to the command
-                wrapped_command = f'cd "{self.working_directory}" && {command} ; echo "###ARTIFICE_PWD###$(pwd)###"'
-
             # Create subprocess with pipes for stdout and stderr
             process = await asyncio.create_subprocess_shell(
-                wrapped_command,
+                command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=self.working_directory,
+                #cwd=self.working_directory,
             )
 
             # Collect output
@@ -117,10 +71,8 @@ class ShellExecutor:
                         break
                     text = line.decode('utf-8', errors='replace')
                     lines_list.append(text)
-                    # Filter out the marker from live output
-                    filtered_text = re.sub(r'###ARTIFICE_PWD###[^#]+###\r?\n?', '', text)
-                    if filtered_text and callback:
-                        callback(filtered_text)
+                    if text and callback:
+                        callback(text)
 
             # Read stdout and stderr concurrently
             await asyncio.gather(
@@ -134,16 +86,6 @@ class ShellExecutor:
             # Collect results
             full_output = "".join(stdout_lines)
             full_error = "".join(stderr_lines)
-
-            # Extract and remove the working directory marker
-            pwd_match = re.search(r'###ARTIFICE_PWD###([^#]+)###', full_output)
-            if pwd_match:
-                new_pwd = pwd_match.group(1).strip()
-                if new_pwd and os.path.isdir(new_pwd):
-                    self.working_directory = new_pwd
-
-            # Remove the marker from output
-            full_output = re.sub(r'###ARTIFICE_PWD###[^#]+###\r?\n?', '', full_output)
 
             result.output = full_output
             result.error = full_error
@@ -169,13 +111,6 @@ class ShellExecutor:
             result.error = error_text
             if on_error:
                 on_error(error_text)
-        finally:
-            # Clean up temporary init file if created
-            if init_file:
-                try:
-                    os.unlink(init_file.name)
-                except Exception:
-                    pass
 
         return result
 

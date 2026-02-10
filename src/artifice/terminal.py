@@ -15,7 +15,6 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 
-from .config import ArtificeConfig
 from .execution import ExecutionResult, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
@@ -313,11 +312,7 @@ class ArtificeTerminal(Widget):
         self._executor = CodeExecutor()
         
         # Load configuration and create shell executor with init script
-        config = ArtificeConfig.load()
-        self._shell_executor = ShellExecutor(
-            init_script=config.shell_init_script,
-            use_simple_subprocess=config.use_simple_subprocess
-        )
+        self._shell_executor = ShellExecutor()
 
         # Create history manager
         self._history = History(history_file=history_file, max_history_size=max_history_size)
