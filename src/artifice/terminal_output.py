@@ -18,7 +18,7 @@ from .ansi_handler import ansi_to_textual
 class BaseBlock(Static):
     DEFAULT_CSS = """
     BaseBlock {
-        margin: 0 0 1 0;
+        margin: 0;
         padding: 0;
         padding-left: 1;
     }
@@ -290,15 +290,20 @@ class AgentOutputBlock(BaseBlock):
         background: $surface-darken-1;
         padding-left: 0;
         padding-right: 0;
+        padding-top: 1;
         layout: stream;
     }
 
+    AgentOutputBlock .status-indicator {
+        margin-top: 1;
+    }
+
     AgentOutputBlock .agent-output MarkdownBlock:last-child {
-        margin-bottom: 0;
+        /*margin-bottom: 0;*/
     }
 
     AgentOutputBlock .agent-output MarkdownFence {
-        margin: 0;
+        /*margin: 0;*/
     }
 
     AgentOutputBlock .agent-output MarkdownTable {
