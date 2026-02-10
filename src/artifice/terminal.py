@@ -457,6 +457,9 @@ class ArtificeTerminal(Widget):
         # Clear input
         self.input.clear()
 
+        # Show activity indicator
+        self.input.show_activity()
+
         # Create a task to track execution
         async def execute():
             try:
@@ -480,6 +483,9 @@ class ArtificeTerminal(Widget):
                 raise
             finally:
                 self._current_task = None
+                # Hide activity indicator and refocus input
+                self.input.hide_activity()
+                #self.input.focus_input()
 
         self._current_task = asyncio.create_task(execute())
     
@@ -762,8 +768,8 @@ class ArtificeTerminal(Widget):
         # Focus input immediately so user can continue working
         self.input.query_one("#code-input", InputTextArea).focus()
 
-        # Show loading indicator on the block
-        #block.show_loading()
+        # Show activity indicator
+        self.input.show_activity()
 
         # Create a task to track execution
         async def execute():
@@ -786,6 +792,9 @@ class ArtificeTerminal(Widget):
                 if result:
                     code_input_block.update_status(result)
                 self._current_task = None
+                # Hide activity indicator and refocus input
+                self.input.hide_activity()
+                self.input.focus_input()
 
         self._current_task = asyncio.create_task(execute())
 

@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.message import Message
-from textual.widgets import Static, TextArea, Input
+from textual.widgets import Static, TextArea, Input, LoadingIndicator
 from textual import events
 from textual_autocomplete import AutoComplete, DropdownItem, TargetState
 
@@ -170,6 +170,13 @@ class TerminalInput(Static):
         margin: 0;
     }
 
+    TerminalInput .prompt-container {
+        width: 2;
+        height: auto;
+        padding: 0;
+        margin: 0;
+    }
+
     TerminalInput .prompt {
         width: 2;
         color: $primary;
@@ -190,6 +197,10 @@ class TerminalInput(Static):
 
     TerminalInput TextArea:focus {
         border: none !important;
+    }
+
+    TerminalInput TextArea:disabled {
+        opacity: 0.6;
     }
 
     TerminalInput Input {
@@ -270,16 +281,21 @@ class TerminalInput(Static):
         self._search_mode = False
         self._search_input: Input | None = None
         self._autocomplete: HistoryAutoComplete | None = None
+        self._activity_mode = False  # Whether activity indicator is shown
         self.add_class("in-context")
 
     def compose(self) -> ComposeResult:
         with Horizontal():
-            yield Static(self._python_prompt, classes="prompt", id="prompt-display")
+            with Vertical(classes="prompt-container"):
+                yield LoadingIndicator(id="activity-indicator")
+                yield Static(self._python_prompt, classes="prompt", id="prompt-display")
             yield InputTextArea(id="code-input")
 
     def on_mount(self) -> None:
         """Focus the text area on mount."""
         self.query_one("#code-input", InputTextArea).focus()
+        # Hide the loading indicator initially
+        self.query_one("#activity-indicator", LoadingIndicator).styles.display = "none"
         self._update_prompt()
 
     def on_terminal_input_submit_requested(self, event: SubmitRequested) -> None:
@@ -490,6 +506,46 @@ class TerminalInput(Static):
             self._exit_search_mode()
             event.prevent_default()
             event.stop()
+
+    def show_activity(self) -> None:
+        """Show the activity indicator and disable input."""
+        if self._activity_mode:
+            return
+
+        self._activity_mode = True
+        loading_indicator = self.query_one("#activity-indicator", LoadingIndicator)
+        prompt_display = self.query_one("#prompt-display", Static)
+        text_area = self.query_one("#code-input", InputTextArea)
+
+        # Show loading indicator, hide prompt
+        loading_indicator.styles.display = "block"
+        prompt_display.styles.display = "none"
+
+        # Change placeholder to show cancel instruction
+        text_area.placeholder = " [cyan]ctrl+c[/] to cancel"
+
+        # Disable text area (but ctrl+c still works via action bindings)
+        #text_area.disabled = True
+
+    def hide_activity(self) -> None:
+        """Hide the activity indicator and re-enable input."""
+        if not self._activity_mode:
+            return
+
+        self._activity_mode = False
+        loading_indicator = self.query_one("#activity-indicator", LoadingIndicator)
+        prompt_display = self.query_one("#prompt-display", Static)
+        text_area = self.query_one("#code-input", InputTextArea)
+
+        # Hide loading indicator, show prompt
+        loading_indicator.styles.display = "none"
+        prompt_display.styles.display = "block"
+
+        # Re-enable text area
+        #text_area.disabled = False
+
+        # Restore original placeholder based on mode
+        self._update_prompt()
 
     def focus_input(self) -> None:
         """Focus the input text area."""
