@@ -310,7 +310,7 @@ class ArtificeTerminal(Widget):
         padding-left: 0;
     }
 
-    ArtificeTerminal .highlighted {
+    ArtificeTerminal .highlighted > Horizontal > .status-indicator {
         background: $surface-lighten-2;
     }
 
@@ -458,7 +458,7 @@ class ArtificeTerminal(Widget):
         self.input.clear()
 
         # Show activity indicator
-        self.input.show_activity()
+        #self.input.show_activity()
 
         # Create a task to track execution
         async def execute():
@@ -484,7 +484,7 @@ class ArtificeTerminal(Widget):
             finally:
                 self._current_task = None
                 # Hide activity indicator and refocus input
-                self.input.hide_activity()
+                #self.input.hide_activity()
                 #self.input.focus_input()
 
         self._current_task = asyncio.create_task(execute())
@@ -769,7 +769,7 @@ class ArtificeTerminal(Widget):
         self.input.query_one("#code-input", InputTextArea).focus()
 
         # Show activity indicator
-        self.input.show_activity()
+        #self.input.show_activity()
 
         # Create a task to track execution
         async def execute():
@@ -793,7 +793,7 @@ class ArtificeTerminal(Widget):
                     code_input_block.update_status(result)
                 self._current_task = None
                 # Hide activity indicator and refocus input
-                self.input.hide_activity()
+                #self.input.hide_activity()
                 self.input.focus_input()
 
         self._current_task = asyncio.create_task(execute())

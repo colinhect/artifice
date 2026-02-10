@@ -47,6 +47,14 @@ class BaseBlock(Static):
         padding: 0;
     }
 
+    BaseBlock > Horizontal > .status-indicator {
+        height: 100%;
+    }
+
+    BaseBlock .status-indicator LoadingIndicator {
+        height: 1;
+    }
+
     BaseBlock .status-success {
         color: $primary;
     }
@@ -84,6 +92,8 @@ class CodeInputBlock(BaseBlock):
         self._show_loading = show_loading
         self._language = language
         self._status_indicator = Static(self._get_prompt(), classes="status-indicator")
+        if show_loading:
+            self._status_indicator.styles.display= "none"
         self._status_indicator.add_class("status-unexecuted")
         self._original_code = code  # Store original code for re-execution
         self._code = Static(highlight.highlight(code, language=language), classes="code")
@@ -96,9 +106,9 @@ class CodeInputBlock(BaseBlock):
     def compose(self) -> ComposeResult:
         with Horizontal():
             with Vertical(classes="status-indicator"):
+                yield self._status_indicator
                 if self._show_loading:
                     yield self._loading_indicator
-                yield self._status_indicator
             yield self._code
 
     def update_status(self, result: ExecutionResult) -> None:
@@ -121,6 +131,7 @@ class CodeInputBlock(BaseBlock):
     def finish_streaming(self) -> None:
         """Hide the loading indicator after streaming is complete."""
         self._loading_indicator.styles.display = "none"
+        self._status_indicator.styles.display= "block"
 
     def update_code(self, code: str) -> None:
         """Update the displayed code (used during streaming)."""
