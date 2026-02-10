@@ -25,6 +25,9 @@ class BaseBlock(Static):
 
     BaseBlock.in-context {
         padding-left: 0;
+        border-left: solid $primary;
+        margin-bottom: 0;
+        padding-bottom: 1;
     }
 
     BaseBlock Horizontal {
