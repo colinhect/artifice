@@ -26,7 +26,7 @@ class ArtificeHeader(Static):
 
     DEFAULT_CSS = """
     ArtificeHeader {
-        height: 1;
+        height: auto;
         padding: 0;
         margin: 0;
         background: $background;
@@ -35,20 +35,30 @@ class ArtificeHeader(Static):
 
     ArtificeHeader .header-bar {
         width: 1fr;
-        height: 1;
+        height: auto;
         padding: 0;
         margin: 0;
         color: $primary;
     }
     """
 
+    def __init__(self, show_banner):
+        super().__init__()
+        self.show_banner = show_banner
+
     def compose(self) -> ComposeResult:
         # Create a gradient bar using Unicode box-drawing characters
         # Start with a solid block from the left (matching in-context border) and fade right
         # Extended gradient for a more interesting fade effect
         gradient_chars = ["█", "█", "▓", "▓", "▒", "▒", "░", "░", "·", "·", " "]
-        header_content = "".join(gradient_chars)
 
+        header_content = ""
+        if self.show_banner:
+            header_content = """┌─┐┬─┐┌┬┐┬┌─┐┬┌─┐┌─┐
+├─┤├┬┘ │ │├┤ ││  ├┤
+┴ ┴┴└─ ┴ ┴└  ┴└─┘└─┘\n"""
+        
+        header_content += "".join(gradient_chars)
         yield Static(header_content, classes="header-bar")
 
 
@@ -75,13 +85,14 @@ class ArtificeApp(App):
         Binding("f2", "toggle_footer", "Toggle Help"),
     ]
 
-    def __init__(self, agent_type):
+    def __init__(self, agent_type, show_banner=False):
         self.agent_type = agent_type
+        self.show_banner = show_banner
         self.footer_visible = False
         super().__init__()
 
     def compose(self) -> ComposeResult:
-        yield ArtificeHeader()
+        yield ArtificeHeader(self.show_banner)
         yield ArtificeTerminal(self)
         footer = Footer()
         footer.display = False
@@ -103,9 +114,10 @@ def main():
         default="",
         help="Type of agent to use (claude, copilot, ollama, or simulated). Defaults to empty."
     )
+    parser.add_argument("--show-banner", action="store_true", help="Show the banner")
     args = parser.parse_args()
 
-    app = ArtificeApp(args.agent_type)
+    app = ArtificeApp(args.agent_type, args.show_banner)
     app.run(inline=True, inline_no_clear=True)
 
 
