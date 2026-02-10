@@ -73,17 +73,6 @@ class CodeInputBlock(BaseBlock):
         padding: 0;
         border: none;
     }
-
-    CodeInputBlock .markdown-code {
-        background: $background-darken-3;
-        padding: 0;
-        border: none;
-        layout: stream;
-    }
-
-    CodeInputBlock .markdown-code MarkdownFence {
-        margin: 0;
-    }
     """
 
     def __init__(self, code: str, language: str, show_loading: bool = True, in_context=False, **kwargs) -> None:
