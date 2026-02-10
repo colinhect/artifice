@@ -43,6 +43,8 @@ class InputTextArea(TextArea):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(language="python", **kwargs)
+        self._focused_placeholder: str = ""
+        self._unfocused_placeholder: str = " [cyan]enter[/] to execute    [cyan]ctrl+i[/] return to prompt"
 
     def action_submit_code(self) -> None:
         """Submit the code."""
@@ -60,6 +62,20 @@ class InputTextArea(TextArea):
     def set_syntax_highlighting(self, language: str) -> None:
         """Enable or disable Python syntax highlighting."""
         self.language = language
+
+    def set_focused_placeholder(self, text: str) -> None:
+        """Set the placeholder text to show when focused."""
+        self._focused_placeholder = text
+        if self.has_focus:
+            self.placeholder = text
+
+    def on_focus(self) -> None:
+        """Update placeholder when gaining focus."""
+        self.placeholder = self._focused_placeholder
+
+    def on_blur(self) -> None:
+        """Update placeholder when losing focus."""
+        self.placeholder = self._unfocused_placeholder
 
     async def _on_key(self, event: events.Key) -> None:
         """Intercept key events before TextArea processes them."""
@@ -311,19 +327,19 @@ class TerminalInput(Static):
         """Update the prompt display based on current mode."""
         prompt_widget = self.query_one("#prompt-display", Static)
         text_area = self.query_one("#code-input", InputTextArea)
-        
+
         with self.app.batch_update():
             if self.mode == "ai":
                 prompt_widget.update(self._ai_prompt)
-                text_area.placeholder = "ai prompt...       [cyan]][/] python  [cyan]$[/] shell"
+                text_area.set_focused_placeholder("ai prompt...       [cyan]][/] python  [cyan]$[/] shell")
                 text_area.set_syntax_highlighting(None)
             elif self.mode == "shell":
                 prompt_widget.update(self._shell_prompt)
-                text_area.placeholder = "shell command...   [cyan]>[/] ai  [cyan]][/] python"
+                text_area.set_focused_placeholder("shell command...   [cyan]>[/] ai  [cyan]][/] python")
                 text_area.set_syntax_highlighting("bash")
             else:
                 prompt_widget.update(self._python_prompt)
-                text_area.placeholder = "python code...     [cyan]>[/] ai  [cyan]$[/] shell"
+                text_area.set_focused_placeholder("python code...     [cyan]>[/] ai  [cyan]$[/] shell")
                 text_area.set_syntax_highlighting("python")
 
     @property
@@ -474,3 +490,8 @@ class TerminalInput(Static):
             self._exit_search_mode()
             event.prevent_default()
             event.stop()
+
+    def focus_input(self) -> None:
+        """Focus the input text area."""
+        if not self._search_mode:
+            self.query_one("#code-input", InputTextArea).focus()

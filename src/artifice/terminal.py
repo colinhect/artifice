@@ -330,6 +330,7 @@ class ArtificeTerminal(Widget):
     """
 
     BINDINGS = [
+        Binding("ctrl+i", "focus_input", "Focus Input", show=True),
         Binding("ctrl+l", "clear", "Clear", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
@@ -758,6 +759,8 @@ class ArtificeTerminal(Widget):
         self._context_blocks.append(code_input_block)
         self.output.append_block(code_input_block)
 
+        # Focus input immediately so user can continue working
+        self.input.query_one("#code-input", InputTextArea).focus()
 
         # Show loading indicator on the block
         #block.show_loading()
@@ -799,6 +802,10 @@ class ArtificeTerminal(Widget):
     def action_clear(self) -> None:
         """Clear the output."""
         self.output.clear()
+
+    def action_focus_input(self) -> None:
+        """Focus the input text area."""
+        self.input.focus_input()
 
     def action_cancel_execution(self) -> None:
         """Cancel the currently executing code or AI prompt."""
