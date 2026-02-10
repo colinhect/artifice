@@ -338,8 +338,9 @@ class AgentOutputBlock(BaseBlock):
     def append(self, response) -> None:
         self._full += response
         if self._markdown:
+            self._markdown.append(response)
             # Use full re-render instead of incremental append to avoid duplication bugs
-            self._markdown.update(self._full)
+            #self._markdown.update(self._full)
         elif self._output:
             self._output.update(self._full)
 
