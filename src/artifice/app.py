@@ -2,7 +2,7 @@ import argparse
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import Header, Footer
+from textual.widgets import Footer, Static
 
 from artifice import ArtificeTerminal
 
@@ -19,6 +19,38 @@ logging.basicConfig(
 )
 
 logging.getLogger('artifice.agent').setLevel(logging.INFO)
+
+
+class ArtificeHeader(Static):
+    """Custom header with gradient fade effect."""
+
+    DEFAULT_CSS = """
+    ArtificeHeader {
+        height: 1;
+        padding: 0;
+        margin: 0;
+        background: $background;
+        content-align: left middle;
+    }
+
+    ArtificeHeader .header-bar {
+        width: 1fr;
+        height: 1;
+        padding: 0;
+        margin: 0;
+        color: $primary;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        # Create a gradient bar using Unicode box-drawing characters
+        # Start with a solid block from the left (matching in-context border) and fade right
+        # Extended gradient for a more interesting fade effect
+        gradient_chars = ["█", "█", "▓", "▓", "▒", "▒", "░", "░", "·", "·", " "]
+        header_content = "".join(gradient_chars)
+
+        yield Static(header_content, classes="header-bar")
+
 
 class ArtificeApp(App):
     TITLE = "Artifice Terminal"
@@ -49,7 +81,7 @@ class ArtificeApp(App):
         super().__init__()
 
     def compose(self) -> ComposeResult:
-        #yield Header()
+        yield ArtificeHeader()
         yield ArtificeTerminal(self)
         footer = Footer()
         footer.display = False
