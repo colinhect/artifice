@@ -90,7 +90,7 @@ class StreamingFenceDetector:
         self.first_agent_block: AgentOutputBlock | None = None
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
-        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=False, in_context=True)
+        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=True, in_context=True)
 
     def start(self) -> None:
         """Create the initial AgentOutputBlock for streaming prose."""
@@ -258,6 +258,11 @@ class StreamingFenceDetector:
         if self._current_block and hasattr(self._current_block, 'mark_success'):
             self._current_block.mark_success()
 
+        # Hide loading indicators on all CodeInputBlocks
+        for block in self.all_blocks:
+            if isinstance(block, CodeInputBlock):
+                block.finish_streaming()
+
         # Remove remaining empty AgentOutputBlocks
         # Note: first_agent_block may be None if it was removed during splitting
         # We keep first_agent_block if it still exists (to preserve status indicator)
@@ -385,7 +390,7 @@ class ArtificeTerminal(Widget):
         elif app.agent_type.lower() == "simulated":
             from artifice.agent.simulated import SimulatedAgent
             self._agent = SimulatedAgent(
-                response_delay=0.01,
+                response_delay=0.1,
                 on_connect=on_agent_connect,
             )
 
@@ -394,6 +399,10 @@ class ArtificeTerminal(Widget):
                 {
                     'pattern': r'hello|hi|hey',
                     'response': 'Hello! I\'m a **simulated** agent. How can I help you today?'
+                },
+                {
+                    'pattern': r'blank',
+                    'response': '```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
                 },
                 {
                     'pattern': r'calculate|math|sum|add',

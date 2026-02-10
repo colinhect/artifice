@@ -18,7 +18,7 @@ from .ansi_handler import ansi_to_textual
 class BaseBlock(Static):
     DEFAULT_CSS = """
     BaseBlock {
-        margin: 0;
+        margin: 0 0 1 0;
         padding: 0;
         padding-left: 1;
     }
@@ -115,6 +115,10 @@ class CodeInputBlock(BaseBlock):
         self._status_indicator.remove_class("status-error")
         self._status_indicator.update("")
 
+    def finish_streaming(self) -> None:
+        """Hide the loading indicator after streaming is complete."""
+        self._loading_indicator.styles.display = "none"
+
     def update_code(self, code: str) -> None:
         """Update the displayed code (used during streaming)."""
         self._original_code = code
@@ -169,7 +173,7 @@ class CodeOutputBlock(BaseBlock):
     }
 
     CodeOutputBlock .markdown-output MarkdownFence {
-        margin: 0 0 0 0;
+        margin: 0;
     }
 
     CodeOutputBlock .markdown-output MarkdownTable {
@@ -290,23 +294,16 @@ class AgentOutputBlock(BaseBlock):
         background: $surface-darken-1;
         padding-left: 0;
         padding-right: 0;
-        padding-top: 1;
         layout: stream;
     }
 
-    AgentOutputBlock .status-indicator {
-        margin-top: 1;
-    }
-
-    /*
     AgentOutputBlock .agent-output MarkdownBlock:last-child {
-        margin-bottom: 1;
+        margin-bottom: 0;
     }
 
     AgentOutputBlock .agent-output MarkdownFence {
         margin: 0;
     }
-    */
 
     AgentOutputBlock .agent-output MarkdownTable {
         width: auto;
