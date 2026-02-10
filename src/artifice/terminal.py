@@ -346,6 +346,12 @@ class ArtificeTerminal(Widget):
                 system_prompt=system_prompt,
                 on_connect=on_agent_connect,
             )
+        elif app.agent_type.lower() == "copilot":
+            from .agent import CopilotAgent
+            self._agent = CopilotAgent(
+                system_prompt=system_prompt,
+                on_connect=on_agent_connect,
+            )
         elif app.agent_type.lower() == "simulated":
             from artifice.agent.simulated import SimulatedAgent
             self._agent = SimulatedAgent(
