@@ -99,7 +99,7 @@ class StreamingFenceDetector:
         self.all_blocks.append(self._current_block)
         self.first_agent_block = self._current_block
 
-    def feed(self, text: str) -> None:
+    def feed(self, text: str, auto_scroll: bool = True) -> None:
         """Process a chunk of streaming text, creating blocks as needed."""
         self._chunk_buffer = ""  # Reset for this chunk
         for ch in text:
@@ -109,8 +109,9 @@ class StreamingFenceDetector:
         # Update current block with accumulated chunk text
         if self._chunk_buffer and self._current_block:
             self._update_current_block_with_chunk()
-        # Scroll to bottom immediately after updating content
-        self._output.scroll_end(animate=False)
+        # Optionally scroll to bottom after updating content
+        if auto_scroll:
+            self._output.scroll_end(animate=False)
 
     def _feed_char(self, ch: str) -> None:
         if self._state == _FenceState.PROSE:
@@ -432,6 +433,8 @@ class ArtificeTerminal(Widget):
         self._current_task: asyncio.Task | None = None
         self._context_blocks: list[BaseBlock] = []  # Blocks in agent context
         self._current_detector: StreamingFenceDetector | None = None  # Active streaming detector
+        self._chunk_buffer: str = ""  # Buffer for batching StreamChunk messages
+        self._chunk_processing_scheduled: bool = False  # Flag to avoid duplicate batch processing
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -799,12 +802,41 @@ class ArtificeTerminal(Widget):
         self._current_task = asyncio.create_task(execute())
 
     def on_stream_chunk(self, event: StreamChunk) -> None:
-        """Handle streaming chunk message - process text and update blocks in real-time."""
+        """Handle streaming chunk message - buffer and batch process chunks."""
         if self._current_detector:
-            self._current_detector.feed(event.text)
+            # Add chunk to buffer
+            self._chunk_buffer += event.text
+
+            # Schedule batch processing if not already scheduled
+            if not self._chunk_processing_scheduled:
+                self._chunk_processing_scheduled = True
+                # Schedule on next tick to allow chunks to accumulate
+                self.call_later(self._process_chunk_buffer)
+
+    def _process_chunk_buffer(self) -> None:
+        """Process all accumulated chunks in the buffer at once."""
+        if self._current_detector and self._chunk_buffer:
+            # Try to batch DOM updates if we have an active app
+            try:
+                with self.app.batch_update():
+                    # Process all accumulated text without scrolling
+                    self._current_detector.feed(self._chunk_buffer, auto_scroll=False)
+                # Scroll once after all updates are complete
+                self.output.scroll_end(animate=False)
+            except:
+                # No active app (e.g., in tests), process without batching
+                self._current_detector.feed(self._chunk_buffer, auto_scroll=False)
+            # Clear buffer
+            self._chunk_buffer = ""
+        # Reset scheduling flag to allow next batch
+        self._chunk_processing_scheduled = False
 
     def on_stream_complete(self, event: StreamComplete) -> None:
         """Handle stream completion message - finalize the detector state."""
+        # Process any remaining buffered chunks first
+        if self._chunk_buffer:
+            self._process_chunk_buffer()
+
         if self._current_detector:
             self._current_detector.finish()
 
