@@ -254,6 +254,7 @@ class TerminalInput(Static):
         self._search_mode = False
         self._search_input: Input | None = None
         self._autocomplete: HistoryAutoComplete | None = None
+        self.add_class("in-context")
 
     def compose(self) -> ComposeResult:
         with Horizontal():

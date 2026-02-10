@@ -423,7 +423,7 @@ class ArtificeTerminal(Widget):
             )
         elif app.agent_type:
             raise Exception(f"Unsupported agent {app.agent_type}")
-        self._auto_send_to_agent: bool = False  # Persistent mode for auto-sending execution results
+        self._auto_send_to_agent: bool = True  # Persistent mode for auto-sending execution results
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
@@ -711,7 +711,7 @@ class ArtificeTerminal(Widget):
         # After sending a prompt to the agent, enable auto-send mode
         if not self._auto_send_to_agent:
             self._auto_send_to_agent = True
-            #self.input.add_class("in-context")
+            self.input.add_class("in-context")
 
     async def _send_execution_result_to_agent(self, code: str, result: ExecutionResult) -> None:
         """Send execution results back to the agent and split the response."""
@@ -847,10 +847,10 @@ class ArtificeTerminal(Widget):
         self._auto_send_to_agent = not self._auto_send_to_agent
 
         # Update visual indicator on input
-        #if self._auto_send_to_agent:
-        #    self.input.add_class("in-context")
-        #else:
-        #    self.input.remove_class("in-context")
+        if self._auto_send_to_agent:
+            self.input.add_class("in-context")
+        else:
+            self.input.remove_class("in-context")
 
     def action_clear_agent_context(self) -> None:
         """Clear the agent's conversation context and unhighlight all in-context blocks."""
