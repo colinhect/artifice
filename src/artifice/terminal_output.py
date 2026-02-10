@@ -18,7 +18,7 @@ from .ansi_handler import ansi_to_textual
 class BaseBlock(Static):
     DEFAULT_CSS = """
     BaseBlock {
-        margin: 0;
+        margin: 0 0 1 0;
         padding: 0;
         padding-left: 1;
     }
@@ -62,10 +62,6 @@ class BaseBlock(Static):
 
 class CodeInputBlock(BaseBlock):
     DEFAULT_CSS = """
-    CodeInputBlock {
-        margin: 0;
-    }
-
     CodeInputBlock .code {
         background: $background-darken-3;
         padding: 0;
@@ -157,10 +153,6 @@ class CodeInputBlock(BaseBlock):
 
 class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """
-    CodeOutputBlock {
-        margin: 0 0 0 0;
-    }
-
     CodeOutputBlock .code-output {
         background: $surface-darken-1;
         /*background: $surface-darken-1;*/
@@ -276,10 +268,6 @@ class WidgetOutputBlock(BaseBlock):
 
 class AgentInputBlock(BaseBlock):
     DEFAULT_CSS = """
-    AgentInputBlock {
-        margin: 0;
-    }
-
     AgentInputBlock .prompt {
         background: $primary-background-darken-2;
         padding: 0;
@@ -321,7 +309,7 @@ class AgentOutputBlock(BaseBlock):
     }
 
     AgentOutputBlock .agent-output MarkdownFence {
-        margin: 0 0 0 0;
+        margin: 0;
     }
 
     AgentOutputBlock .agent-output MarkdownTable {
