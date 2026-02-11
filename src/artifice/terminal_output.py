@@ -48,7 +48,7 @@ class BaseBlock(Static):
     }
 
     BaseBlock .loading-indicator {
-        width: 2;
+        width: 1;
         height: 1;
         content-align: center top;
         padding: 0;
@@ -86,6 +86,11 @@ class CodeInputBlock(BaseBlock):
         border: none;
     }
 
+    CodeInputBlock .prompt-indicator {
+        width: 1;
+        height: 1;
+    }
+
     CodeInputBlock .code-unused {
         background: $surface-darken-1;
         padding: 0;
@@ -95,17 +100,19 @@ class CodeInputBlock(BaseBlock):
 
     def __init__(self, code: str, language: str, show_loading: bool = True, in_context=False, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._loading_indicator = LoadingIndicator()
-        self._show_loading = show_loading
+        self._loading_indicator = LoadingIndicator(classes="status-indicator")
+        if show_loading:
+            self._loading_indicator.styles.display = "block"
         self._streaming = show_loading
         self._language = language
-        self._status_indicator = Static(self._get_prompt(), classes="status-indicator")
-        if show_loading:
-            self._status_indicator.styles.display = "none"
-        self._status_indicator.add_class("status-unexecuted")
+        self._prompt_indicator = Static(self._get_prompt(), classes="prompt-indicator")
+        # Status icon appears before the prompt (✔, ✖, or loading indicator)
+        self._status_icon = Static("", classes="status-indicator")
+        self._status_icon.add_class("status-unexecuted")
         self._original_code = code  # Store original code for re-execution
         # Always use syntax highlighting, even during streaming
         self._code = Static(highlight.highlight(code, language=language), classes="code")
+        self._status_container = Horizontal(classes="status-indicator")
         if in_context:
             self.add_class("in-context")
 
@@ -114,33 +121,34 @@ class CodeInputBlock(BaseBlock):
 
     def compose(self) -> ComposeResult:
         with Horizontal():
-            with Vertical(classes="status-indicator"):
-                yield self._status_indicator
-                if self._show_loading:
-                    yield self._loading_indicator
+            with self._status_container:
+                yield self._loading_indicator
+                yield self._status_icon
+                #yield self._prompt_indicator
             yield self._code
 
     def update_status(self, result: ExecutionResult) -> None:
         self._loading_indicator.styles.display = "none"
         if result.status == ExecutionStatus.SUCCESS:
-            self._status_indicator.update(f"✔{self._get_prompt()}")
-            self._status_indicator.add_class("status-success")
+            self._status_icon.update("✔")
+            self._status_icon.remove_class("status-error")
+            self._status_icon.add_class("status-success")
         elif result.status == ExecutionStatus.ERROR:
-            self._status_indicator.update(f"✖{self._get_prompt()}")
-            self._status_indicator.add_class("status-error")
+            self._status_icon.update("✖")
+            self._status_icon.remove_class("status-success")
+            self._status_icon.add_class("status-error")
 
-    def show_loading(self) -> None:
+    async def show_loading(self) -> None:
         """Show the loading indicator (for re-execution)."""
         self._loading_indicator.styles.display = "block"
         # Clear any previous status styling
-        self._status_indicator.remove_class("status-success")
-        self._status_indicator.remove_class("status-error")
-        self._status_indicator.update("")
+        self._status_icon.remove_class("status-success")
+        self._status_icon.remove_class("status-error")
+        self._status_icon.update("")
 
     def finish_streaming(self) -> None:
         """End streaming: show status indicator (code already highlighted)."""
         self._loading_indicator.styles.display = "none"
-        self._status_indicator.styles.display = "block"
         self._streaming = False
 
     def update_code(self, code: str) -> None:
@@ -164,7 +172,7 @@ class CodeInputBlock(BaseBlock):
         else:
             self._language = "python"
 
-        self._status_indicator.update(self._get_prompt())
+        self._prompt_indicator.update(self._get_prompt())
 
         # Update syntax highlighting and markdown
         self._code.update(highlight.highlight(self._original_code, language=self._language))

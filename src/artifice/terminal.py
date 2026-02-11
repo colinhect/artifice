@@ -423,7 +423,7 @@ class ArtificeTerminal(Widget):
                 },
                 {
                     'pattern': r'blank',
-                    'response': '```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
+                    'response': '```python\nimport time\ntime.sleep(3)\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
                 },
                 {
                     'pattern': r'calculate|math|sum|add',
@@ -543,7 +543,7 @@ class ArtificeTerminal(Widget):
             in_context: Whether the output should be marked as in agent context.
         """
         if code_input_block is None:
-            code_input_block = CodeInputBlock(code, language=language)
+            code_input_block = CodeInputBlock(code, language=language, show_loading=True, in_context=in_context)
             self.output.append_block(code_input_block)
 
         markdown_enabled = self._shell_markdown_enabled if language == "bash" else self._python_markdown_enabled
@@ -685,6 +685,9 @@ class ArtificeTerminal(Widget):
         mode = block.get_mode()
         language = "bash" if mode == "shell" else "python"
 
+        # Show loading indicator before execution
+        await block.show_loading()
+
         # Focus input immediately so user can continue working
         self.input.query_one("#code-input", InputTextArea).focus()
 
@@ -707,8 +710,8 @@ class ArtificeTerminal(Widget):
                 raise
             finally:
                 if result:
-                    code_input_block.update_status(result)
-                code_input_block.finish_streaming()
+                    block.update_status(result)
+                block.finish_streaming()
                 self._current_task = None
                 self.input.focus_input()
 
