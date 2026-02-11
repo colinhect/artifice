@@ -1,8 +1,10 @@
 """Simulated AI agent for testing and development."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from .common import AgentBase, AgentResponse
 
@@ -20,8 +22,8 @@ class SimulatedAgent(AgentBase):
 
     def __init__(
         self,
-        system_prompt: Optional[str] = None,
-        on_connect: Optional[Callable] = None,
+        system_prompt: str | None = None,
+        on_connect: Callable | None = None,
         response_delay: float = 0.05,
     ):
         """Initialize the simulated agent.
@@ -65,7 +67,7 @@ class SimulatedAgent(AgentBase):
         self.scenarios = scenarios
         self.current_scenario_index = 0
 
-    def add_scenario(self, response: str, pattern: Optional[str] = None) -> None:
+    def add_scenario(self, response: str, pattern: str | None = None) -> None:
         """Add a single scenario to the configuration.
 
         Args:
@@ -81,7 +83,7 @@ class SimulatedAgent(AgentBase):
         """Set the default response when no scenarios match."""
         self.default_response = response
 
-    def _find_matching_scenario(self, prompt: str) -> Optional[dict[str, Any]]:
+    def _find_matching_scenario(self, prompt: str) -> dict[str, Any] | None:
         """Find a scenario that matches the given prompt."""
         import re
 
@@ -104,7 +106,7 @@ class SimulatedAgent(AgentBase):
     async def send_prompt(
         self,
         prompt: str,
-        on_chunk: Optional[Callable[[str], None]] = None,
+        on_chunk: Callable[[str], None] | None = None,
     ) -> AgentResponse:
         """Send a prompt to the simulated agent.
 
@@ -172,7 +174,7 @@ class ScriptedAgent(SimulatedAgent):
     def __init__(
         self,
         script: list[dict[str, Any]],
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         response_delay: float = 0.05,
     ):
         """Initialize the scripted agent.
@@ -188,32 +190,24 @@ class ScriptedAgent(SimulatedAgent):
     async def send_prompt(
         self,
         prompt: str,
-        on_chunk: Optional[Callable[[str], None]] = None,
+        on_chunk: Callable[[str], None] | None = None,
     ) -> AgentResponse:
         """Send a prompt and return the next scripted response."""
-        # Always use the next scenario in order, ignore pattern matching
         if self.current_scenario_index < len(self.scenarios):
-            scenario = self.scenarios[self.current_scenario_index]
+            response_text = self.scenarios[self.current_scenario_index]['response']
             self.current_scenario_index += 1
-
-            # Temporarily set as the only scenario for parent method
-            original_scenarios = self.scenarios
-            original_index = self.current_scenario_index
-            self.scenarios = [scenario]
-            self.current_scenario_index = 0
-
-            result = await super().send_prompt(prompt, on_chunk)
-
-            # Restore original state
-            self.scenarios = original_scenarios
-            self.current_scenario_index = original_index
-            return result
         else:
-            # Script exhausted
-            return AgentResponse(
-                text="[Script completed]",
-                stop_reason="end_turn"
-            )
+            response_text = "[Script completed]"
+
+        if on_chunk:
+            for char in response_text:
+                on_chunk(char)
+                await asyncio.sleep(self.response_delay)
+
+        self.conversation_history.append({'role': 'user', 'content': prompt})
+        self.conversation_history.append({'role': 'assistant', 'content': response_text})
+
+        return AgentResponse(text=response_text, stop_reason="end_turn")
 
 
 class EchoAgent(SimulatedAgent):
@@ -222,7 +216,7 @@ class EchoAgent(SimulatedAgent):
     def __init__(
         self,
         prefix: str = "You said: ",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ):
         """Initialize the echo agent.
 
@@ -236,7 +230,7 @@ class EchoAgent(SimulatedAgent):
     async def send_prompt(
         self,
         prompt: str,
-        on_chunk: Optional[Callable[[str], None]] = None,
+        on_chunk: Callable[[str], None] | None = None,
     ) -> AgentResponse:
         """Echo the prompt back with the configured prefix."""
         logger.info(f"[EchoAgent] Sending prompt: {prompt}")

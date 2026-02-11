@@ -93,7 +93,7 @@ class CodeInputBlock(BaseBlock):
         self._language = language
         self._status_indicator = Static(self._get_prompt(), classes="status-indicator")
         if show_loading:
-            self._status_indicator.styles.display= "none"
+            self._status_indicator.styles.display = "none"
         self._status_indicator.add_class("status-unexecuted")
         self._original_code = code  # Store original code for re-execution
         self._code = Static(highlight.highlight(code, language=language), classes="code")
@@ -131,7 +131,7 @@ class CodeInputBlock(BaseBlock):
     def finish_streaming(self) -> None:
         """Hide the loading indicator after streaming is complete."""
         self._loading_indicator.styles.display = "none"
-        self._status_indicator.styles.display= "block"
+        self._status_indicator.styles.display = "block"
 
     def update_code(self, code: str) -> None:
         """Update the displayed code (used during streaming)."""
@@ -162,8 +162,6 @@ class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """
     CodeOutputBlock .code-output {
         background: $surface-darken-1;
-        /*background: $surface-darken-1;*/
-        /*color: $text-muted;*/
         padding-left: 0;
         padding-right: 0;
     }
@@ -201,7 +199,7 @@ class CodeOutputBlock(BaseBlock):
         self._output = Static(output, classes="code-output") if not render_markdown else None
         self._markdown = Markdown(output, classes="markdown-output") if render_markdown else None
         self._full = output
-        self._render_markdown= render_markdown
+        self._render_markdown = render_markdown
         self._has_error = False
         self._contents = Horizontal()
         if in_context:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import enum
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -24,28 +23,7 @@ if TYPE_CHECKING:
     from .app import ArtificeApp
 
 
-def parse_response_segments(text: str) -> list[tuple]:
-    """Parse response text into text and code block segments.
-
-    Returns list of tuples:
-    - ('text', content) for text segments
-    - ('code', language, code) for code blocks (python or bash)
-    """
-    pattern = r'```(py|python|bash|shell)?\n(.*?)```'
-    segments = []
-    last_end = 0
-    for match in re.finditer(pattern, text, re.DOTALL):
-        before = text[last_end:match.start()].strip()
-        if before:
-            segments.append(('text', before))
-        # Default to 'python' if no language specified
-        lang = match.group(1) or 'python'
-        segments.append(('code', lang, match.group(2)))
-        last_end = match.end()
-    after = text[last_end:].strip()
-    if after:
-        segments.append(('text', after))
-    return segments
+_LANG_ALIASES = {"py": "python", "shell": "bash", "sh": "bash", "zsh": "bash"}
 
 
 class _FenceState(enum.Enum):
@@ -144,14 +122,9 @@ class StreamingFenceDetector:
         """Process language line after opening fence."""
         if ch == '\n':
             # Language line complete - start code block
-            lang = self._lang_buffer.strip()
-            if not lang:
-                lang = "python"
+            lang = self._lang_buffer.strip() or "python"
             # Normalize language aliases
-            if lang in ("py",):
-                lang = "python"
-            elif lang in ("shell", "sh", "zsh"):
-                lang = "bash"
+            lang = _LANG_ALIASES.get(lang, lang)
             self._current_lang = lang
 
             # Update current block with accumulated chunk
@@ -159,23 +132,16 @@ class StreamingFenceDetector:
                 self._update_current_block_with_chunk()
                 self._chunk_buffer = ""
 
-            # Check if the current prose block is empty and remove it if so
-            current_is_empty = False
-            if isinstance(self._current_block, AgentOutputBlock):
-                if hasattr(self._current_block, '_full') and not self._current_block._full.strip():
-                    current_is_empty = True
-                    # Remove from all_blocks and output
-                    if self._current_block in self.all_blocks:
-                        self.all_blocks.remove(self._current_block)
-                    if self._current_block in self._output._blocks:
-                        self._output._blocks.remove(self._current_block)
-                    # Update first_agent_block if we're removing it
-                    if self._current_block is self.first_agent_block:
-                        self.first_agent_block = None
-                    self._current_block.remove()
-
-            # End current prose block (mark as no longer active) only if not removed
-            if not current_is_empty and hasattr(self._current_block, 'mark_success'):
+            # Remove empty prose block, or mark it complete
+            current_is_empty = (
+                isinstance(self._current_block, AgentOutputBlock)
+                and not self._current_block._full.strip()
+            )
+            if current_is_empty:
+                if self._current_block is self.first_agent_block:
+                    self.first_agent_block = None
+                self._remove_block(self._current_block)
+            elif isinstance(self._current_block, AgentOutputBlock):
                 self._current_block.mark_success()
 
             # Create new code block
@@ -225,30 +191,31 @@ class StreamingFenceDetector:
     def _update_current_block_with_chunk(self) -> None:
         """Update the current block with the chunk buffer."""
         if self._chunk_buffer and self._current_block:
-            if hasattr(self._current_block, 'update_code'):
-                # Code block - update with accumulated code
+            if isinstance(self._current_block, CodeInputBlock):
                 existing = self._current_block.get_code()
                 self._current_block.update_code(existing + self._chunk_buffer)
-            elif hasattr(self._current_block, 'append'):
-                # Prose block - append text
+            elif isinstance(self._current_block, AgentOutputBlock):
                 self._current_block.append(self._chunk_buffer)
+
+    def _remove_block(self, block: BaseBlock) -> None:
+        """Remove a block from tracking lists and the DOM."""
+        if block in self.all_blocks:
+            self.all_blocks.remove(block)
+        if block in self._output._blocks:
+            self._output._blocks.remove(block)
+        block.remove()
 
     def finish(self) -> None:
         """Flush any remaining state at end of stream."""
         # Handle incomplete fences
         if self._state == _FenceState.LANG_LINE:
-            # Incomplete opening fence - treat as prose
             self._pending_buffer = '```' + self._lang_buffer
             self._state = _FenceState.PROSE
-        elif self._state == _FenceState.CODE:
-            # Incomplete closing fence - flush what we have
-            if self._backtick_count > 0:
-                self._pending_buffer += '`' * self._backtick_count
-                self._backtick_count = 0
-        elif self._state == _FenceState.PROSE:
-            if self._backtick_count > 0:
-                self._pending_buffer += '`' * self._backtick_count
-                self._backtick_count = 0
+
+        # Flush trailing backticks that weren't a complete fence
+        if self._backtick_count > 0:
+            self._pending_buffer += '`' * self._backtick_count
+            self._backtick_count = 0
 
         # Flush any remaining text
         self._flush_pending_to_chunk()
@@ -256,7 +223,7 @@ class StreamingFenceDetector:
             self._update_current_block_with_chunk()
 
         # Mark the last block as complete
-        if self._current_block and hasattr(self._current_block, 'mark_success'):
+        if isinstance(self._current_block, AgentOutputBlock):
             self._current_block.mark_success()
 
         # Hide loading indicators on all CodeInputBlocks
@@ -264,24 +231,12 @@ class StreamingFenceDetector:
             if isinstance(block, CodeInputBlock):
                 block.finish_streaming()
 
-        # Remove remaining empty AgentOutputBlocks
-        # Note: first_agent_block may be None if it was removed during splitting
-        # We keep first_agent_block if it still exists (to preserve status indicator)
-        # but remove all other empty prose blocks
-        blocks_to_remove = []
-        for block in self.all_blocks:
-            if isinstance(block, AgentOutputBlock) and block is not self.first_agent_block:
-                # Check if the block is empty (whitespace only)
-                if hasattr(block, '_full') and not block._full.strip():
-                    blocks_to_remove.append(block)
-
-        # Remove empty blocks from both lists and from the output
-        for block in blocks_to_remove:
-            if block in self.all_blocks:
-                self.all_blocks.remove(block)
-            if block in self._output._blocks:
-                self._output._blocks.remove(block)
-            block.remove()
+        # Remove empty AgentOutputBlocks (keep first_agent_block for status indicator)
+        for block in [
+            b for b in self.all_blocks
+            if isinstance(b, AgentOutputBlock) and b is not self.first_agent_block and not b._full.strip()
+        ]:
+            self._remove_block(block)
 
 
 class ArtificeTerminal(Widget):
@@ -371,30 +326,17 @@ class ArtificeTerminal(Widget):
             "Do not over explain unless asked to. Always use ```python or ```shell to mark code or shell command."
         )
         
-        def on_agent_connect(agent_name):
-            pass
-            #app.notify(f"Connected to {agent_name}")
-
         # Create agent
         self._agent = None
         if app.agent_type.lower() == "claude":
             from .agent import ClaudeAgent
-            self._agent = ClaudeAgent(
-                system_prompt=system_prompt,
-                on_connect=on_agent_connect,
-            )
+            self._agent = ClaudeAgent(system_prompt=system_prompt)
         elif app.agent_type.lower() == "copilot":
             from .agent import CopilotAgent
-            self._agent = CopilotAgent(
-                system_prompt=system_prompt,
-                on_connect=on_agent_connect,
-            )
+            self._agent = CopilotAgent(system_prompt=system_prompt)
         elif app.agent_type.lower() == "simulated":
             from artifice.agent.simulated import SimulatedAgent
-            self._agent = SimulatedAgent(
-                response_delay=0.001,
-                on_connect=on_agent_connect,
-            )
+            self._agent = SimulatedAgent(response_delay=0.001)
 
             # Configure scenarios with pattern matching
             self._agent.configure_scenarios([
@@ -419,10 +361,7 @@ class ArtificeTerminal(Widget):
             self._agent.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
         elif app.agent_type.lower() == "ollama":
             from .agent import OllamaAgent
-            self._agent = OllamaAgent(
-                system_prompt=system_prompt,
-                on_connect=on_agent_connect,
-            )
+            self._agent = OllamaAgent(system_prompt=system_prompt)
         elif app.agent_type:
             raise Exception(f"Unsupported agent {app.agent_type}")
         self._auto_send_to_agent: bool = True  # Persistent mode for auto-sending execution results
@@ -443,25 +382,11 @@ class ArtificeTerminal(Widget):
             yield self.input
             yield self.pinned_output
 
-    def on_mount(self) -> None:
-        """Add ASCII art banner when the terminal is mounted."""
-        pass
-#        banner = """┌─┐┬─┐┌┬┐┬┌─┐┬┌─┐┌─┐
-#├─┤├┬┘ │ │├┤ ││  ├┤
-#┴ ┴┴└─ ┴ ┴└  ┴└─┘└─┘"""
-#        banner_block = BaseBlock()
-#        banner_block.update(banner)
-#        self.output.append_block(banner_block)
-
     async def on_terminal_input_submitted(self, event: TerminalInput.Submitted) -> None:
         """Handle code submission from input."""
         code = event.code
 
-        # Clear input
         self.input.clear()
-
-        # Show activity indicator
-        #self.input.show_activity()
 
         # Create a task to track execution
         async def execute():
@@ -469,13 +394,11 @@ class ArtificeTerminal(Widget):
                 if event.is_agent_prompt:
                     await self._handle_agent_prompt(code)
                 elif event.is_shell_command:
-                    result = await self._handle_shell_execution(code)
-
+                    result = await self._execute_code(code, language="bash")
                     if self._auto_send_to_agent:
                         await self._send_execution_result_to_agent(code, result)
                 else:
-                    result = await self._handle_python_execution(code)
-
+                    result = await self._execute_code(code, language="python")
                     if self._auto_send_to_agent:
                         await self._send_execution_result_to_agent(code, result)
             except asyncio.CancelledError:
@@ -486,157 +409,61 @@ class ArtificeTerminal(Widget):
                 raise
             finally:
                 self._current_task = None
-                # Hide activity indicator and refocus input
-                #self.input.hide_activity()
-                #self.input.focus_input()
 
         self._current_task = asyncio.create_task(execute())
-    
-    async def on_terminal_input_decline_requested(self, event: TerminalInput.DeclineRequested) -> None:
-        """Handle decline request from input (escape key)."""
-        # If no pending execution, just ignore the escape key
-        pass
 
-    async def _handle_python_execution(self, code: str) -> ExecutionResult:
-        """Execute Python code."""
-        code_input_block = CodeInputBlock(code, language="python")
-        self.output.append_block(code_input_block)
-
+    def _make_output_callbacks(self, markdown_enabled: bool, in_context: bool = False):
+        """Create on_output/on_error callbacks that lazily create a CodeOutputBlock."""
         code_output_block = None
 
-        def on_output(text):
+        def ensure_block():
             nonlocal code_output_block
             if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
+                code_output_block = CodeOutputBlock(render_markdown=markdown_enabled, in_context=in_context)
+                if in_context:
+                    self._context_blocks.append(code_output_block)
                 self.output.append_block(code_output_block)
-            code_output_block.append_output(text)
+            return code_output_block
+
+        def on_output(text):
+            ensure_block().append_output(text)
             self.output.scroll_end(animate=False)
 
         def on_error(text):
-            nonlocal code_output_block
-            if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled)
-                self.output.append_block(code_output_block)
-            code_output_block.append_error(text)
+            ensure_block().append_error(text)
             self.output.scroll_end(animate=False)
 
-        result = await self._executor.execute(
-            code,
-            on_output=on_output,
-            on_error=on_error,
-        )
+        return on_output, on_error
+
+    async def _execute_code(
+        self, code: str, language: str = "python",
+        code_input_block: CodeInputBlock | None = None,
+        in_context: bool = False,
+    ) -> ExecutionResult:
+        """Execute code (python or bash), optionally creating the input block.
+
+        Args:
+            code: The code/command to execute.
+            language: "python" or "bash".
+            code_input_block: Existing block to update status on. If None, one is created.
+            in_context: Whether the output should be marked as in agent context.
+        """
+        if code_input_block is None:
+            code_input_block = CodeInputBlock(code, language=language)
+            self.output.append_block(code_input_block)
+
+        markdown_enabled = self._shell_markdown_enabled if language == "bash" else self._python_markdown_enabled
+        on_output, on_error = self._make_output_callbacks(markdown_enabled, in_context)
+
+        executor = self._shell_executor if language == "bash" else self._executor
+        result = await executor.execute(code, on_output=on_output, on_error=on_error)
 
         code_input_block.update_status(result)
 
-        if isinstance(result.result_value, Widget):
+        if language != "bash" and isinstance(result.result_value, Widget):
             widget_block = WidgetOutputBlock(result.result_value)
             self.output.append_block(widget_block)
 
-        return result
-
-    async def _execute_block_python(self, code_input_block: CodeInputBlock, code: str, in_context=False) -> ExecutionResult:
-        """Execute Python code from an existing block."""
-        code_output_block = None
-
-        def on_output(text):
-            nonlocal code_output_block
-            if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled, in_context=in_context)
-                if in_context:
-                    self._context_blocks.append(code_output_block)
-                self.output.append_block(code_output_block)
-            code_output_block.append_output(text)
-            self.output.scroll_end(animate=False)
-
-        def on_error(text):
-            nonlocal code_output_block
-            if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._python_markdown_enabled, in_context=in_context)
-                if in_context:
-                    self._context_blocks.append(code_output_block)
-                self.output.append_block(code_output_block)
-            code_output_block.append_error(text)
-            self.output.scroll_end(animate=False)
-
-        result = await self._executor.execute(
-            code,
-            on_output=on_output,
-            on_error=on_error,
-        )
-
-        code_input_block.update_status(result)
-
-        if isinstance(result.result_value, Widget):
-            widget_block = WidgetOutputBlock(result.result_value)
-            self.output.append_block(widget_block)
-
-        return result
-
-    async def _handle_shell_execution(self, command: str) -> ExecutionResult:
-        """Execute shell command."""
-        command_input_block = CodeInputBlock(command, language="bash")
-        self.output.append_block(command_input_block)
-
-        code_output_block = None
-
-        def on_output(text):
-            nonlocal code_output_block
-            if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
-                self.output.append_block(code_output_block)
-            code_output_block.append_output(text)
-            self.output.scroll_end(animate=False)
-
-        def on_error(text):
-            nonlocal code_output_block
-            if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled)
-                self.output.append_block(code_output_block)
-            code_output_block.append_error(text)
-            self.output.scroll_end(animate=False)
-
-        # Execute asynchronously with streaming callbacks
-        result = await self._shell_executor.execute(
-            command,
-            on_output=on_output,
-            on_error=on_error,
-        )
-
-        command_input_block.update_status(result)
-        return result
-
-    async def _execute_block_shell(self, code_input_block: CodeInputBlock, command: str, in_context=False) -> ExecutionResult:
-        """Execute shell command from an existing block."""
-        code_output_block = None
-
-        def on_output(text):
-            nonlocal code_output_block
-            if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled, in_context=in_context)
-                if in_context:
-                    self._context_blocks.append(code_output_block)
-                self.output.append_block(code_output_block)
-            code_output_block.append_output(text)
-            self.output.scroll_end(animate=False)
-
-        def on_error(text):
-            nonlocal code_output_block
-            if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=self._shell_markdown_enabled, in_context=in_context)
-                if in_context:
-                    self._context_blocks.append(code_output_block)
-                self.output.append_block(code_output_block)
-            code_output_block.append_error(text)
-            self.output.scroll_end(animate=False)
-
-        # Execute asynchronously with streaming callbacks
-        result = await self._shell_executor.execute(
-            command,
-            on_output=on_output,
-            on_error=on_error,
-        )
-
-        code_input_block.update_status(result)
         return result
 
     def _mark_block_in_context(self, block: BaseBlock) -> None:
@@ -764,29 +591,25 @@ class ArtificeTerminal(Widget):
         executed_input_block = AgentInputBlock("Executed:", in_context=True)
         self._context_blocks.append(executed_input_block)
         self.output.append_block(executed_input_block)
-        code_input_block = CodeInputBlock(code, language="bash" if mode=="shell" else "python", show_loading=True, in_context=True)
+        language = "bash" if mode == "shell" else "python"
+        code_input_block = CodeInputBlock(code, language=language, show_loading=True, in_context=True)
         self._context_blocks.append(code_input_block)
         self.output.append_block(code_input_block)
 
         # Focus input immediately so user can continue working
         self.input.query_one("#code-input", InputTextArea).focus()
 
-        # Show activity indicator
-        #self.input.show_activity()
-
         # Create a task to track execution
         async def execute():
             result = ExecutionResult(code=code, status=ExecutionStatus.ERROR)
             try:
-                if mode == "shell":
-                    result = await self._execute_block_shell(block, code, in_context=self._auto_send_to_agent)
-                else:  # python
-                    result = await self._execute_block_python(block, code, in_context=self._auto_send_to_agent)
+                result = await self._execute_code(
+                    code, language=language,
+                    code_input_block=block, in_context=self._auto_send_to_agent,
+                )
                 code_input_block.update_status(result)
-                # Always send to agent for block execution
                 await self._send_execution_result_to_agent(code, result)
             except asyncio.CancelledError:
-                # Task was cancelled
                 code_output_block = CodeOutputBlock(render_markdown=False)
                 self.output.append_block(code_output_block)
                 code_output_block.append_error("\n[Cancelled]\n")
@@ -795,8 +618,6 @@ class ArtificeTerminal(Widget):
                 if result:
                     code_input_block.update_status(result)
                 self._current_task = None
-                # Hide activity indicator and refocus input
-                #self.input.hide_activity()
                 self.input.focus_input()
 
         self._current_task = asyncio.create_task(execute())
@@ -819,12 +640,9 @@ class ArtificeTerminal(Widget):
             # Try to batch DOM updates if we have an active app
             try:
                 with self.app.batch_update():
-                    # Process all accumulated text without scrolling
                     self._current_detector.feed(self._chunk_buffer, auto_scroll=False)
-                # Scroll once after all updates are complete
                 self.output.scroll_end(animate=False)
-            except:
-                # No active app (e.g., in tests), process without batching
+            except Exception:
                 self._current_detector.feed(self._chunk_buffer, auto_scroll=False)
             # Clear buffer
             self._chunk_buffer = ""
