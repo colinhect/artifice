@@ -90,13 +90,18 @@ class CodeInputBlock(BaseBlock):
         super().__init__(**kwargs)
         self._loading_indicator = LoadingIndicator()
         self._show_loading = show_loading
+        self._streaming = show_loading  # Streaming blocks use plain text for speed
         self._language = language
         self._status_indicator = Static(self._get_prompt(), classes="status-indicator")
         if show_loading:
             self._status_indicator.styles.display = "none"
         self._status_indicator.add_class("status-unexecuted")
         self._original_code = code  # Store original code for re-execution
-        self._code = Static(highlight.highlight(code, language=language), classes="code")
+        # During streaming: plain text (cheap). Otherwise: syntax highlighted.
+        if self._streaming:
+            self._code = Static(code, classes="code")
+        else:
+            self._code = Static(highlight.highlight(code, language=language), classes="code")
         if in_context:
             self.add_class("in-context")
 
@@ -129,14 +134,21 @@ class CodeInputBlock(BaseBlock):
         self._status_indicator.update("")
 
     def finish_streaming(self) -> None:
-        """Hide the loading indicator after streaming is complete."""
+        """End streaming: apply syntax highlighting once, show status indicator."""
         self._loading_indicator.styles.display = "none"
         self._status_indicator.styles.display = "block"
+        if self._streaming:
+            self._streaming = False
+            self._code.update(highlight.highlight(self._original_code, language=self._language))
 
     def update_code(self, code: str) -> None:
         """Update the displayed code (used during streaming)."""
         self._original_code = code
-        self._code.update(highlight.highlight(code, language=self._language))
+        if self._streaming:
+            # During streaming: plain text update (cheap)
+            self._code.update(code)
+        else:
+            self._code.update(highlight.highlight(code, language=self._language))
 
     def get_code(self) -> str:
         """Get the original code."""
@@ -201,6 +213,7 @@ class CodeOutputBlock(BaseBlock):
         self._full = output
         self._render_markdown = render_markdown
         self._has_error = False
+        self._dirty = False  # True when _full has changed but widget not yet updated
         self._contents = Horizontal()
         if in_context:
             self.add_class("in-context")
@@ -215,10 +228,16 @@ class CodeOutputBlock(BaseBlock):
 
     def append_output(self, output) -> None:
         self._full += output
+        self._dirty = True
+
+    def flush(self) -> None:
+        """Push accumulated text to the widget. Call after batching appends."""
+        if not self._dirty:
+            return
+        self._dirty = False
         if self._markdown:
-            self._markdown.append(output)
+            self._markdown.update(self._full)
         elif self._output:
-            #textual_output = ansi_to_textual(self._full.rstrip('\n'))
             self._output.update(self._full.rstrip('\n'))
 
     def append_error(self, output) -> None:
@@ -336,12 +355,23 @@ class AgentOutputBlock(BaseBlock):
         super().__init__()
         self._loading_indicator = LoadingIndicator()
         self._status_indicator = Static(classes="status-indicator")
-        self._output = Static(output, classes="text-output") if not render_markdown else None
-        self._markdown = Markdown(output, classes="agent-output") if render_markdown else None
         self._full = output
         self._render_markdown = render_markdown
+        self._streaming = activity  # True while streaming — use plain text for speed
         self._contents = Horizontal()
         self.add_class("in-context")
+
+        if self._streaming:
+            # During streaming: use plain Static for cheap O(1) appends
+            self._output = Static(output, classes="text-output")
+            self._markdown = None
+        elif render_markdown:
+            self._output = None
+            self._markdown = Markdown(output, classes="agent-output")
+        else:
+            self._output = Static(output, classes="text-output")
+            self._markdown = None
+
         if not activity:
             self.mark_success()
 
@@ -357,12 +387,24 @@ class AgentOutputBlock(BaseBlock):
 
     def append(self, response) -> None:
         self._full += response
-        if self._markdown:
-            #self._markdown.append(response)
-            # Use full re-render instead of incremental append to avoid duplication bugs
+        if self._streaming:
+            # During streaming: cheap plain-text update (no markdown parsing)
+            self._output.update(self._full)
+        elif self._markdown:
             self._markdown.update(self._full)
         elif self._output:
             self._output.update(self._full)
+
+    def finalize_streaming(self) -> None:
+        """End streaming mode: replace plain Static with Markdown (rendered once)."""
+        if not self._streaming:
+            return
+        self._streaming = False
+        if self._render_markdown and self._output:
+            self._output.remove()
+            self._output = None
+            self._markdown = Markdown(self._full, classes="agent-output")
+            self._contents.mount(self._markdown)
 
     def mark_success(self) -> None:
         self._loading_indicator.styles.display = "none"

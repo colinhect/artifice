@@ -117,6 +117,7 @@ class SimulatedAgent(AgentBase):
         Returns:
             AgentResponse with the simulated response
         """
+        await asyncio.sleep(2)
         # Add prompt to conversation history
         self.conversation_history.append({
             'role': 'user',

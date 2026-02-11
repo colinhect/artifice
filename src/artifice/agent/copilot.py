@@ -117,6 +117,7 @@ class CopilotAgent(AgentBase):
         """
         try:
             session = await self._get_session()
+            loop = asyncio.get_running_loop()
 
             # Track the response
             response_chunks = []
@@ -125,7 +126,11 @@ class CopilotAgent(AgentBase):
             stop_reason = None
 
             def handle_event(event):
-                """Handle session events."""
+                """Handle session events.
+
+                May be called from a background thread, so use
+                call_soon_threadsafe to schedule callbacks on the event loop.
+                """
                 nonlocal error_message, stop_reason
 
                 event_type = event.type.value if hasattr(event.type, 'value') else str(event.type)
@@ -136,7 +141,7 @@ class CopilotAgent(AgentBase):
                     if delta:
                         response_chunks.append(delta)
                         if on_chunk:
-                            on_chunk(delta)
+                            loop.call_soon_threadsafe(on_chunk, delta)
 
                 elif event_type == "assistant.message":
                     # Final message
@@ -148,18 +153,18 @@ class CopilotAgent(AgentBase):
                     if not response_chunks and content:
                         response_chunks.append(content)
                         if on_chunk:
-                            on_chunk(content)
+                            loop.call_soon_threadsafe(on_chunk, content)
 
                 elif event_type == "session.idle":
                     # Session finished processing
                     logger.info("[CopilotAgent] Session idle")
-                    done_event.set()
+                    loop.call_soon_threadsafe(done_event.set)
 
                 elif event_type == "error":
                     # Error occurred
                     error_message = str(event.data) if hasattr(event, 'data') else "Unknown error"
                     logger.error(f"[CopilotAgent] Error event: {error_message}")
-                    done_event.set()
+                    loop.call_soon_threadsafe(done_event.set)
 
             # Register event handler
             session.on(handle_event)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -18,6 +19,8 @@ from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExec
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
 from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput, BaseBlock
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .app import ArtificeApp
@@ -39,10 +42,6 @@ class StreamChunk(Message):
         super().__init__()
         self.text = text
 
-
-class StreamComplete(Message):
-    """Message posted when streaming is complete."""
-    pass
 
 
 class StreamingFenceDetector:
@@ -226,10 +225,12 @@ class StreamingFenceDetector:
         if isinstance(self._current_block, AgentOutputBlock):
             self._current_block.mark_success()
 
-        # Hide loading indicators on all CodeInputBlocks
+        # Finalize all blocks: switch from streaming mode to final rendering
         for block in self.all_blocks:
             if isinstance(block, CodeInputBlock):
                 block.finish_streaming()
+            elif isinstance(block, AgentOutputBlock):
+                block.finalize_streaming()
 
         # Remove empty AgentOutputBlocks (keep first_agent_block for status indicator)
         for block in [
@@ -336,7 +337,7 @@ class ArtificeTerminal(Widget):
             self._agent = CopilotAgent(system_prompt=system_prompt)
         elif app.agent_type.lower() == "simulated":
             from artifice.agent.simulated import SimulatedAgent
-            self._agent = SimulatedAgent(response_delay=0.001)
+            self._agent = SimulatedAgent(response_delay=0.1)
 
             # Configure scenarios with pattern matching
             self._agent.configure_scenarios([
@@ -406,6 +407,7 @@ class ArtificeTerminal(Widget):
                 code_output_block = CodeOutputBlock(render_markdown=False)
                 self.output.append_block(code_output_block)
                 code_output_block.append_error("\n[Cancelled]\n")
+                code_output_block.flush()
                 raise
             finally:
                 self._current_task = None
@@ -413,27 +415,43 @@ class ArtificeTerminal(Widget):
         self._current_task = asyncio.create_task(execute())
 
     def _make_output_callbacks(self, markdown_enabled: bool, in_context: bool = False):
-        """Create on_output/on_error callbacks that lazily create a CodeOutputBlock."""
-        code_output_block = None
+        """Create on_output/on_error/flush callbacks that lazily create a CodeOutputBlock.
+
+        Callbacks buffer text and schedule a single flush per event-loop tick,
+        so rapid output (e.g. many lines from a shell command) gets batched.
+        Returns (on_output, on_error, flush) — call flush() after execution to
+        ensure all buffered text is rendered.
+        """
+        state = {"block": None, "flush_scheduled": False}
 
         def ensure_block():
-            nonlocal code_output_block
-            if code_output_block is None:
-                code_output_block = CodeOutputBlock(render_markdown=markdown_enabled, in_context=in_context)
+            if state["block"] is None:
+                state["block"] = CodeOutputBlock(render_markdown=markdown_enabled, in_context=in_context)
                 if in_context:
-                    self._context_blocks.append(code_output_block)
-                self.output.append_block(code_output_block)
-            return code_output_block
+                    self._context_blocks.append(state["block"])
+                self.output.append_block(state["block"])
+            return state["block"]
+
+        def flush():
+            state["flush_scheduled"] = False
+            if state["block"]:
+                state["block"].flush()
+                self.output.scroll_end(animate=False)
+
+        def _schedule_flush():
+            if not state["flush_scheduled"]:
+                state["flush_scheduled"] = True
+                self.call_later(flush)
 
         def on_output(text):
             ensure_block().append_output(text)
-            self.output.scroll_end(animate=False)
+            _schedule_flush()
 
         def on_error(text):
             ensure_block().append_error(text)
-            self.output.scroll_end(animate=False)
+            _schedule_flush()
 
-        return on_output, on_error
+        return on_output, on_error, flush
 
     async def _execute_code(
         self, code: str, language: str = "python",
@@ -453,10 +471,11 @@ class ArtificeTerminal(Widget):
             self.output.append_block(code_input_block)
 
         markdown_enabled = self._shell_markdown_enabled if language == "bash" else self._python_markdown_enabled
-        on_output, on_error = self._make_output_callbacks(markdown_enabled, in_context)
+        on_output, on_error, flush_output = self._make_output_callbacks(markdown_enabled, in_context)
 
         executor = self._shell_executor if language == "bash" else self._executor
         result = await executor.execute(code, on_output=on_output, on_error=on_error)
+        flush_output()  # Ensure any remaining buffered output is rendered
 
         code_input_block.update_status(result)
 
@@ -493,11 +512,11 @@ class ArtificeTerminal(Widget):
 
         response = await self._agent.send_prompt(prompt, on_chunk=on_chunk)
 
-        # Post completion message
-        self.post_message(StreamComplete())
-
-        # Wait a moment for messages to be processed
-        await asyncio.sleep(0.01)
+        # Flush any remaining buffered chunks and finalize directly
+        # (no message-based race — send_prompt has returned, no more chunks coming)
+        if self._chunk_buffer:
+            self._process_chunk_buffer()
+        self._current_detector.finish()
 
         with self.app.batch_update():
             # Mark all blocks as in context
@@ -613,6 +632,7 @@ class ArtificeTerminal(Widget):
                 code_output_block = CodeOutputBlock(render_markdown=False)
                 self.output.append_block(code_output_block)
                 code_output_block.append_error("\n[Cancelled]\n")
+                code_output_block.flush()
                 raise
             finally:
                 if result:
@@ -637,26 +657,17 @@ class ArtificeTerminal(Widget):
     def _process_chunk_buffer(self) -> None:
         """Process all accumulated chunks in the buffer at once."""
         if self._current_detector and self._chunk_buffer:
-            # Try to batch DOM updates if we have an active app
+            text = self._chunk_buffer
+            self._chunk_buffer = ""
             try:
                 with self.app.batch_update():
-                    self._current_detector.feed(self._chunk_buffer, auto_scroll=False)
+                    self._current_detector.feed(text, auto_scroll=False)
                 self.output.scroll_end(animate=False)
             except Exception:
-                self._current_detector.feed(self._chunk_buffer, auto_scroll=False)
-            # Clear buffer
-            self._chunk_buffer = ""
+                logger.exception("Error processing chunk buffer")
         # Reset scheduling flag to allow next batch
         self._chunk_processing_scheduled = False
 
-    def on_stream_complete(self, event: StreamComplete) -> None:
-        """Handle stream completion message - finalize the detector state."""
-        # Process any remaining buffered chunks first
-        if self._chunk_buffer:
-            self._process_chunk_buffer()
-
-        if self._current_detector:
-            self._current_detector.finish()
 
     def action_clear(self) -> None:
         """Clear the output."""
