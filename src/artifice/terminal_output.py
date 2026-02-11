@@ -346,7 +346,6 @@ class AgentOutputBlock(BaseBlock):
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__()
         self._loading_indicator = LoadingIndicator()
-        self._status_indicator = Static(classes="status-indicator")
         self._full = output
         self._render_markdown = render_markdown
         self._streaming = activity
@@ -368,7 +367,6 @@ class AgentOutputBlock(BaseBlock):
         with self._contents:
             with Vertical(classes="status-indicator"):
                 yield self._loading_indicator
-                yield self._status_indicator
             if self._markdown:
                 yield self._markdown
             elif self._output is not None:
@@ -388,12 +386,9 @@ class AgentOutputBlock(BaseBlock):
 
     def mark_success(self) -> None:
         self._loading_indicator.styles.display = "none"
-        self._status_indicator.update("✨")
 
     def mark_failed(self) -> None:
         self._loading_indicator.styles.display = "none"
-        self._status_indicator.update("✗")
-        self._status_indicator.add_class("status-error")
 
     def toggle_markdown(self) -> None:
         self._render_markdown = not self._render_markdown

@@ -169,6 +169,8 @@ class StreamingFenceDetector:
                 self._backtick_count = 0
 
                 # Start new prose block
+                if isinstance(self._current_block, CodeInputBlock):
+                    self._current_block.finish_streaming()
                 self._current_block = self._make_prose_block(activity=True)
                 self._output.append_block(self._current_block)
                 self.all_blocks.append(self._current_block)
