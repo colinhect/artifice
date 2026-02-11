@@ -22,6 +22,8 @@ class OllamaAgent(AgentBase):
     def __init__(
         self,
         model: str = "llama3.2:1b",
+        #model: str = "tinyllama:1.1b",
+        #model: str = "qwen2.5:3b",
         system_prompt: str | None = None,
         on_connect: Callable | None = None,
         host: str | None = None,
