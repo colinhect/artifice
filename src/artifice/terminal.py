@@ -337,7 +337,7 @@ class ArtificeTerminal(Widget):
             self._agent = CopilotAgent(system_prompt=system_prompt)
         elif app.agent_type.lower() == "simulated":
             from artifice.agent.simulated import SimulatedAgent
-            self._agent = SimulatedAgent(response_delay=0.1)
+            self._agent = SimulatedAgent(response_delay=0.001)
 
             # Configure scenarios with pattern matching
             self._agent.configure_scenarios([
