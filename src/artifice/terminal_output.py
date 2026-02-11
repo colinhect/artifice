@@ -123,10 +123,10 @@ class CodeInputBlock(BaseBlock):
     def update_status(self, result: ExecutionResult) -> None:
         self._loading_indicator.styles.display = "none"
         if result.status == ExecutionStatus.SUCCESS:
-            self._status_indicator.update(self._get_prompt())
+            self._status_indicator.update(f"✔{self._get_prompt()}")
             self._status_indicator.add_class("status-success")
         elif result.status == ExecutionStatus.ERROR:
-            self._status_indicator.update(self._get_prompt())
+            self._status_indicator.update(f"✖{self._get_prompt()}")
             self._status_indicator.add_class("status-error")
 
     def show_loading(self) -> None:
@@ -581,6 +581,8 @@ class TerminalOutput(VerticalScroll):
         for i, block in enumerate(self._blocks):
             if i == self._highlighted_index:
                 block.add_class("highlighted")
+                # Auto-scroll to make the highlighted block visible
+                self.scroll_to_widget(block, animate=True)
             else:
                 block.remove_class("highlighted")
 
@@ -689,6 +691,8 @@ class PinnedOutput(Vertical):
         for i, block in enumerate(self._pinned_blocks):
             if i == self._highlighted_index:
                 block.add_class("highlighted")
+                # Auto-scroll to make the highlighted block visible
+                self.scroll_to_widget(block, animate=True)
             else:
                 block.remove_class("highlighted")
 

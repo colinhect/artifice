@@ -471,11 +471,11 @@ class ArtificeTerminal(Widget):
                 if event.is_agent_prompt:
                     await self._handle_agent_prompt(code)
                 elif event.is_shell_command:
-                    result = await self._execute_code(code, language="bash")
+                    result = await self._execute_code(code, language="bash", in_context=self._auto_send_to_agent)
                     if self._auto_send_to_agent:
                         await self._send_execution_result_to_agent(code, result)
                 else:
-                    result = await self._execute_code(code, language="python")
+                    result = await self._execute_code(code, language="python", in_context=self._auto_send_to_agent)
                     if self._auto_send_to_agent:
                         await self._send_execution_result_to_agent(code, result)
             except asyncio.CancelledError:
@@ -683,13 +683,13 @@ class ArtificeTerminal(Widget):
         block = event.block
         code = block.get_code()
         mode = block.get_mode()
-        executed_input_block = AgentInputBlock("Executed:", in_context=True)
-        self._context_blocks.append(executed_input_block)
-        self.output.append_block(executed_input_block)
+        #executed_input_block = AgentInputBlock("↑ Executed...", in_context=True)
+        #self._context_blocks.append(executed_input_block)
+        #self.output.append_block(executed_input_block)
         language = "bash" if mode == "shell" else "python"
-        code_input_block = CodeInputBlock(code, language=language, show_loading=True, in_context=True)
-        self._context_blocks.append(code_input_block)
-        self.output.append_block(code_input_block)
+        #code_input_block = CodeInputBlock(code, language=language, show_loading=True, in_context=True)
+        #self._context_blocks.append(code_input_block)
+        #self.output.append_block(code_input_block)
 
         # Focus input immediately so user can continue working
         self.input.query_one("#code-input", InputTextArea).focus()
@@ -702,7 +702,7 @@ class ArtificeTerminal(Widget):
                     code, language=language,
                     code_input_block=block, in_context=self._auto_send_to_agent,
                 )
-                code_input_block.update_status(result)
+                block.update_status(result)
                 await self._send_execution_result_to_agent(code, result)
             except asyncio.CancelledError:
                 code_output_block = CodeOutputBlock(render_markdown=False)
