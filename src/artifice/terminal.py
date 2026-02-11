@@ -713,6 +713,7 @@ class ArtificeTerminal(Widget):
             finally:
                 if result:
                     code_input_block.update_status(result)
+                code_input_block.finish_streaming()
                 self._current_task = None
                 self.input.focus_input()
 
