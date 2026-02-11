@@ -47,6 +47,13 @@ class BaseBlock(Static):
         padding: 0;
     }
 
+    BaseBlock .loading-indicator {
+        width: 2;
+        height: 1;
+        content-align: center top;
+        padding: 0;
+    }
+
     BaseBlock > Horizontal > .status-indicator {
         height: 100%;
     }
@@ -345,7 +352,7 @@ class AgentOutputBlock(BaseBlock):
 
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__()
-        self._loading_indicator = LoadingIndicator()
+        self._loading_indicator = LoadingIndicator(classes="loading-indicator")
         self._full = output
         self._render_markdown = render_markdown
         self._streaming = activity
