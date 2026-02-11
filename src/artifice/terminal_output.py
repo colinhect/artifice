@@ -353,6 +353,7 @@ class AgentOutputBlock(BaseBlock):
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__()
         self._loading_indicator = LoadingIndicator(classes="loading-indicator")
+        self._status_indicator = Static("", classes="status-indicator")
         self._full = output
         self._render_markdown = render_markdown
         self._streaming = activity
@@ -372,8 +373,8 @@ class AgentOutputBlock(BaseBlock):
 
     def compose(self) -> ComposeResult:
         with self._contents:
-            with Vertical():
-                yield self._loading_indicator
+            yield self._loading_indicator
+            yield self._status_indicator
             if self._markdown:
                 yield self._markdown
             elif self._output is not None:
