@@ -188,12 +188,14 @@ class StreamingFenceDetector:
                 self.all_blocks.append(self._current_block)
 
                 self._state = _FenceState.PROSE
+            # Don't add character to pending buffer yet - we're accumulating backticks
         else:
-            # Not a fence marker
+            # Not a backtick, or we're in a string
             if self._backtick_count > 0:
-                # We had some backticks that weren't a fence
+                # We had some backticks that weren't a fence - add them
                 self._pending_buffer += '`' * self._backtick_count
                 self._backtick_count = 0
+            # Always add the current character
             self._pending_buffer += ch
 
     def _update_string_state(self, ch: str) -> None:
