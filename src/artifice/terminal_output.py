@@ -365,7 +365,7 @@ class AgentOutputBlock(BaseBlock):
 
     def compose(self) -> ComposeResult:
         with self._contents:
-            with Vertical(classes="status-indicator"):
+            with Vertical():
                 yield self._loading_indicator
             if self._markdown:
                 yield self._markdown
