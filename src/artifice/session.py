@@ -89,19 +89,19 @@ class SessionTranscript:
             return f"## User\n\n{prompt}"
         
         elif isinstance(block, AgentOutputBlock):
-            content = block._full
-            if content.strip():
+            content = block._full.strip()
+            if content:
                 return f"## Agent\n\n{content}"
             return ""
         
         elif isinstance(block, CodeInputBlock):
-            code = block.get_code()
+            code = block.get_code().strip()
             language = block._language
             return f"### Code ({language})\n\n```{language}\n{code}\n```"
         
         elif isinstance(block, CodeOutputBlock):
-            output = block._full
-            if output.strip():
+            output = block._full.strip()
+            if output:
                 # Check if there were errors
                 if block._has_error:
                     return f"### Output (error)\n\n```\n{output}\n```"
