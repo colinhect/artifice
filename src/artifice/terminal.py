@@ -93,6 +93,7 @@ class StreamingFenceDetector:
         # Update current block with accumulated chunk text
         if self._chunk_buffer and self._current_block:
             self._update_current_block_with_chunk()
+            self._chunk_buffer = ""  # Clear after updating to avoid reprocessing
         # Optionally scroll to bottom after updating content
         if auto_scroll:
             self._output.scroll_end(animate=False)
@@ -295,10 +296,13 @@ class StreamingFenceDetector:
             self._pending_buffer += '`' * self._backtick_count
             self._backtick_count = 0
 
-        # Flush any remaining text
-        self._flush_pending_to_chunk()
-        if self._chunk_buffer and self._current_block:
-            self._update_current_block_with_chunk()
+        # Flush any remaining text ONLY if there's pending content
+        # Don't flush _chunk_buffer as it was already processed by _process_chunk_buffer()
+        if self._pending_buffer:
+            self._flush_pending_to_chunk()
+            if self._chunk_buffer and self._current_block:
+                self._update_current_block_with_chunk()
+                self._chunk_buffer = ""  # Clear to avoid double-processing
 
         # Mark the last block as complete
         if isinstance(self._current_block, AgentOutputBlock):
