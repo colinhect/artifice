@@ -98,16 +98,17 @@ class CodeInputBlock(BaseBlock):
     }
     """
 
-    def __init__(self, code: str, language: str, show_loading: bool = True, in_context=False, **kwargs) -> None:
+    def __init__(self, code: str, language: str, show_loading: bool = True, in_context=False, command_number: int | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._loading_indicator = LoadingIndicator(classes="status-indicator")
         if show_loading:
             self._loading_indicator.styles.display = "block"
         self._streaming = show_loading
         self._language = language
+        self._command_number = command_number
         self._prompt_indicator = Static(self._get_prompt(), classes="prompt-indicator")
         # Status icon appears before the prompt (✔, ✖, or loading indicator)
-        self._status_icon = Static("", classes="status-indicator")
+        self._status_icon = Static(self._status_text(), classes="status-indicator")
         self._status_icon.add_class("status-unexecuted")
         self._original_code = code  # Store original code for re-execution
         # Always use syntax highlighting, even during streaming
@@ -115,6 +116,12 @@ class CodeInputBlock(BaseBlock):
         self._status_container = Horizontal(classes="status-indicator")
         if in_context:
             self.add_class("in-context")
+
+    def _status_text(self) -> str:
+        """Return the status icon text: the command number if set, else empty."""
+        if self._command_number is not None:
+            return str(self._command_number)
+        return ""
 
     def _get_prompt(self) -> str:
         return "]" if self._language == "python" else "$"
@@ -144,7 +151,7 @@ class CodeInputBlock(BaseBlock):
         # Clear any previous status styling
         self._status_icon.remove_class("status-success")
         self._status_icon.remove_class("status-error")
-        self._status_icon.update("")
+        self._status_icon.update(self._status_text())
 
     def finish_streaming(self) -> None:
         """End streaming: show status indicator (code already highlighted)."""
@@ -453,13 +460,14 @@ class TerminalOutput(VerticalScroll):
 
     BINDINGS = [
         Binding("end", "", "Input Prompt", show=True),
-        #Binding("up", "highlight_previous", "Previous Block", show=True),
-        #Binding("down", "highlight_next", "Next Block", show=True),
+        Binding("up", "highlight_previous_code", "Previous Code", show=True),
+        Binding("down", "highlight_next_code", "Next Code", show=True),
         Binding("ctrl+c", "activate_block", "Copy as Input", show=True),
         Binding("enter", "execute_block", "Execute", show=True),
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown", show=True),
         #Binding("ctrl+u", "pin_block", "Pin Block", show=True),
         Binding("insert", "cycle_language", "Mode", show=True),
+        *[Binding(str(n), f"run_numbered('{n}')", f"Run #{n}", show=False) for n in range(1, 10)],
     ]
 
     def __init__(
@@ -472,12 +480,19 @@ class TerminalOutput(VerticalScroll):
         super().__init__(name=name, id=id, classes=classes)
         self._blocks = []
         self._highlighted_index: int | None = None
+        self._next_command_number: int = 1
 
     def append_block(self, block: BaseBlock):
         self._blocks.append(block)
         self.mount(block)
         self.scroll_end(animate=False)
         return block
+
+    def next_command_number(self) -> int:
+        """Return the next command number and increment the counter."""
+        n = self._next_command_number
+        self._next_command_number += 1
+        return n
 
     def auto_scroll(self) -> None:
         """Scroll to the bottom without animation."""
@@ -489,6 +504,7 @@ class TerminalOutput(VerticalScroll):
             block.remove()
         self._blocks.clear()
         self._highlighted_index = None
+        self._next_command_number = 1
 
     def highlight_next(self) -> bool:
         """Move highlight to next block."""
@@ -573,9 +589,53 @@ class TerminalOutput(VerticalScroll):
         if not self.highlight_next():
             self.app.query_one("#code-input", InputTextArea).focus()
 
+    def action_highlight_previous_code(self) -> None:
+        """Move highlight to the previous CodeInputBlock, skipping other block types."""
+        if not self._blocks:
+            return
+        start = (self._highlighted_index - 1) if self._highlighted_index is not None else len(self._blocks) - 1
+        for i in range(start, -1, -1):
+            if isinstance(self._blocks[i], CodeInputBlock):
+                self._highlighted_index = i
+                self._update_highlight()
+                return
+
+    def action_highlight_next_code(self) -> None:
+        """Move highlight to the next CodeInputBlock, skipping other block types."""
+        if not self._blocks:
+            return
+        start = (self._highlighted_index + 1) if self._highlighted_index is not None else 0
+        for i in range(start, len(self._blocks)):
+            if isinstance(self._blocks[i], CodeInputBlock):
+                self._highlighted_index = i
+                self._update_highlight()
+                return
+        # No more code blocks forward — move focus to input
+        self.app.query_one("#code-input", InputTextArea).focus()
+
+    def action_run_numbered(self, n: str) -> None:
+        """Execute the CodeInputBlock with the given command number."""
+        block = self._find_numbered_block(int(n))
+        if block is not None:
+            self.post_message(self.BlockExecuteRequested(block))
+
+    def _find_numbered_block(self, number: int) -> CodeInputBlock | None:
+        """Find a CodeInputBlock with the given command number."""
+        for block in self._blocks:
+            if isinstance(block, CodeInputBlock) and block._command_number == number:
+                return block
+        return None
+
     def on_focus(self) -> None:
-        """When focusing on TerminalOutput, highlight the newest block if none is highlighted."""
+        """When focusing on TerminalOutput, highlight the last CodeInputBlock."""
         if self._blocks and self._highlighted_index is None:
+            # Find the last CodeInputBlock
+            for i in range(len(self._blocks) - 1, -1, -1):
+                if isinstance(self._blocks[i], CodeInputBlock):
+                    self._highlighted_index = i
+                    self._update_highlight()
+                    return
+            # Fallback: highlight the last block if no CodeInputBlock found
             self._highlighted_index = len(self._blocks) - 1
             self._update_highlight()
 

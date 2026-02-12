@@ -74,7 +74,7 @@ class StreamingFenceDetector:
         self._quote_buffer = ""  # Buffer for detecting triple quotes
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
-        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=True, in_context=True)
+        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=True, in_context=True, command_number=self._output.next_command_number())
 
     def start(self) -> None:
         """Create the initial AgentOutputBlock for streaming prose."""
@@ -448,7 +448,7 @@ class ArtificeTerminal(Widget):
             self._agent = CopilotAgent(system_prompt=system_prompt)
         elif app.provider.lower() == "simulated":
             from artifice.agent.simulated import SimulatedAgent
-            self._agent = SimulatedAgent(response_delay=0.001)
+            self._agent = SimulatedAgent(response_delay=0.0001)
 
             # Configure scenarios with pattern matching
             self._agent.configure_scenarios([
