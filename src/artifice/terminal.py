@@ -428,10 +428,11 @@ class ArtificeTerminal(Widget):
 
         # System prompt to guide the agent's behavior
         system_prompt = (
-            "You are collaborating with the user to interface with his Linux system with access to a bash shell and a Python session. "
-            "Any Python code or shell commands in your responses are interpreted as requests by you to execute that code. Make one request at a time. "
-            "Do not over explain unless asked to. Always use ```python or ```shell to mark code or shell command. "
-            "Explanations should precede the code."
+            "You are collaborating with the user to interface with their Linux system with access to a bash shell and a Python session. "
+            "All Python code or shell commands in your responses are interpreted as requests by you to execute that code. Make one request at a time. "
+            "Do not over explain unless asked to. Explanations precede the code. "
+            "If you give more than one option then the first is considered the main option. "
+            "Always use ```python or ```shell to mark code or shell command."
         )
         
         # Create agent
@@ -675,7 +676,7 @@ class ArtificeTerminal(Widget):
         # Search backward through the blocks created in this response
         last_code_block = None
         for block in reversed(self._current_detector.all_blocks):
-            if isinstance(block, CodeInputBlock):
+            if isinstance(block, CodeInputBlock) and block._command_number == 1:
                 last_code_block = block
                 break
 
