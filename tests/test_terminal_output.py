@@ -32,16 +32,52 @@ class TestCodeInputBlock:
         assert block.get_code() == new_code
 
     def test_finish_streaming_shows_status(self):
-        """Test that finish_streaming() shows the status indicator."""
+        """Test that finish_streaming() hides the loading indicator."""
         block = CodeInputBlock("x = 1", language="python", show_loading=True)
 
-        # Initially status indicator should be hidden
-        assert block._status_indicator.styles.display == "none"
+        # Initially loading indicator should be visible
+        assert block._loading_indicator.styles.display != "none"
 
-        # After finish_streaming, should be visible
+        # After finish_streaming, loading indicator should be hidden
         block.finish_streaming()
-        assert block._status_indicator.styles.display == "block"
+        assert block._loading_indicator.styles.display == "none"
         assert block._streaming is False
+
+    def test_non_streaming_block_shows_prompt_immediately(self):
+        """Test that non-streaming blocks (show_loading=False) show prompt immediately."""
+        block = CodeInputBlock("x = 1", language="python", show_loading=False)
+
+        # Should have the prompt character
+        assert block._get_prompt() == "]"  # Python prompt
+        
+        # Prompt indicator should be visible
+        assert block._prompt_indicator is not None
+        
+        # Should not be in streaming mode
+        assert block._streaming is False
+
+    def test_prompt_always_visible(self):
+        """Test that prompt character is always visible regardless of status."""
+        from artifice.execution import ExecutionResult, ExecutionStatus
+        
+        # Create a block with loading
+        block = CodeInputBlock("x = 1", language="python", show_loading=True)
+        
+        # Prompt indicator should exist and be separate from status
+        assert block._prompt_indicator is not None
+        assert block._status_icon is not None
+        assert block._prompt_indicator != block._status_icon
+        
+        # Verify prompt is set correctly for python
+        assert block._get_prompt() == "]"
+        
+        # After updating status, prompt should remain
+        result = ExecutionResult(code="x = 1", status=ExecutionStatus.SUCCESS)
+        block.update_status(result)
+        
+        # Status icon gets the checkmark, prompt stays as-is
+        assert block._get_prompt() == "]"
+        assert block._status_icon.has_class("status-success") is True
 
 
 class TestAgentOutputBlock:

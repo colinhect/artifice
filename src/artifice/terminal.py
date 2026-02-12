@@ -82,9 +82,6 @@ class StreamingFenceDetector:
         self._output.append_block(self._current_block)
         self.all_blocks.append(self._current_block)
         self.first_agent_block = self._current_block
-        # Save the initial agent block
-        if self._save_callback:
-            self._save_callback(self._current_block)
 
     def feed(self, text: str, auto_scroll: bool = True) -> None:
         """Process a chunk of streaming text, creating blocks as needed."""
@@ -157,9 +154,6 @@ class StreamingFenceDetector:
             self._current_block = self._make_code_block("", lang)
             self._output.append_block(self._current_block)
             self.all_blocks.append(self._current_block)
-            # Save code block
-            if self._save_callback:
-                self._save_callback(self._current_block)
 
             self._pending_buffer = ""
             self._state = _FenceState.CODE
@@ -195,9 +189,6 @@ class StreamingFenceDetector:
                 self._current_block = self._make_prose_block(activity=True)
                 self._output.append_block(self._current_block)
                 self.all_blocks.append(self._current_block)
-                # Save prose block
-                if self._save_callback:
-                    self._save_callback(self._current_block)
 
                 self._state = _FenceState.PROSE
             # Don't add character to pending buffer yet - we're accumulating backticks
@@ -326,6 +317,11 @@ class StreamingFenceDetector:
             if isinstance(b, AgentOutputBlock) and b is not self.first_agent_block and not b._full.strip()
         ]:
             self._remove_block(block)
+        
+        # Save all blocks to session now that they're finalized
+        if self._save_callback:
+            for block in self.all_blocks:
+                self._save_callback(block)
 
 
 class ArtificeTerminal(Widget):
