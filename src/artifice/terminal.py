@@ -761,6 +761,7 @@ class ArtificeTerminal(Widget):
         # Create a task to track execution
         async def execute():
             result = ExecutionResult(code=code, status=ExecutionStatus.ERROR)
+            sent_to_agent = False
             try:
                 result = await self._execute_code(
                     code, language=language,
@@ -768,6 +769,7 @@ class ArtificeTerminal(Widget):
                 )
                 block.update_status(result)
                 if self._auto_send_to_agent:
+                    sent_to_agent = True
                     await self._send_execution_result_to_agent(code, result)
             except asyncio.CancelledError:
                 code_output_block = CodeOutputBlock(render_markdown=False)
@@ -780,7 +782,11 @@ class ArtificeTerminal(Widget):
                     block.update_status(result)
                 block.finish_streaming()
                 self._current_task = None
-                self.input.focus_input()
+                # Only focus input if we didn't send results to the agent;
+                # _stream_agent_response already set focus to the first
+                # suggested code block when applicable.
+                if not sent_to_agent:
+                    self.input.focus_input()
 
         self._current_task = asyncio.create_task(execute())
 

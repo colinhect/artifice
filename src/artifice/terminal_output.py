@@ -188,6 +188,7 @@ class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """
     CodeOutputBlock .code-output {
         background: $surface-darken-1;
+        color: $foreground 66%;
         padding-left: 0;
         padding-right: 0;
     }
@@ -309,7 +310,7 @@ class WidgetOutputBlock(BaseBlock):
 class AgentInputBlock(BaseBlock):
     DEFAULT_CSS = """
     AgentInputBlock .prompt {
-        background: $primary-background-darken-2;
+        /*background: $primary-background-darken-2;*/
         padding: 0;
         border: none;
     }
