@@ -5,6 +5,7 @@ from textual.binding import Binding
 from textual.widgets import Footer, Static
 
 from artifice import ArtificeTerminal
+from artifice.config import load_config, ArtificeConfig
 
 import logging
 
@@ -95,9 +96,11 @@ class ArtificeApp(App):
         Binding("f2", "toggle_footer", "Toggle Help"),
     ]
 
-    def __init__(self, agent_type, show_banner=False):
-        self.agent_type = agent_type
-        self.show_banner = show_banner
+    def __init__(self, config: ArtificeConfig):
+        self.config = config
+        # Use config values, with command-line args taking precedence
+        self.agent_type = config.agent_type or ""
+        self.show_banner = config.show_banner
         self.footer_visible = False
         super().__init__()
 
@@ -121,13 +124,30 @@ def main():
     parser.add_argument(
         "--agent-type",
         choices=["claude", "copilot", "ollama", "simulated"],
-        default="",
-        help="Type of agent to use (claude, copilot, ollama, or simulated). Defaults to empty."
+        default=None,
+        help="Type of agent to use (claude, copilot, ollama, or simulated). Overrides config."
     )
-    parser.add_argument("--show-banner", action="store_true", help="Show the banner")
+    parser.add_argument("--show-banner", action="store_true", default=None, help="Show the banner")
+    parser.add_argument("--model", default=None, help="Model to use (overrides config)")
     args = parser.parse_args()
 
-    app = ArtificeApp(args.agent_type, args.show_banner)
+    # Load configuration from ~/.config/artifice/init.py
+    config, config_error = load_config()
+    
+    # Command-line arguments override config
+    if args.agent_type is not None:
+        config.agent_type = args.agent_type
+    if args.show_banner is not None:
+        config.show_banner = args.show_banner
+    if args.model is not None:
+        config.model = args.model
+
+    app = ArtificeApp(config)
+    
+    # Show config error if any (as a notification once app starts)
+    if config_error:
+        app.call_later(lambda: app.notify(f"Config error: {config_error}", severity="warning", timeout=10))
+    
     app.run(inline=True, inline_no_clear=True)
 
 

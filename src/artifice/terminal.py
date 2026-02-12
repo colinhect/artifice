@@ -19,6 +19,8 @@ from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExec
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
 from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput, BaseBlock
+from .config import ArtificeConfig, get_sessions_dir, ensure_sessions_dir
+from .session import SessionTranscript
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +55,10 @@ class StreamingFenceDetector:
     Creates blocks as fences are detected, accumulating text to update once per chunk.
     """
 
-    def __init__(self, output: TerminalOutput, auto_scroll) -> None:
+    def __init__(self, output: TerminalOutput, auto_scroll, save_callback=None) -> None:
         self._output = output
         self._auto_scroll = auto_scroll
+        self._save_callback = save_callback  # Callback to save blocks to session
         self._state = _FenceState.PROSE
         self._backtick_count = 0
         self._lang_buffer = ""
@@ -79,6 +82,9 @@ class StreamingFenceDetector:
         self._output.append_block(self._current_block)
         self.all_blocks.append(self._current_block)
         self.first_agent_block = self._current_block
+        # Save the initial agent block
+        if self._save_callback:
+            self._save_callback(self._current_block)
 
     def feed(self, text: str, auto_scroll: bool = True) -> None:
         """Process a chunk of streaming text, creating blocks as needed."""
@@ -151,6 +157,9 @@ class StreamingFenceDetector:
             self._current_block = self._make_code_block("", lang)
             self._output.append_block(self._current_block)
             self.all_blocks.append(self._current_block)
+            # Save code block
+            if self._save_callback:
+                self._save_callback(self._current_block)
 
             self._pending_buffer = ""
             self._state = _FenceState.CODE
@@ -186,6 +195,9 @@ class StreamingFenceDetector:
                 self._current_block = self._make_prose_block(activity=True)
                 self._output.append_block(self._current_block)
                 self.all_blocks.append(self._current_block)
+                # Save prose block
+                if self._save_callback:
+                    self._save_callback(self._current_block)
 
                 self._state = _FenceState.PROSE
             # Don't add character to pending buffer yet - we're accumulating backticks
@@ -383,31 +395,54 @@ class ArtificeTerminal(Widget):
         max_history_size: int = 1000,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
+        
+        # Store config reference
+        self._config = app.config
+        
         self._executor = CodeExecutor()
         
-        # Load configuration and create shell executor with init script
+        # Create shell executor
         self._shell_executor = ShellExecutor()
+        
+        # Set shell init script from config
+        if self._config.shell_init_script:
+            self._shell_executor.init_script = self._config.shell_init_script
 
         # Create history manager
         self._history = History(history_file=history_file, max_history_size=max_history_size)
 
-        # Per-mode markdown rendering settings
-        self._python_markdown_enabled = False  # Default: no markdown for Python output
-        self._agent_markdown_enabled = True    # Default: markdown for agent responses
-        self._shell_markdown_enabled = False   # Default: no markdown for shell output
+        # Per-mode markdown rendering settings (from config)
+        self._python_markdown_enabled = self._config.python_markdown
+        self._agent_markdown_enabled = self._config.agent_markdown
+        self._shell_markdown_enabled = self._config.shell_markdown
+        
+        # Initialize session transcript if enabled
+        self._session_transcript: SessionTranscript | None = None
+        if self._config.save_sessions:
+            try:
+                ensure_sessions_dir(self._config)
+                sessions_dir = get_sessions_dir(self._config)
+                self._session_transcript = SessionTranscript(sessions_dir)
+            except Exception as e:
+                logger.error(f"Failed to initialize session transcript: {e}")
 
         # System prompt to guide the agent's behavior
         system_prompt = (
             "You are collaborating with the user to interface with his Linux system with access to a bash shell and a Python session. "
             "Any Python code or shell commands in your responses are interpreted as requests by you to execute that code. Make one request at a time. "
-            "Do not over explain unless asked to. Always use ```python or ```shell to mark code or shell command."
+            "Do not over explain unless asked to. Always use ```python or ```shell to mark code or shell command. "
+            "Explanations should precede the code."
         )
         
         # Create agent
         self._agent = None
         if app.agent_type.lower() == "claude":
             from .agent import ClaudeAgent
-            self._agent = ClaudeAgent(system_prompt=system_prompt)
+            # Use configured model if available
+            if self._config.model:
+                self._agent = ClaudeAgent(model=self._config.model, system_prompt=system_prompt)
+            else:
+                self._agent = ClaudeAgent(system_prompt=system_prompt)
         elif app.agent_type.lower() == "copilot":
             from .agent import CopilotAgent
             self._agent = CopilotAgent(system_prompt=system_prompt)
@@ -438,10 +473,18 @@ class ArtificeTerminal(Widget):
             self._agent.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
         elif app.agent_type.lower() == "ollama":
             from .agent import OllamaAgent
-            self._agent = OllamaAgent(system_prompt=system_prompt)
+            # Use configured model and host if available
+            kwargs = {"system_prompt": system_prompt}
+            if self._config.model:
+                kwargs["model"] = self._config.model
+            if self._config.ollama_host:
+                kwargs["host"] = self._config.ollama_host
+            self._agent = OllamaAgent(**kwargs)
         elif app.agent_type:
             raise Exception(f"Unsupported agent {app.agent_type}")
-        self._auto_send_to_agent: bool = True  # Persistent mode for auto-sending execution results
+        
+        # Use auto-send setting from config
+        self._auto_send_to_agent: bool = self._config.auto_send_to_agent
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
@@ -458,6 +501,14 @@ class ArtificeTerminal(Widget):
             yield Static(id="flash")
             yield self.input
             yield self.pinned_output
+    
+    def _save_block_to_session(self, block: BaseBlock) -> None:
+        """Save a block to the session transcript if enabled."""
+        if self._session_transcript:
+            try:
+                self._session_transcript.append_block(block)
+            except Exception as e:
+                logger.error(f"Failed to save block to session: {e}")
 
     async def on_terminal_input_submitted(self, event: TerminalInput.Submitted) -> None:
         """Handle code submission from input."""
@@ -498,7 +549,7 @@ class ArtificeTerminal(Widget):
         Returns (on_output, on_error, flush) — call flush() after execution to
         ensure all buffered text is rendered.
         """
-        state = {"block": None, "flush_scheduled": False}
+        state = {"block": None, "flush_scheduled": False, "saved": False}
 
         def ensure_block():
             if state["block"] is None:
@@ -513,6 +564,10 @@ class ArtificeTerminal(Widget):
             if state["block"]:
                 state["block"].flush()
                 self.output.scroll_end(animate=False)
+                # Save to session on final flush if not already saved
+                if not state["saved"]:
+                    self._save_block_to_session(state["block"])
+                    state["saved"] = True
 
         def _schedule_flush():
             if not state["flush_scheduled"]:
@@ -545,6 +600,7 @@ class ArtificeTerminal(Widget):
         if code_input_block is None:
             code_input_block = CodeInputBlock(code, language=language, show_loading=True, in_context=in_context)
             self.output.append_block(code_input_block)
+            self._save_block_to_session(code_input_block)
 
         markdown_enabled = self._shell_markdown_enabled if language == "bash" else self._python_markdown_enabled
         on_output, on_error, flush_output = self._make_output_callbacks(markdown_enabled, in_context)
@@ -579,7 +635,11 @@ class ArtificeTerminal(Widget):
         Returns the detector (with all_blocks, first_agent_block) and the AgentResponse.
         """
         # Create detector and store it so message handlers can access it
-        self._current_detector = StreamingFenceDetector(self.output, self.output.auto_scroll)
+        self._current_detector = StreamingFenceDetector(
+            self.output, 
+            self.output.auto_scroll,
+            save_callback=self._save_block_to_session
+        )
         self._current_detector.start()
 
         # Post messages from streaming callback (runs in background thread)
@@ -635,6 +695,7 @@ class ArtificeTerminal(Widget):
         # Create a block showing the prompt
         agent_input_block = AgentInputBlock(prompt)
         self.output.append_block(agent_input_block)
+        self._save_block_to_session(agent_input_block)
 
         # Mark the prompt as in context
         self._mark_block_in_context(agent_input_block)
