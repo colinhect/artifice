@@ -43,9 +43,9 @@ class ArtificeHeader(Static):
     }
     """
 
-    def __init__(self, show_banner):
+    def __init__(self, banner):
         super().__init__()
-        self.show_banner = show_banner
+        self.banner = banner
 
     def compose(self) -> ComposeResult:
         # Create a gradient bar using Unicode box-drawing characters
@@ -54,7 +54,7 @@ class ArtificeHeader(Static):
         gradient_chars = ["█", "█", "▓", "▓", "▒", "▒", "░", "░", "·", "·", " "]
 
         header_content = ""
-        if self.show_banner:
+        if self.banner:
             header_content = """┌─┐┬─┐┌┬┐┬┌─┐┬┌─┐┌─┐
 ├─┤├┬┘ │ │├┤ ││  ├┤
 ┴ ┴┴└─ ┴ ┴└  ┴└─┘└─┘\n"""
@@ -99,13 +99,13 @@ class ArtificeApp(App):
     def __init__(self, config: ArtificeConfig):
         self.config = config
         # Use config values, with command-line args taking precedence
-        self.agent_type = config.agent_type or ""
-        self.show_banner = config.show_banner
+        self.provider = config.provider or ""
+        self.banner = config.banner
         self.footer_visible = False
         super().__init__()
 
     def compose(self) -> ComposeResult:
-        yield ArtificeHeader(self.show_banner)
+        yield ArtificeHeader(self.banner)
         yield ArtificeTerminal(self)
         footer = Footer()
         footer.display = False
@@ -122,12 +122,12 @@ def main():
     """Main entry point for the artifice command."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--agent-type",
+        "--provider",
         choices=["claude", "copilot", "ollama", "simulated"],
         default=None,
         help="Type of agent to use (claude, copilot, ollama, or simulated). Overrides config."
     )
-    parser.add_argument("--show-banner", action="store_true", default=None, help="Show the banner")
+    parser.add_argument("--banner", action="store_true", default=None, help="Show the banner")
     parser.add_argument("--model", default=None, help="Model to use (overrides config)")
     args = parser.parse_args()
 
@@ -135,10 +135,10 @@ def main():
     config, config_error = load_config()
     
     # Command-line arguments override config
-    if args.agent_type is not None:
-        config.agent_type = args.agent_type
-    if args.show_banner is not None:
-        config.show_banner = args.show_banner
+    if args.provider is not None:
+        config.provider = args.provider
+    if args.banner is not None:
+        config.banner = args.banner
     if args.model is not None:
         config.model = args.model
 

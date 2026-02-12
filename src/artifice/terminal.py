@@ -432,17 +432,17 @@ class ArtificeTerminal(Widget):
         
         # Create agent
         self._agent = None
-        if app.agent_type.lower() == "claude":
+        if app.provider.lower() == "claude":
             from .agent import ClaudeAgent
             # Use configured model if available
             if self._config.model:
                 self._agent = ClaudeAgent(model=self._config.model, system_prompt=system_prompt)
             else:
                 self._agent = ClaudeAgent(system_prompt=system_prompt)
-        elif app.agent_type.lower() == "copilot":
+        elif app.provider.lower() == "copilot":
             from .agent import CopilotAgent
             self._agent = CopilotAgent(system_prompt=system_prompt)
-        elif app.agent_type.lower() == "simulated":
+        elif app.provider.lower() == "simulated":
             from artifice.agent.simulated import SimulatedAgent
             self._agent = SimulatedAgent(response_delay=0.001)
 
@@ -467,7 +467,7 @@ class ArtificeTerminal(Widget):
             ])
 
             self._agent.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
-        elif app.agent_type.lower() == "ollama":
+        elif app.provider.lower() == "ollama":
             from .agent import OllamaAgent
             # Use configured model and host if available
             kwargs = {"system_prompt": system_prompt}
@@ -476,8 +476,8 @@ class ArtificeTerminal(Widget):
             if self._config.ollama_host:
                 kwargs["host"] = self._config.ollama_host
             self._agent = OllamaAgent(**kwargs)
-        elif app.agent_type:
-            raise Exception(f"Unsupported agent {app.agent_type}")
+        elif app.provider:
+            raise Exception(f"Unsupported agent {app.provider}")
         
         # Use auto-send setting from config
         self._auto_send_to_agent: bool = self._config.auto_send_to_agent

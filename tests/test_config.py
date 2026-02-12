@@ -18,7 +18,7 @@ def test_artifice_config_defaults():
     """Test that ArtificeConfig has sensible defaults."""
     config = ArtificeConfig()
     
-    assert config.agent_type is None
+    assert config.provider is None
     assert config.model is None
     assert config.ollama_host is None
     assert config.show_banner is False
@@ -68,7 +68,7 @@ def test_load_config_with_file(tmp_path, monkeypatch):
     # Create a temporary init.py
     init_file = tmp_path / "init.py"
     init_file.write_text("""
-config.agent_type = "ollama"
+config.provider = "ollama"
 config.model = "llama3.2:1b"
 config.show_banner = True
 config.python_markdown = True
@@ -82,7 +82,7 @@ config.set("custom", "value")
     config, error = load_config()
     
     assert error is None
-    assert config.agent_type == "ollama"
+    assert config.provider == "ollama"
     assert config.model == "llama3.2:1b"
     assert config.show_banner is True
     assert config.python_markdown is True

@@ -8,12 +8,12 @@
 # ============================================================================
 
 # Set the AI agent provider (claude, copilot, ollama, simulated)
-config.agent_type = "claude"
+config.provider = "claude"
 
 # Set the model to use (provider-specific)
-# Claude examples: "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"
-# Ollama examples: "llama3.2:1b", "qwen2.5:3b", "tinyllama:1.1b"
-config.model = "claude-haiku-4-5-20251001"
+# Claude examples: "claude-sonnet-4-5", "claude-haiku-4-5"
+# Ollama examples: "llama3.2:1b", "qwen2.5:3b"
+config.model = "claude-haiku-4-5"
 
 # Ollama-specific: set the host URL (default: http://localhost:11434)
 # config.ollama_host = "http://localhost:11434"
@@ -23,7 +23,7 @@ config.model = "claude-haiku-4-5-20251001"
 # ============================================================================
 
 # Show ASCII art banner on startup
-config.show_banner = True
+config.banner = True
 
 # Enable/disable markdown rendering for different output types
 config.python_markdown = False  # Python code output

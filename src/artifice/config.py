@@ -21,14 +21,14 @@ class ArtificeConfig:
     
     def __init__(self):
         # Agent settings
-        self.agent_type: Optional[str] = None  # claude, copilot, ollama, simulated
+        self.provider: Optional[str] = None  # claude, copilot, ollama, simulated
         self.model: Optional[str] = None  # claude-sonnet-4-5, gpt-4, llama3.2:1b, etc
         
         # Provider-specific settings
         self.ollama_host: Optional[str] = None  # e.g., http://localhost:11434
         
         # Display settings
-        self.show_banner: bool = False
+        self.banner: bool = False
         self.python_markdown: bool = False
         self.agent_markdown: bool = True
         self.shell_markdown: bool = False
