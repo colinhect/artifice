@@ -634,6 +634,9 @@ class ArtificeTerminal(Widget):
 
         Returns the detector (with all_blocks, first_agent_block) and the AgentResponse.
         """
+        # Clear old command numbers so the new response starts from 1
+        self.output.clear_command_numbers()
+
         # Create detector and store it so message handlers can access it
         self._current_detector = StreamingFenceDetector(
             self.output, 

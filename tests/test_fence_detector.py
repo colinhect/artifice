@@ -40,9 +40,15 @@ class FakeMockOutput:
 
     def __init__(self):
         self._blocks = []
+        self._next_command_number = 1
 
     def append_block(self, block):
         self._blocks.append(block)
+
+    def next_command_number(self):
+        n = self._next_command_number
+        self._next_command_number += 1
+        return n
 
     def scroll_end(self, animate=False):
         pass

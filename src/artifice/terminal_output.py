@@ -346,6 +346,11 @@ class AgentOutputBlock(BaseBlock):
         layout: stream;
     }
 
+    AgentOutputBlock .loading-indicator {
+        width: 2;
+        height: 1;
+    }
+
     AgentOutputBlock .agent-output MarkdownBlock:last-child {
         margin-bottom: 0;
     }
@@ -369,6 +374,7 @@ class AgentOutputBlock(BaseBlock):
         super().__init__()
         self._loading_indicator = LoadingIndicator(classes="loading-indicator")
         self._status_indicator = Static("", classes="status-indicator")
+        self._status_indicator.styles.display = "none"
         self._full = output
         self._render_markdown = render_markdown
         self._streaming = activity
@@ -409,9 +415,11 @@ class AgentOutputBlock(BaseBlock):
 
     def mark_success(self) -> None:
         self._loading_indicator.styles.display = "none"
+        self._status_indicator.styles.display = "block"
 
     def mark_failed(self) -> None:
         self._loading_indicator.styles.display = "none"
+        self._status_indicator.styles.display = "block"
 
     def toggle_markdown(self) -> None:
         self._render_markdown = not self._render_markdown
@@ -497,6 +505,15 @@ class TerminalOutput(VerticalScroll):
     def auto_scroll(self) -> None:
         """Scroll to the bottom without animation."""
         self.scroll_end(animate=False)
+
+    def clear_command_numbers(self) -> None:
+        """Remove command numbers from all CodeInputBlocks and reset the counter."""
+        for block in self._blocks:
+            if isinstance(block, CodeInputBlock) and block._command_number is not None:
+                if block._status_icon.content == str(block._command_number):
+                    block._status_icon.update("")
+                block._command_number = None
+        self._next_command_number = 1
 
     def clear(self) -> None:
         """Clear all output."""
