@@ -658,6 +658,8 @@ class ArtificeTerminal(Widget):
             # Mark the first agent output block with success/failure
             if self._current_detector.first_agent_block:
                 if response.error:
+                    # Show the error message in the block
+                    self._current_detector.first_agent_block.append(f"\n**Error:** {response.error}\n")
                     self._current_detector.first_agent_block.mark_failed()
                 else:
                     self._current_detector.first_agent_block.mark_success()

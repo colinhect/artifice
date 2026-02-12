@@ -55,14 +55,17 @@ class CopilotAgent(AgentBase):
                     self.on_connect(f"Copilot ({self.model})")
 
                 logger.info(f"[CopilotAgent] Connected to Copilot CLI")
-            except ImportError:
-                raise ImportError(
+            except ImportError as e:
+                error_msg = (
                     "github-copilot-sdk package not installed. "
                     "Install with: pip install github-copilot-sdk"
                 )
+                logger.error(f"[CopilotAgent] {error_msg}")
+                raise ImportError(error_msg) from e
             except Exception as e:
-                logger.error(f"[CopilotAgent] Failed to start client: {e}")
-                raise
+                error_msg = f"Failed to start Copilot client: {e}"
+                logger.error(f"[CopilotAgent] {error_msg}")
+                raise RuntimeError(error_msg) from e
 
         return self._client
 
@@ -74,6 +77,7 @@ class CopilotAgent(AgentBase):
             session_config = {
                 "model": self.model,
                 "streaming": True,
+                "available_tools": []
             }
 
             # Add system message if provided
@@ -129,19 +133,32 @@ class CopilotAgent(AgentBase):
                 """Handle session events.
 
                 May be called from a background thread, so use
-                call_soon_threadsafe to schedule callbacks on the event loop.
+                call_soon_threadsafe to schedule all state modifications
+                and callbacks on the event loop thread.
                 """
                 nonlocal error_message, stop_reason
 
+                # Log raw event for debugging
+                logger.debug(f"[CopilotAgent] Raw event: type={type(event)}, event={event}")
+                
                 event_type = event.type.value if hasattr(event.type, 'value') else str(event.type)
+                logger.info(f"[CopilotAgent] Event type: {event_type}, has data: {hasattr(event, 'data')}")
+                
+                # Log event data if available
+                if hasattr(event, 'data'):
+                    logger.debug(f"[CopilotAgent] Event data: {event.data}")
 
                 if event_type == "assistant.message_delta":
-                    # Streaming chunk
-                    delta = event.data.delta_content or ""
+                    # Streaming chunk - schedule all operations on event loop
+                    # Try both delta_content and delta attributes
+                    delta = getattr(event.data, 'delta_content', None) or getattr(event.data, 'delta', None) or ""
+                    logger.debug(f"[CopilotAgent] Delta content: {delta[:50] if delta else 'None'}...")
                     if delta:
-                        response_chunks.append(delta)
-                        if on_chunk:
-                            loop.call_soon_threadsafe(on_chunk, delta)
+                        def process_delta():
+                            response_chunks.append(delta)
+                            if on_chunk:
+                                on_chunk(delta)
+                        loop.call_soon_threadsafe(process_delta)
 
                 elif event_type == "assistant.message":
                     # Final message
@@ -150,10 +167,13 @@ class CopilotAgent(AgentBase):
                         f"[CopilotAgent] Received final message ({len(content)} chars)"
                     )
                     # Use final content if we didn't get deltas
-                    if not response_chunks and content:
-                        response_chunks.append(content)
-                        if on_chunk:
-                            loop.call_soon_threadsafe(on_chunk, content)
+                    if content:
+                        def process_final():
+                            if not response_chunks:
+                                response_chunks.append(content)
+                                if on_chunk:
+                                    on_chunk(content)
+                        loop.call_soon_threadsafe(process_final)
 
                 elif event_type == "session.idle":
                     # Session finished processing
@@ -162,19 +182,33 @@ class CopilotAgent(AgentBase):
 
                 elif event_type == "error":
                     # Error occurred
-                    error_message = str(event.data) if hasattr(event, 'data') else "Unknown error"
-                    logger.error(f"[CopilotAgent] Error event: {error_message}")
-                    loop.call_soon_threadsafe(done_event.set)
+                    error_msg = str(event.data) if hasattr(event, 'data') else "Unknown error"
+                    logger.error(f"[CopilotAgent] Error event: {error_msg}")
+                    def set_error():
+                        nonlocal error_message
+                        error_message = error_msg
+                        done_event.set()
+                    loop.call_soon_threadsafe(set_error)
+                
+                else:
+                    # Unknown event type - log it for debugging
+                    logger.warning(f"[CopilotAgent] Unhandled event type: {event_type}")
 
             # Register event handler
             session.on(handle_event)
 
             # Send the prompt
-            logger.info(f"[CopilotAgent] Sending prompt: {prompt}")
+            logger.info(f"[CopilotAgent] Sending prompt: {prompt[:100]}...")
             await session.send({"prompt": prompt})
+            logger.info(f"[CopilotAgent] Prompt sent, waiting for response...")
 
-            # Wait for completion
-            await done_event.wait()
+            # Wait for completion with timeout
+            try:
+                await asyncio.wait_for(done_event.wait(), timeout=60.0)
+                logger.info(f"[CopilotAgent] Response completed")
+            except asyncio.TimeoutError:
+                logger.error(f"[CopilotAgent] Timeout waiting for response")
+                error_message = "Timeout waiting for Copilot response"
 
             # Combine response chunks
             full_text = "".join(response_chunks)
@@ -187,7 +221,9 @@ class CopilotAgent(AgentBase):
                 stop_reason=stop_reason or "end_turn",
             )
 
-        except ImportError as e:
+        except (ImportError, RuntimeError, PermissionError, FileNotFoundError) as e:
+            # Configuration/setup errors - return full error message
+            logger.error(f"[CopilotAgent] Setup error: {e}")
             return AgentResponse(text="", error=str(e))
         except Exception as e:
             error_msg = f"Error communicating with Copilot: {e}"
