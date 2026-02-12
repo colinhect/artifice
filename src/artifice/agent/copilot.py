@@ -83,6 +83,7 @@ class CopilotAgent(AgentBase):
             # Add system message if provided
             if self.system_prompt:
                 session_config["system_message"] = {
+                    "mode": "append",
                     "content": self.system_prompt,
                 }
 
@@ -138,30 +139,39 @@ class CopilotAgent(AgentBase):
                 """
                 nonlocal error_message, stop_reason
 
-                # Log raw event for debugging
-                logger.debug(f"[CopilotAgent] Raw event: type={type(event)}, event={event}")
+                # Event type is directly accessible as a string
+                try:
+                    event_type = event.type
+                    logger.info(f"[CopilotAgent] Event received: {event_type}")
+                except Exception as e:
+                    logger.error(f"[CopilotAgent] Error accessing event.type: {e}, event={event}")
+                    return
                 
-                event_type = event.type.value if hasattr(event.type, 'value') else str(event.type)
-                logger.info(f"[CopilotAgent] Event type: {event_type}, has data: {hasattr(event, 'data')}")
-                
-                # Log event data if available
-                if hasattr(event, 'data'):
-                    logger.debug(f"[CopilotAgent] Event data: {event.data}")
-
-                if event_type == "assistant.message_delta":
+                if event_type == "assistant.message.delta":
                     # Streaming chunk - schedule all operations on event loop
-                    # Try both delta_content and delta attributes
-                    delta = getattr(event.data, 'delta_content', None) or getattr(event.data, 'delta', None) or ""
-                    logger.debug(f"[CopilotAgent] Delta content: {delta[:50] if delta else 'None'}...")
-                    if delta:
-                        def process_delta():
-                            response_chunks.append(delta)
-                            if on_chunk:
-                                on_chunk(delta)
-                        loop.call_soon_threadsafe(process_delta)
+                    try:
+                        delta = event.data.delta_content
+                        logger.debug(f"[CopilotAgent] Delta content: {delta[:50] if delta else 'None'}...")
+                        if delta:
+                            def process_delta():
+                                response_chunks.append(delta)
+                                if on_chunk:
+                                    on_chunk(delta)
+                            loop.call_soon_threadsafe(process_delta)
+                    except AttributeError as e:
+                        logger.error(f"[CopilotAgent] Error accessing delta_content: {e}")
+
+                elif event_type == "assistant.reasoning.delta":
+                    # Reasoning chunk (model-dependent, e.g., o1)
+                    try:
+                        delta = event.data.delta_content
+                        logger.debug(f"[CopilotAgent] Reasoning delta: {delta[:50] if delta else 'None'}...")
+                        # Could optionally handle reasoning separately
+                    except AttributeError as e:
+                        logger.error(f"[CopilotAgent] Error accessing reasoning delta: {e}")
 
                 elif event_type == "assistant.message":
-                    # Final message
+                    # Final message - always sent regardless of streaming
                     content = event.data.content or ""
                     logger.info(
                         f"[CopilotAgent] Received final message ({len(content)} chars)"
@@ -175,32 +185,55 @@ class CopilotAgent(AgentBase):
                                     on_chunk(content)
                         loop.call_soon_threadsafe(process_final)
 
+                elif event_type == "assistant.reasoning":
+                    # Final reasoning content
+                    logger.debug("[CopilotAgent] Received final reasoning")
+                    # Could optionally handle reasoning separately
+
                 elif event_type == "session.idle":
                     # Session finished processing
                     logger.info("[CopilotAgent] Session idle")
                     loop.call_soon_threadsafe(done_event.set)
 
-                elif event_type == "error":
+                elif event_type == "session.error":
                     # Error occurred
-                    error_msg = str(event.data) if hasattr(event, 'data') else "Unknown error"
+                    error_msg = event.data.message if hasattr(event.data, 'message') else str(event.data)
                     logger.error(f"[CopilotAgent] Error event: {error_msg}")
                     def set_error():
                         nonlocal error_message
                         error_message = error_msg
                         done_event.set()
                     loop.call_soon_threadsafe(set_error)
+
+                elif event_type == "session.start":
+                    # Session started
+                    logger.debug("[CopilotAgent] Session started")
+
+                elif event_type == "user.message":
+                    # User message echoed back
+                    logger.debug("[CopilotAgent] User message event")
+
+                elif event_type.startswith("tool."):
+                    # Tool execution events (executionStart, executionComplete, etc.)
+                    logger.debug(f"[CopilotAgent] Tool event: {event_type}")
                 
                 else:
                     # Unknown event type - log it for debugging
-                    logger.warning(f"[CopilotAgent] Unhandled event type: {event_type}")
+                    logger.info(f"[CopilotAgent] Unhandled event type: {event_type}")
 
             # Register event handler
-            session.on(handle_event)
+            unsubscribe = session.on(handle_event)
+            logger.info("[CopilotAgent] Event handler registered")
 
             # Send the prompt
             logger.info(f"[CopilotAgent] Sending prompt: {prompt[:100]}...")
-            await session.send({"prompt": prompt})
-            logger.info(f"[CopilotAgent] Prompt sent, waiting for response...")
+            try:
+                await session.send({"prompt": prompt})
+                logger.info(f"[CopilotAgent] Prompt sent, waiting for response...")
+            except Exception as e:
+                logger.error(f"[CopilotAgent] Error sending prompt: {e}")
+                unsubscribe()
+                return AgentResponse(text="", error=f"Failed to send prompt: {e}")
 
             # Wait for completion with timeout
             try:
@@ -209,6 +242,10 @@ class CopilotAgent(AgentBase):
             except asyncio.TimeoutError:
                 logger.error(f"[CopilotAgent] Timeout waiting for response")
                 error_message = "Timeout waiting for Copilot response"
+            finally:
+                # Always unsubscribe from events
+                unsubscribe()
+                logger.info("[CopilotAgent] Event handler unsubscribed")
 
             # Combine response chunks
             full_text = "".join(response_chunks)
