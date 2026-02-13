@@ -821,7 +821,8 @@ class ArtificeTerminal(Widget):
             try:
                 with self.app.batch_update():
                     self._current_detector.feed(text, auto_scroll=False)
-                self.output.scroll_end(animate=False)
+                # Schedule scroll after layout refresh so Markdown widget height is recalculated
+                self.call_after_refresh(lambda: self.output.scroll_end(animate=False))
             except Exception:
                 logger.exception("Error processing chunk buffer")
         # Reset scheduling flag to allow next batch

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 
 from textual import highlight
 from textual.app import ComposeResult
@@ -375,6 +376,8 @@ class AgentOutputBlock(BaseBlock):
     }
     """
 
+    _FLUSH_INTERVAL = 0.1  # Minimum seconds between Markdown re-renders during streaming
+
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__()
         self._loading_indicator = LoadingIndicator(classes="loading-indicator")
@@ -384,6 +387,8 @@ class AgentOutputBlock(BaseBlock):
         self._render_markdown = render_markdown
         self._streaming = activity
         self._dirty = False  # True when _full has changed but widget not yet updated
+        self._last_flush_time: float = 0.0
+        self._flush_timer_pending: bool = False
         self._contents = Horizontal()
         self.add_class("in-context")
 
@@ -412,19 +417,44 @@ class AgentOutputBlock(BaseBlock):
         self._dirty = True
 
     def flush(self) -> None:
-        """Push accumulated text to the widget. Call after batching appends."""
+        """Push accumulated text to the widget, throttled for Markdown during streaming."""
+        if not self._dirty:
+            return
+
+        # Throttle Markdown re-renders during streaming
+        if self._markdown and self._streaming:
+            now = time.monotonic()
+            elapsed = now - self._last_flush_time
+            if elapsed < self._FLUSH_INTERVAL:
+                # Too soon — schedule a deferred flush if not already pending
+                if not self._flush_timer_pending:
+                    self._flush_timer_pending = True
+                    self.set_timer(self._FLUSH_INTERVAL - elapsed, self._deferred_flush)
+                return
+
+        self._do_flush()
+
+    def _do_flush(self) -> None:
+        """Actually push content to the widget."""
         if not self._dirty:
             return
         self._dirty = False
-        # Update the appropriate widget (Markdown or Static)
+        self._last_flush_time = time.monotonic()
+        self._flush_timer_pending = False
         if self._markdown:
             self._markdown.update(self._full)
         elif self._output:
             self._output.update(self._full)
 
+    def _deferred_flush(self) -> None:
+        """Timer callback for deferred flush."""
+        self._flush_timer_pending = False
+        self._do_flush()
+
     def finalize_streaming(self) -> None:
-        """End streaming mode (widget already properly configured)."""
+        """End streaming mode — force final flush to ensure content is current."""
         self._streaming = False
+        self._do_flush()
 
     def mark_success(self) -> None:
         self._loading_indicator.styles.display = "none"
