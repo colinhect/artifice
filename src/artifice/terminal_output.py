@@ -161,7 +161,7 @@ class CodeInputBlock(BaseBlock):
         """Update the displayed code with syntax highlighting (used during streaming)."""
         self._original_code = code
         # Always apply syntax highlighting
-        self._code.update(highlight.highlight(code, language=self._language))
+        self._code.update(highlight.highlight(code.strip(), language=self._language))
 
     def get_code(self) -> str:
         """Get the original code."""
@@ -181,7 +181,7 @@ class CodeInputBlock(BaseBlock):
         self._prompt_indicator.update(self._get_prompt())
 
         # Update syntax highlighting and markdown
-        self._code.update(highlight.highlight(self._original_code, language=self._language))
+        self._code.update(highlight.highlight(self._original_code.strip(), language=self._language))
 
 class CodeOutputBlock(BaseBlock):
     DEFAULT_CSS = """
@@ -254,9 +254,9 @@ class CodeOutputBlock(BaseBlock):
             return
         self._dirty = False
         if self._markdown:
-            self._markdown.update(self._full)
+            self._markdown.update(self._full.strip())
         elif self._output:
-            self._output.update(self._full.rstrip('\n'))
+            self._output.update(self._full.strip())
 
     def append_error(self, output) -> None:
         self.append_output(output)
@@ -442,9 +442,9 @@ class AgentOutputBlock(BaseBlock):
         self._last_flush_time = time.monotonic()
         self._flush_timer_pending = False
         if self._markdown:
-            self._markdown.update(self._full)
+            self._markdown.update(self._full.strip())
         elif self._output:
-            self._output.update(self._full)
+            self._output.update(self._full.strip())
 
     def _deferred_flush(self) -> None:
         """Timer callback for deferred flush."""
