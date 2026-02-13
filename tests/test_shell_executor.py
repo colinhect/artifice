@@ -39,14 +39,14 @@ class TestOutputStreaming:
     @pytest.mark.asyncio
     async def test_stdout_callback(self, executor):
         lines = []
-        result = await executor.execute("echo one; echo two", on_output=lambda t: lines.append(t))
-        assert any("one" in l for l in lines)
-        assert any("two" in l for l in lines)
+        await executor.execute("echo one; echo two", on_output=lambda t: lines.append(t))
+        assert any("one" in line for line in lines)
+        assert any("two" in line for line in lines)
 
     @pytest.mark.asyncio
     async def test_stderr_callback(self, executor):
         errors = []
-        result = await executor.execute("echo err >&2", on_error=lambda t: errors.append(t))
+        await executor.execute("echo err >&2", on_error=lambda t: errors.append(t))
         assert any("err" in e for e in errors)
 
 

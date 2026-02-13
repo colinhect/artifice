@@ -3,6 +3,7 @@ import argparse
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Static
+from textual.theme import Theme
 
 from artifice import ArtificeTerminal
 from artifice.config import load_config, ArtificeConfig
@@ -44,7 +45,6 @@ class ArtificeHeader(Static):
         header_content += "".join(gradient_chars)
         yield Static(header_content, classes="header-bar")
 
-from textual.theme import Theme
 def create_artifice_theme() -> Theme:
     #black = "#07080A" 
     dark_gray = "#3B4252" 
