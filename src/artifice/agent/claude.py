@@ -186,6 +186,7 @@ class ClaudeAgent(AgentBase):
                 content_blocks.append({
                     "type": "thinking",
                     "thinking": block.thinking,
+                    "signature": block.signature,
                 })
             elif block.type == "text":
                 content_blocks.append({
