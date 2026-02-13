@@ -1,7 +1,6 @@
 """Tests for the Python code executor."""
 
 import pytest
-import asyncio
 from artifice.execution.python import CodeExecutor
 from artifice.execution.common import ExecutionStatus
 

@@ -1,7 +1,5 @@
 """Tests for session transcript saving."""
 
-import pytest
-from pathlib import Path
 from unittest.mock import MagicMock
 from artifice.config import ArtificeConfig
 from artifice.session import SessionTranscript

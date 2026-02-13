@@ -57,7 +57,7 @@ class CopilotAgent(AgentBase):
                 if self.on_connect:
                     self.on_connect(f"Copilot ({self.model})")
 
-                logger.info(f"[CopilotAgent] Connected to Copilot CLI")
+                logger.info("[CopilotAgent] Connected to Copilot CLI")
             except ImportError as e:
                 error_msg = (
                     "github-copilot-sdk package not installed. "

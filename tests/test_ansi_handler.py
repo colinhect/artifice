@@ -1,6 +1,5 @@
 """Tests for ANSI escape code parsing and conversion."""
 
-import pytest
 from artifice.ansi_handler import (
     strip_ansi, ansi_to_textual, has_ansi_codes, _parse_sgr_codes,
 )

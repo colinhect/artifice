@@ -1,7 +1,6 @@
 """Tests for History - command history with multi-mode navigation and persistence."""
 
 import json
-import pytest
 from artifice.history import History
 
 

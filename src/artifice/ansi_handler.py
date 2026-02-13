@@ -5,7 +5,7 @@ to Textual markup for rich terminal output display.
 """
 
 import re
-from typing import List, Tuple
+from typing import List
 
 # ANSI SGR (Select Graphic Rendition) codes for basic colors
 ANSI_BASIC_COLORS = {

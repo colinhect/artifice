@@ -1,9 +1,7 @@
 """Tests for configuration loading and sandboxing."""
 
-import os
-import pytest
 from pathlib import Path
-from artifice.config import ArtificeConfig, load_config, get_sessions_dir, get_init_script_path
+from artifice.config import ArtificeConfig, load_config, get_sessions_dir
 
 
 class TestArtificeConfig:

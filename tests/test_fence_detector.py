@@ -7,7 +7,7 @@ targets in the terminal module so the detector recognizes our fakes.
 
 from unittest.mock import patch
 import pytest
-from artifice.terminal import StreamingFenceDetector, _FenceState, _LANG_ALIASES
+from artifice.terminal import StreamingFenceDetector, _FenceState
 
 
 # --- Fakes to avoid Textual widget dependencies ---

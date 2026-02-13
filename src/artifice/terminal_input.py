@@ -5,13 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rich.text import Text
-from rich.style import Style
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Static, TextArea, Input, LoadingIndicator
-from textual.widgets.text_area import TextAreaTheme
 from textual import events
 from textual_autocomplete import AutoComplete, DropdownItem, TargetState
 

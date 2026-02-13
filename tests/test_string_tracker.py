@@ -1,6 +1,5 @@
 """Tests for StringTracker - the streaming string literal detector."""
 
-import pytest
 from artifice.terminal import StringTracker
 
 

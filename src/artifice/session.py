@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from .config import ArtificeConfig
 
 if TYPE_CHECKING:
-    from .terminal_output import BaseBlock, CodeInputBlock, CodeOutputBlock, AgentInputBlock, AgentOutputBlock
+    from .terminal_output import BaseBlock
 
 
 class SessionTranscript:
@@ -64,10 +64,6 @@ class SessionTranscript:
         self._ensure_header()
         
         # Import here to avoid circular imports
-        from .terminal_output import (
-            CodeInputBlock, CodeOutputBlock, 
-            AgentInputBlock, AgentOutputBlock
-        )
         
         markdown = self._block_to_markdown(block)
         if markdown:

@@ -125,7 +125,7 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
         exec(code, sandbox)
         return config, None
         
-    except Exception as e:
+    except Exception:
         error_msg = f"Error loading config from {init_path}:\n{traceback.format_exc()}"
         return config, error_msg
 

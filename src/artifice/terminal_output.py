@@ -14,7 +14,6 @@ from textual.widgets import Static, LoadingIndicator, Markdown
 
 from .execution import ExecutionResult, ExecutionStatus
 from .terminal_input import InputTextArea
-from .ansi_handler import ansi_to_textual
 
 class BaseBlock(Static):
     DEFAULT_CSS = """
