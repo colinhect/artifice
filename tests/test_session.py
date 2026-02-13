@@ -51,11 +51,11 @@ class TestSessionTranscript:
         assert content.count("# Artifice Session") == 1
 
     def test_header_contains_metadata(self, tmp_sessions_dir):
-        config = make_config(provider="claude", model="opus")
+        config = make_config(provider="anthropic", model="opus")
         s = SessionTranscript(tmp_sessions_dir, config)
         s._ensure_header()
         content = s.session_file.read_text()
-        assert "claude" in content
+        assert "anthropic" in content
         assert "opus" in content
 
     def test_finalize_adds_footer(self, tmp_sessions_dir):

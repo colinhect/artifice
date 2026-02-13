@@ -459,7 +459,7 @@ class ArtificeTerminal(Widget):
         self._agent: AgentBase | None = None
         model = self._config.model
         system_prompt = self._config.system_prompt
-        if app.provider.lower() == "claude":
+        if app.provider.lower() == "anthropic":
             from .agent import ClaudeAgent
             self._agent = ClaudeAgent(model=model, system_prompt=system_prompt, thinking_budget=self._config.thinking_budget)
         elif app.provider.lower() == "copilot":
@@ -640,13 +640,14 @@ class ArtificeTerminal(Widget):
         # Clear old command numbers so the new response starts from 1
         self.output.clear_command_numbers()
 
-        # Create detector and store it so message handlers can access it
+        # Create detector but don't start yet — defer until first text chunk
+        # so that ThinkingOutputBlock (if any) gets mounted first
         self._current_detector = StreamingFenceDetector(
             self.output,
             self.output.auto_scroll,
             save_callback=self._save_block_to_session
         )
-        self._current_detector.start()
+        self._detector_started = False
 
         # Post messages from streaming callback (runs in background thread)
         def on_chunk(text):
@@ -674,6 +675,10 @@ class ArtificeTerminal(Widget):
         # (no message-based race — send_prompt has returned, no more chunks coming)
         if self._chunk_buffer:
             self._process_chunk_buffer()
+        # Ensure detector is started before finishing (handles thinking-only or error cases)
+        if not self._detector_started:
+            self._detector_started = True
+            self._current_detector.start()
         self._current_detector.finish()
 
         with self.app.batch_update():
@@ -805,6 +810,11 @@ class ArtificeTerminal(Widget):
     def on_stream_chunk(self, event: StreamChunk) -> None:
         """Handle streaming chunk message - buffer and batch process chunks."""
         if self._current_detector:
+            # Start detector on first text chunk (deferred so thinking block comes first)
+            if not self._detector_started:
+                self._detector_started = True
+                self._current_detector.start()
+
             # Add chunk to buffer
             self._chunk_buffer += event.text
 
@@ -817,6 +827,10 @@ class ArtificeTerminal(Widget):
     def _process_chunk_buffer(self) -> None:
         """Process all accumulated chunks in the buffer at once."""
         if self._current_detector and self._chunk_buffer:
+            # Ensure detector is started before feeding text
+            if not self._detector_started:
+                self._detector_started = True
+                self._current_detector.start()
             text = self._chunk_buffer
             self._chunk_buffer = ""
             try:

@@ -40,15 +40,15 @@ class TestLoadConfig:
     def test_valid_config(self, monkeypatch, tmp_path):
         init_file = tmp_path / "init.py"
         init_file.write_text(
-            'config.provider = "claude"\n'
-            'config.model = "claude-sonnet-4-5-20250929"\n'
+            'config.provider = "anthropic"\n'
+            'config.model = "claude-sonnet-4-5"\n'
             'config.agent_markdown = False\n'
         )
         monkeypatch.setattr("artifice.config.get_init_script_path", lambda: init_file)
         config, error = load_config()
         assert error is None
-        assert config.provider == "claude"
-        assert config.model == "claude-sonnet-4-5-20250929"
+        assert config.provider == "anthropic"
+        assert config.model == "claude-sonnet-4-5"
         assert config.agent_markdown is False
 
     def test_sandbox_blocks_import(self, monkeypatch, tmp_path):
@@ -56,7 +56,7 @@ class TestLoadConfig:
         init_file = tmp_path / "init.py"
         init_file.write_text("import os\n")
         monkeypatch.setattr("artifice.config.get_init_script_path", lambda: init_file)
-        config, error = load_config()
+        _, error = load_config()
         assert error is not None
         assert "Error" in error
 
@@ -64,14 +64,14 @@ class TestLoadConfig:
         init_file = tmp_path / "init.py"
         init_file.write_text("f = open('/etc/passwd')\n")
         monkeypatch.setattr("artifice.config.get_init_script_path", lambda: init_file)
-        config, error = load_config()
+        _, error = load_config()
         assert error is not None
 
     def test_sandbox_blocks_eval(self, monkeypatch, tmp_path):
         init_file = tmp_path / "init.py"
         init_file.write_text("eval('1+1')\n")
         monkeypatch.setattr("artifice.config.get_init_script_path", lambda: init_file)
-        config, error = load_config()
+        _, error = load_config()
         assert error is not None
 
     def test_sandbox_allows_basic_types(self, monkeypatch, tmp_path):
@@ -93,7 +93,7 @@ class TestLoadConfig:
         init_file = tmp_path / "init.py"
         init_file.write_text("def f(:\n")
         monkeypatch.setattr("artifice.config.get_init_script_path", lambda: init_file)
-        config, error = load_config()
+        _, error = load_config()
         assert error is not None
         assert "SyntaxError" in error
 

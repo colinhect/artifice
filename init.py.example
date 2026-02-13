@@ -19,8 +19,8 @@ config.prompt_prefix = ""
 # Agent Configuration
 # ============================================================================
 
-# Set the AI agent provider (claude, copilot, ollama, simulated)
-config.provider = "claude"
+# Set the AI agent provider (anthropic, copilot, ollama, simulated)
+config.provider = "anthropic"
 
 # Set the model to use (provider-specific)
 # Claude examples: "claude-sonnet-4-5", "claude-haiku-4-5"

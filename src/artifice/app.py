@@ -145,9 +145,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--provider",
-        choices=["claude", "copilot", "ollama", "simulated"],
+        choices=["anthropic", "copilot", "ollama", "simulated"],
         default=None,
-        help="Type of agent to use (claude, copilot, ollama, or simulated). Overrides config."
+        help="Type of agent to use (anthropic, copilot, ollama, or simulated). Overrides config."
     )
     parser.add_argument("--model", default=None, help="Model to use (overrides config)")
     parser.add_argument("--system-prompt", default=None, help="System prompt to use for the agent")
