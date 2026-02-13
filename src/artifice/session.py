@@ -97,7 +97,7 @@ class SessionTranscript:
         elif isinstance(block, CodeInputBlock):
             code = block.get_code().strip()
             language = block._language
-            return f"### Code ({language})\n\n```{language}\n{code}\n```"
+            return f"### {block._command_number} Code\n\n```{language}\n{code}\n```"
         
         elif isinstance(block, CodeOutputBlock):
             output = block._full.strip()
