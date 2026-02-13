@@ -41,6 +41,7 @@ class SimulatedAgent(AgentBase):
         self.scenarios: list[dict[str, Any]] = []
         self.current_scenario_index = 0
         self.default_response = "I'm a simulated AI agent. I can be configured with custom responses."
+        self.default_thinking: str | None = None
 
         if on_connect:
             on_connect("Artifice")
@@ -49,22 +50,27 @@ class SimulatedAgent(AgentBase):
         self.configure_scenarios([
             {
                 'pattern': r'hello|hi|hey',
-                'response': 'Hello! I\'m a **simulated** agent. How can I help you today?'
+                'response': 'Hello! I\'m a **simulated** agent. How can I help you today?',
+                'thinking': 'The user is greeting me. I should respond in a friendly manner and offer to help.'
             },
             {
                 'pattern': r'blank',
                 'response': '```python\nimport time\ntime.sleep(3)\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
+                'thinking': 'Let me think about this problem. I need to write some Python code to demonstrate a calculation with a delay.'
             },
             {
                 'pattern': r'calculate|math|sum|add',
                 'response': 'I can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
+                'thinking': 'The user wants me to perform a calculation. I should write Python code to compute the result and display it clearly.'
             },
             {
                 'pattern': r'goodbye|bye|exit',
-                'response': 'Goodbye! Thanks for chatting with me.'
+                'response': 'Goodbye! Thanks for chatting with me.',
+                'thinking': 'The user is saying goodbye. I should acknowledge and thank them for the conversation.'
             },
         ])
         self.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
+        self.set_default_thinking("Hmm, I'm not sure how to respond to this. Let me think about what the user might be asking for.")
 
     def configure_scenarios(self, scenarios: list[dict[str, Any]]) -> None:
         """Configure the agent with predefined scenarios.
@@ -72,37 +78,48 @@ class SimulatedAgent(AgentBase):
         Each scenario is a dict with:
         - 'response': str - The text response to stream
         - 'pattern': str - Optional regex pattern to match against prompts
+        - 'thinking': str - Optional thinking text to stream before response
 
         Example:
             agent.configure_scenarios([
                 {
                     'pattern': r'hello|hi',
-                    'response': 'Hello! How can I help you today?'
+                    'response': 'Hello! How can I help you today?',
+                    'thinking': 'The user is greeting me. I should respond politely.'
                 },
                 {
                     'pattern': r'calculate|sum',
                     'response': 'Let me calculate that for you.\\n\\n```python\\nresult = 2 + 2\\nprint(result)\\n```',
+                    'thinking': 'I need to write Python code to perform this calculation.'
                 }
             ])
         """
         self.scenarios = scenarios
         self.current_scenario_index = 0
 
-    def add_scenario(self, response: str, pattern: str | None = None) -> None:
+    def add_scenario(self, response: str, pattern: str | None = None, thinking: str | None = None) -> None:
         """Add a single scenario to the configuration.
 
         Args:
             response: The text response to stream
             pattern: Optional regex pattern to match against prompts
+            thinking: Optional thinking text to stream before response
         """
-        self.scenarios.append({
+        scenario = {
             'response': response,
             'pattern': pattern
-        })
+        }
+        if thinking is not None:
+            scenario['thinking'] = thinking
+        self.scenarios.append(scenario)
 
     def set_default_response(self, response: str) -> None:
         """Set the default response when no scenarios match."""
         self.default_response = response
+
+    def set_default_thinking(self, thinking: str | None) -> None:
+        """Set the default thinking text when no scenarios match."""
+        self.default_thinking = thinking
 
     def _find_matching_scenario(self, prompt: str) -> dict[str, Any] | None:
         """Find a scenario that matches the given prompt."""
@@ -135,7 +152,7 @@ class SimulatedAgent(AgentBase):
         Args:
             prompt: The user's prompt
             on_chunk: Optional callback for streaming response chunks
-            on_thinking_chunk: Optional callback for streaming thinking chunks (ignored)
+            on_thinking_chunk: Optional callback for streaming thinking chunks
 
         Returns:
             AgentResponse with the simulated response
@@ -153,8 +170,17 @@ class SimulatedAgent(AgentBase):
 
         if scenario:
             response_text = scenario['response']
+            thinking_text = scenario.get('thinking')
         else:
             response_text = self.default_response
+            thinking_text = self.default_thinking
+
+        # Stream thinking text if available
+        if thinking_text and on_thinking_chunk:
+            logger.info(f"[SimulatedAgent] Streaming thinking ({len(thinking_text)} chars)")
+            for char in thinking_text:
+                on_thinking_chunk(char)
+                await asyncio.sleep(self.response_delay)
 
         # Stream the response text
         if on_chunk:
@@ -219,11 +245,21 @@ class ScriptedAgent(SimulatedAgent):
     ) -> AgentResponse:
         """Send a prompt and return the next scripted response."""
         if self.current_scenario_index < len(self.scenarios):
-            response_text = self.scenarios[self.current_scenario_index]['response']
+            scenario = self.scenarios[self.current_scenario_index]
+            response_text = scenario['response']
+            thinking_text = scenario.get('thinking')
             self.current_scenario_index += 1
         else:
             response_text = "[Script completed]"
+            thinking_text = None
 
+        # Stream thinking text if available
+        if thinking_text and on_thinking_chunk:
+            for char in thinking_text:
+                on_thinking_chunk(char)
+                await asyncio.sleep(self.response_delay)
+
+        # Stream response text
         if on_chunk:
             for char in response_text:
                 on_chunk(char)
@@ -242,15 +278,18 @@ class EchoAgent(SimulatedAgent):
         self,
         prefix: str = "You said: ",
         system_prompt: str | None = None,
+        thinking_text: str | None = None,
     ):
         """Initialize the echo agent.
 
         Args:
             prefix: Prefix to add before echoing the input
             system_prompt: System prompt (for API compatibility)
+            thinking_text: Optional thinking text to stream before echoing
         """
         super().__init__(system_prompt)
         self.prefix = prefix
+        self.echo_thinking = thinking_text
 
     async def send_prompt(
         self,
@@ -262,6 +301,13 @@ class EchoAgent(SimulatedAgent):
         logger.info(f"[EchoAgent] Sending prompt: {prompt}")
         response_text = f"{self.prefix}{prompt}"
 
+        # Stream thinking text if configured
+        if self.echo_thinking and on_thinking_chunk:
+            for char in self.echo_thinking:
+                on_thinking_chunk(char)
+                await asyncio.sleep(self.response_delay)
+
+        # Stream response text
         if on_chunk:
             for char in response_text:
                 on_chunk(char)

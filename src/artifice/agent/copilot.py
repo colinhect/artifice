@@ -136,13 +136,17 @@ class CopilotAgent(AgentBase):
             unsubscribe = None
             if on_chunk:
                 def handle_delta(event):
-                    if event.type.value == "assistant.message_delta":
-                        try:
+                    try:
+                        if event.type.value == "assistant.reasoning_delta" and on_thinking_chunk:
+                            delta = event.data.delta_content
+                            if delta:
+                                on_thinking_chunk(delta)
+                        elif event.type.value == "assistant.message_delta":
                             delta = event.data.delta_content
                             if delta:
                                 on_chunk(delta)
-                        except Exception as e:
-                            logger.error(f"[CopilotAgent] Delta handler error: {e}")
+                    except Exception as e:
+                        logger.error(f"[CopilotAgent] Delta handler error: {e}")
 
                 unsubscribe = session.on(handle_delta)
 
