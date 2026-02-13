@@ -5,17 +5,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rich.text import Text
+from rich.style import Style
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Static, TextArea, Input, LoadingIndicator
+from textual.widgets.text_area import TextAreaTheme
 from textual import events
 from textual_autocomplete import AutoComplete, DropdownItem, TargetState
 
 if TYPE_CHECKING:
     from .history import History
-
 
 class HistoryAutoComplete(AutoComplete):
     """Custom AutoComplete that applies completion to a TextArea."""
@@ -63,6 +64,7 @@ class InputTextArea(TextArea):
     def set_syntax_highlighting(self, language: str) -> None:
         """Enable or disable Python syntax highlighting."""
         self.language = language
+        self.theme="vscode_dark"
 
     def set_focused_placeholder(self, text: str) -> None:
         """Set the placeholder text to show when focused."""

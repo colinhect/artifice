@@ -275,6 +275,7 @@ class StreamingFenceDetector:
                 self._current_block.update_code(existing + self._chunk_buffer)
             elif isinstance(self._current_block, AgentOutputBlock):
                 self._current_block.append(self._chunk_buffer)
+                self._current_block.flush()
 
     def _remove_block(self, block: BaseBlock) -> None:
         """Remove a block from tracking lists and the DOM."""
@@ -306,6 +307,7 @@ class StreamingFenceDetector:
 
         # Mark the last block as complete
         if isinstance(self._current_block, AgentOutputBlock):
+            self._current_block.flush()  # Ensure final content is rendered
             self._current_block.mark_success()
 
         # Finalize all blocks: switch from streaming mode to final rendering
@@ -313,6 +315,7 @@ class StreamingFenceDetector:
             if isinstance(block, CodeInputBlock):
                 block.finish_streaming()
             elif isinstance(block, AgentOutputBlock):
+                block.flush()  # Ensure all content is rendered before finalizing
                 block.finalize_streaming()
 
         # Remove empty AgentOutputBlocks (keep first_agent_block for status indicator)
@@ -674,8 +677,10 @@ class ArtificeTerminal(Widget):
                 if response.error:
                     # Show the error message in the block
                     self._current_detector.first_agent_block.append(f"\n**Error:** {response.error}\n")
+                    self._current_detector.first_agent_block.flush()
                     self._current_detector.first_agent_block.mark_failed()
                 else:
+                    self._current_detector.first_agent_block.flush()
                     self._current_detector.first_agent_block.mark_success()
 
         # Auto-highlight the last CodeInputBlock from this agent response

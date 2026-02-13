@@ -216,6 +216,10 @@ class CodeOutputBlock(BaseBlock):
     CodeOutputBlock .markdown-output MarkdownTable {
         width: auto;
     }
+
+    CodeOutputBlock .markdown-output MarkdownH1 {
+        text-align: left;
+    }
     """
 
     def __init__(self, output="", render_markdown=False, in_context=False) -> None:
@@ -361,6 +365,10 @@ class AgentOutputBlock(BaseBlock):
         width: auto;
     }
 
+    AgentOutputBlock .agent-output MarkdownH1 {
+        text-align: left;
+    }
+
     AgentOutputBlock .text-output {
         padding: 0;
         margin: 0;
@@ -375,6 +383,7 @@ class AgentOutputBlock(BaseBlock):
         self._full = output
         self._render_markdown = render_markdown
         self._streaming = activity
+        self._dirty = False  # True when _full has changed but widget not yet updated
         self._contents = Horizontal()
         self.add_class("in-context")
 
@@ -400,6 +409,13 @@ class AgentOutputBlock(BaseBlock):
 
     def append(self, response) -> None:
         self._full += response
+        self._dirty = True
+
+    def flush(self) -> None:
+        """Push accumulated text to the widget. Call after batching appends."""
+        if not self._dirty:
+            return
+        self._dirty = False
         # Update the appropriate widget (Markdown or Static)
         if self._markdown:
             self._markdown.update(self._full)
