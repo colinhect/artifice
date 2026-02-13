@@ -146,6 +146,34 @@ class TestScriptedAgent:
         assert resp.text == "[Script completed]"
 
 
+class TestOnThinkingChunkParameter:
+    @pytest.mark.asyncio
+    async def test_simulated_agent_accepts_on_thinking_chunk(self):
+        """SimulatedAgent.send_prompt should accept on_thinking_chunk without error."""
+        agent = SimulatedAgent(response_delay=0)
+        agent.set_default_response("reply")
+        thinking_chunks = []
+        resp = await agent.send_prompt(
+            "test", on_chunk=None, on_thinking_chunk=lambda c: thinking_chunks.append(c)
+        )
+        assert resp.text == "reply"
+        # Simulated agent doesn't produce thinking, so no chunks expected
+        assert thinking_chunks == []
+
+    @pytest.mark.asyncio
+    async def test_scripted_agent_accepts_on_thinking_chunk(self):
+        agent = ScriptedAgent(script=[{"response": "ok"}], response_delay=0)
+        resp = await agent.send_prompt("test", on_thinking_chunk=lambda c: None)
+        assert resp.text == "ok"
+
+    @pytest.mark.asyncio
+    async def test_echo_agent_accepts_on_thinking_chunk(self):
+        agent = EchoAgent(prefix="")
+        agent.response_delay = 0
+        resp = await agent.send_prompt("hi", on_thinking_chunk=lambda c: None)
+        assert resp.text == "hi"
+
+
 class TestEchoAgent:
     @pytest.mark.asyncio
     async def test_echoes_input(self):

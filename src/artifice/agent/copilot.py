@@ -115,7 +115,10 @@ class CopilotAgent(AgentBase):
                 logger.error(f"[CopilotAgent] Error destroying session: {e}")
 
     async def send_prompt(
-        self, prompt: str, on_chunk: Optional[Callable] = None
+        self,
+        prompt: str,
+        on_chunk: Optional[Callable] = None,
+        on_thinking_chunk: Optional[Callable] = None,
     ) -> AgentResponse:
         """Send a prompt to Copilot and stream the response.
 

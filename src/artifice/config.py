@@ -28,6 +28,7 @@ class ArtificeConfig:
 
         # Provider-specific settings
         self.ollama_host: Optional[str] = None  # e.g., http://localhost:11434
+        self.thinking_budget: Optional[int] = None  # Extended thinking token budget
         
         # Display settings
         self.banner: bool = False

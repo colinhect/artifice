@@ -128,12 +128,14 @@ class SimulatedAgent(AgentBase):
         self,
         prompt: str,
         on_chunk: Callable[[str], None] | None = None,
+        on_thinking_chunk: Callable[[str], None] | None = None,
     ) -> AgentResponse:
         """Send a prompt to the simulated agent.
 
         Args:
             prompt: The user's prompt
             on_chunk: Optional callback for streaming response chunks
+            on_thinking_chunk: Optional callback for streaming thinking chunks (ignored)
 
         Returns:
             AgentResponse with the simulated response
@@ -213,6 +215,7 @@ class ScriptedAgent(SimulatedAgent):
         self,
         prompt: str,
         on_chunk: Callable[[str], None] | None = None,
+        on_thinking_chunk: Callable[[str], None] | None = None,
     ) -> AgentResponse:
         """Send a prompt and return the next scripted response."""
         if self.current_scenario_index < len(self.scenarios):
@@ -253,6 +256,7 @@ class EchoAgent(SimulatedAgent):
         self,
         prompt: str,
         on_chunk: Callable[[str], None] | None = None,
+        on_thinking_chunk: Callable[[str], None] | None = None,
     ) -> AgentResponse:
         """Echo the prompt back with the configured prefix."""
         logger.info(f"[EchoAgent] Sending prompt: {prompt}")

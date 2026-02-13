@@ -81,14 +81,20 @@ class SessionTranscript:
             Markdown representation of the block
         """
         from .terminal_output import (
-            CodeInputBlock, CodeOutputBlock, 
-            AgentInputBlock, AgentOutputBlock
+            CodeInputBlock, CodeOutputBlock,
+            AgentInputBlock, AgentOutputBlock, ThinkingOutputBlock
         )
-        
+
         if isinstance(block, AgentInputBlock):
             prompt = block.get_prompt()
             return f"## User\n\n{prompt}"
-        
+
+        elif isinstance(block, ThinkingOutputBlock):
+            content = block._full.strip()
+            if content:
+                return f"## Thinking\n\n<details>\n<summary>Thinking</summary>\n\n{content}\n\n</details>"
+            return ""
+
         elif isinstance(block, AgentOutputBlock):
             content = block._full.strip()
             if content:

@@ -154,6 +154,7 @@ def main():
     parser.add_argument("--prompt-prefix", default=None, help="Prefix to user prompts")
     parser.add_argument("--banner", action="store_true", default=None, help="Show the banner")
     parser.add_argument("--fullscreen", action="store_true", default=None, help="Full screen")
+    parser.add_argument("--thinking-budget", type=int, default=None, help="Extended thinking token budget (enables thinking)")
     parser.add_argument("--logging", action="store_true", default=None, help="Enable logging")
     args = parser.parse_args()
 
@@ -171,6 +172,8 @@ def main():
         config.system_prompt = args.system_prompt
     if args.prompt_prefix:
         config.prompt_prefix = args.prompt_prefix
+    if args.thinking_budget is not None:
+        config.thinking_budget = args.thinking_budget
     if args.logging:
         import logging
         logging.basicConfig(

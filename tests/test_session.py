@@ -80,7 +80,7 @@ class TestBlockToMarkdown:
         """Helper to create session and convert a fake block."""
         from artifice.terminal_output import (
             CodeInputBlock, CodeOutputBlock,
-            AgentInputBlock, AgentOutputBlock
+            AgentInputBlock, AgentOutputBlock, ThinkingOutputBlock
         )
         config = make_config()
         s = SessionTranscript(tmp_sessions_dir, config)
@@ -88,6 +88,7 @@ class TestBlockToMarkdown:
         type_map = {
             "AgentInputBlock": AgentInputBlock,
             "AgentOutputBlock": AgentOutputBlock,
+            "ThinkingOutputBlock": ThinkingOutputBlock,
             "CodeInputBlock": CodeInputBlock,
             "CodeOutputBlock": CodeOutputBlock,
         }
@@ -98,6 +99,8 @@ class TestBlockToMarkdown:
 
         if block_type == "AgentInputBlock":
             block.get_prompt.return_value = kwargs.get("prompt", "test")
+        elif block_type == "ThinkingOutputBlock":
+            block._full = kwargs.get("text", "thinking content")
         elif block_type == "AgentOutputBlock":
             block._full = kwargs.get("text", "response")
         elif block_type == "CodeInputBlock":
@@ -141,4 +144,15 @@ class TestBlockToMarkdown:
 
     def test_code_output_empty(self, tmp_sessions_dir):
         md = self._convert(tmp_sessions_dir, "CodeOutputBlock", output="   ")
+        assert md == ""
+
+    def test_thinking_output(self, tmp_sessions_dir):
+        md = self._convert(tmp_sessions_dir, "ThinkingOutputBlock", text="Let me think about this...")
+        assert "## Thinking" in md
+        assert "<details>" in md
+        assert "Let me think about this..." in md
+        assert "</details>" in md
+
+    def test_thinking_output_empty(self, tmp_sessions_dir):
+        md = self._convert(tmp_sessions_dir, "ThinkingOutputBlock", text="   ")
         assert md == ""

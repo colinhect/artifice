@@ -12,6 +12,15 @@ class TestArtificeConfig:
         assert c.agent_markdown is True
         assert c.python_markdown is False
         assert c.save_sessions is True
+        assert c.thinking_budget is None
+
+    def test_thinking_budget_set_via_config(self, monkeypatch, tmp_path):
+        init_file = tmp_path / "init.py"
+        init_file.write_text("config.thinking_budget = 10000\n")
+        monkeypatch.setattr("artifice.config.get_init_script_path", lambda: init_file)
+        config, error = load_config()
+        assert error is None
+        assert config.thinking_budget == 10000
 
     def test_custom_settings(self):
         c = ArtificeConfig()

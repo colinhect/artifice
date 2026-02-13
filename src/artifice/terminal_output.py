@@ -466,6 +466,46 @@ class AgentOutputBlock(BufferedOutputBlock):
         self._status_indicator.styles.display = "block"
 
 
+class ThinkingOutputBlock(AgentOutputBlock):
+    """Block for displaying AI agent thinking/reasoning content.
+
+    Visually distinct from regular agent output with dimmed styling
+    and a left border accent.
+    """
+
+    DEFAULT_CSS = """
+    ThinkingOutputBlock {
+        opacity: 60%;
+        border-left: solid $accent;
+    }
+
+    ThinkingOutputBlock .thinking-label {
+        color: $accent;
+        text-style: italic;
+        padding: 0;
+        margin: 0;
+    }
+    """
+
+    def __init__(self, output="", activity=True) -> None:
+        super().__init__(output=output, activity=activity, render_markdown=False)
+        self._label = Static("Thinking...", classes="thinking-label")
+
+    def compose(self) -> ComposeResult:
+        yield self._label
+        with self._contents:
+            yield self._loading_indicator
+            yield self._status_indicator
+            if self._markdown:
+                yield self._markdown
+            elif self._output is not None:
+                yield self._output
+
+    def mark_success(self) -> None:
+        super().mark_success()
+        self._label.update("Thinking")
+
+
 class HighlightableContainerMixin:
     """Mixin for containers that support block highlighting and navigation."""
 

@@ -19,7 +19,7 @@ from .agent import AgentBase
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
-from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput, BaseBlock
+from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, ThinkingOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput, BaseBlock
 from .config import get_sessions_dir, ensure_sessions_dir
 from .session import SessionTranscript
 
@@ -40,6 +40,14 @@ class _FenceState(enum.Enum):
 
 class StreamChunk(Message):
     """Message posted when a chunk of streamed text arrives."""
+
+    def __init__(self, text: str) -> None:
+        super().__init__()
+        self.text = text
+
+
+class StreamThinkingChunk(Message):
+    """Message posted when a chunk of streamed thinking text arrives."""
 
     def __init__(self, text: str) -> None:
         super().__init__()
@@ -453,7 +461,7 @@ class ArtificeTerminal(Widget):
         system_prompt = self._config.system_prompt
         if app.provider.lower() == "claude":
             from .agent import ClaudeAgent
-            self._agent = ClaudeAgent(model=model, system_prompt=system_prompt)
+            self._agent = ClaudeAgent(model=model, system_prompt=system_prompt, thinking_budget=self._config.thinking_budget)
         elif app.provider.lower() == "copilot":
             from .agent import CopilotAgent
             self._agent = CopilotAgent(model=model, system_prompt=system_prompt)
@@ -478,6 +486,9 @@ class ArtificeTerminal(Widget):
         self._current_detector: StreamingFenceDetector | None = None  # Active streaming detector
         self._chunk_buffer: str = ""  # Buffer for batching StreamChunk messages
         self._chunk_processing_scheduled: bool = False  # Flag to avoid duplicate batch processing
+        self._thinking_block: ThinkingOutputBlock | None = None  # Active thinking block
+        self._thinking_buffer: str = ""  # Buffer for batching thinking chunks
+        self._thinking_processing_scheduled: bool = False  # Flag to avoid duplicate batch processing
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -641,10 +652,23 @@ class ArtificeTerminal(Widget):
         def on_chunk(text):
             self.post_message(StreamChunk(text))
 
+        def on_thinking_chunk(text):
+            self.post_message(StreamThinkingChunk(text))
+
         if self._config.prompt_prefix:
             prompt = self._config.prompt_prefix + " " + prompt
 
-        response = await agent.send_prompt(prompt, on_chunk=on_chunk)
+        response = await agent.send_prompt(prompt, on_chunk=on_chunk, on_thinking_chunk=on_thinking_chunk)
+
+        # Flush any remaining buffered thinking chunks
+        if self._thinking_buffer:
+            self._process_thinking_buffer()
+        # Finalize thinking block
+        if self._thinking_block:
+            self._thinking_block.finalize_streaming()
+            self._thinking_block.mark_success()
+            self._save_block_to_session(self._thinking_block)
+            self._thinking_block = None
 
         # Flush any remaining buffered chunks and finalize directly
         # (no message-based race — send_prompt has returned, no more chunks coming)
@@ -805,6 +829,30 @@ class ArtificeTerminal(Widget):
         # Reset scheduling flag to allow next batch
         self._chunk_processing_scheduled = False
 
+
+    def on_stream_thinking_chunk(self, event: StreamThinkingChunk) -> None:
+        """Handle streaming thinking chunk message - buffer and batch process."""
+        self._thinking_buffer += event.text
+        if not self._thinking_processing_scheduled:
+            self._thinking_processing_scheduled = True
+            self.call_later(self._process_thinking_buffer)
+
+    def _process_thinking_buffer(self) -> None:
+        """Process all accumulated thinking chunks in the buffer at once."""
+        if self._thinking_buffer:
+            text = self._thinking_buffer
+            self._thinking_buffer = ""
+            try:
+                # Lazily create thinking block on first chunk
+                if self._thinking_block is None:
+                    self._thinking_block = ThinkingOutputBlock(activity=True)
+                    self.output.append_block(self._thinking_block)
+                self._thinking_block.append(text)
+                self._thinking_block.flush()
+                self.output.scroll_end(animate=False)
+            except Exception:
+                logger.exception("Error processing thinking buffer")
+        self._thinking_processing_scheduled = False
 
     def action_clear(self) -> None:
         """Clear the output."""

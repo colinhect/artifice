@@ -64,7 +64,10 @@ class OllamaAgent(AgentBase):
         self.messages = []
 
     async def send_prompt(
-        self, prompt: str, on_chunk: Optional[Callable] = None
+        self,
+        prompt: str,
+        on_chunk: Optional[Callable] = None,
+        on_thinking_chunk: Optional[Callable] = None,
     ) -> AgentResponse:
         """Send a prompt to Ollama and stream the response.
 
