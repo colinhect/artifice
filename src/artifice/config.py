@@ -23,6 +23,7 @@ class ArtificeConfig:
         # Agent settings
         self.provider: Optional[str] = None  # claude, copilot, ollama, simulated
         self.model: Optional[str] = None  # claude-sonnet-4-5, gpt-4, llama3.2:1b, etc
+        self.system_prompt: Optional[str] = None
         
         # Provider-specific settings
         self.ollama_host: Optional[str] = None  # e.g., http://localhost:11434

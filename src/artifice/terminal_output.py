@@ -81,7 +81,6 @@ class BaseBlock(Static):
 class CodeInputBlock(BaseBlock):
     DEFAULT_CSS = """
     CodeInputBlock .code {
-        background: $background-darken-3;
         padding: 0;
         border: none;
     }
@@ -92,7 +91,6 @@ class CodeInputBlock(BaseBlock):
     }
 
     CodeInputBlock .code-unused {
-        background: $surface-darken-1;
         padding: 0;
         border: none;
     }
@@ -341,7 +339,6 @@ class AgentInputBlock(BaseBlock):
 class AgentOutputBlock(BaseBlock):
     DEFAULT_CSS = """
     AgentOutputBlock .agent-output {
-        background: $surface-darken-1;
         padding-left: 0;
         padding-right: 0;
         layout: stream;
@@ -365,7 +362,6 @@ class AgentOutputBlock(BaseBlock):
     }
 
     AgentOutputBlock .text-output {
-        background: $surface-darken-1;
         padding: 0;
         margin: 0;
     }

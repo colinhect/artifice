@@ -434,6 +434,9 @@ class ArtificeTerminal(Widget):
             "If you give more than one option then the first is considered the main option. "
             "Always use ```python or ```shell to mark code or shell command."
         )
+
+        if self._config.system_prompt:
+            system_prompt += "\n\n" + self._config.system_prompt
         
         # Create agent
         self._agent = None
@@ -446,7 +449,10 @@ class ArtificeTerminal(Widget):
                 self._agent = ClaudeAgent(system_prompt=system_prompt)
         elif app.provider.lower() == "copilot":
             from .agent import CopilotAgent
-            self._agent = CopilotAgent(system_prompt=system_prompt)
+            if self._config.model:
+                self._agent = CopilotAgent(model=self._config.model, system_prompt=system_prompt)
+            else:
+                self._agent = CopilotAgent(system_prompt=system_prompt)
         elif app.provider.lower() == "simulated":
             from artifice.agent.simulated import SimulatedAgent
             self._agent = SimulatedAgent(response_delay=0.0001)

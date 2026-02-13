@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import threading
+import time
 import traceback
 from io import StringIO
 from queue import Queue
@@ -151,6 +152,21 @@ class CodeExecutor:
                     except Exception as exec_error:
                         # Error during exec - re-raise without showing the eval attempt
                         raise exec_error from None
+
+                # Keep streams captured for debounce period to catch delayed output
+                debounce_period = 3.0
+                start_time = time.time()
+                last_output_time = start_time
+                
+                while time.time() - last_output_time < debounce_period:
+                    # Check if there's been any new output
+                    current_size = len(captured_stdout.getvalue()) + len(captured_stderr.getvalue())
+                    time.sleep(0.1)  # Brief sleep to avoid busy-waiting
+                    new_size = len(captured_stdout.getvalue()) + len(captured_stderr.getvalue())
+                    
+                    if new_size > current_size:
+                        # New output detected, reset the debounce timer
+                        last_output_time = time.time()
 
                 return result_value, captured_stdout.getvalue(), captured_stderr.getvalue()
             except Exception as e:

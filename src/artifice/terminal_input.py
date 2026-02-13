@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -67,15 +68,15 @@ class InputTextArea(TextArea):
         """Set the placeholder text to show when focused."""
         self._focused_placeholder = text
         if self.has_focus:
-            self.placeholder = text
+            self.placeholder = str(Text.from_markup(text))
 
     def on_focus(self) -> None:
         """Update placeholder when gaining focus."""
-        self.placeholder = self._focused_placeholder
+        self.placeholder = str(Text.from_markup(self._focused_placeholder))
 
     def on_blur(self) -> None:
         """Update placeholder when losing focus."""
-        self.placeholder = self._unfocused_placeholder
+        self.placeholder = str(Text.from_markup(self._unfocused_placeholder))
 
     async def _on_key(self, event: events.Key) -> None:
         """Intercept key events before TextArea processes them."""
@@ -347,7 +348,7 @@ class TerminalInput(Static):
         with self.app.batch_update():
             if self.mode == "ai":
                 prompt_widget.update(self._ai_prompt)
-                text_area.set_focused_placeholder("ai prompt...       [cyan]][/] python  [cyan]$[/] shell")
+                text_area.set_focused_placeholder("ai prompt...       [red]][/] python  [cyan]$[/] shell")
                 text_area.set_syntax_highlighting(None)
             elif self.mode == "shell":
                 prompt_widget.update(self._shell_prompt)
@@ -522,7 +523,7 @@ class TerminalInput(Static):
         prompt_display.styles.display = "none"
 
         # Change placeholder to show cancel instruction
-        text_area.placeholder = " [cyan]ctrl+c[/] to cancel"
+        text_area.placeholder = str(Text.from_markup(" [cyan]ctrl+c[/] to cancel"))
 
         # Disable text area (but ctrl+c still works via action bindings)
         #text_area.disabled = True

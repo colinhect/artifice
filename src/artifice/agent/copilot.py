@@ -77,6 +77,9 @@ class CopilotAgent(AgentBase):
             session_config = {
                 "model": self.model,
                 "streaming": True,
+                "tools": [],
+                "available_tools": [],
+                "infinite_sessions": {"enabled":False}
             }
 
             # Add system message if provided
@@ -127,7 +130,7 @@ class CopilotAgent(AgentBase):
             unsubscribe = None
             if on_chunk:
                 def handle_delta(event):
-                    if event.type == "assistant.message.delta":
+                    if event.type.value == "assistant.message_delta":
                         try:
                             delta = event.data.delta_content
                             if delta:
@@ -151,13 +154,13 @@ class CopilotAgent(AgentBase):
                     text="", error="Timeout waiting for Copilot response"
                 )
 
-            if response.type == "session.error":
+            if response.type.value == "session.error":
                 error_msg = getattr(
                     response.data, "message", str(response.data)
                 )
                 return AgentResponse(text="", error=error_msg)
 
-            if response.type == "assistant.message":
+            if response.type.value == "assistant.message":
                 content = response.data.content or ""
                 # If streaming was off or no deltas arrived, send full text
                 if content and on_chunk and not unsubscribe:

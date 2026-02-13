@@ -7,20 +7,14 @@ from textual.widgets import Footer, Static
 from artifice import ArtificeTerminal
 from artifice.config import load_config, ArtificeConfig
 
-import logging
-
-# Only log agent interactions, not other modules
-
-
-logging.basicConfig(
-  level=logging.INFO,
-  format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-  filename='artifice_agent.log',
-  filemode='a'  # append mode
-)
-
-logging.getLogger('artifice.agent').setLevel(logging.INFO)
-
+#import logging
+#logging.basicConfig(
+#  level=logging.INFO,
+#  format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#  filename='artifice_agent.log',
+#  filemode='a'  # append mode
+#)
+#logging.getLogger('artifice.agent').setLevel(logging.DEBUG)
 
 class ArtificeHeader(Static):
     """Custom header with gradient fade effect."""
@@ -48,9 +42,6 @@ class ArtificeHeader(Static):
         self.banner = banner
 
     def compose(self) -> ComposeResult:
-        # Create a gradient bar using Unicode box-drawing characters
-        # Start with a solid block from the left (matching in-context border) and fade right
-        # Extended gradient for a more interesting fade effect
         gradient_chars = ["█", "█", "▓", "▓", "▒", "▒", "░", "░", "·", "·", " "]
 
         header_content = ""
@@ -61,6 +52,42 @@ class ArtificeHeader(Static):
         
         header_content += "".join(gradient_chars)
         yield Static(header_content, classes="header-bar")
+
+from textual.theme import Theme
+def create_artifice_theme() -> Theme:
+    black = "#07080A" 
+    dark_gray = "#3B4252" 
+    gray = "#434C5E" 
+    light_gray = "#4C566A" 
+    light_gray_bright = "#616E88" 
+    darkest_white = "#D8DEE9" 
+    darker_white = "#E5E9F0" 
+    white = "#ECEFF4" 
+    teal = "#8FBCBB" 
+    off_blue = "#88C0D0" 
+    glacier = "#81A1C1" 
+    blue = "#5E81AC" 
+    red = "#BF616A" 
+    orange = "#D08770" 
+    yellow = "#EBCB8B" 
+    green = "#A3BE8C" 
+    purple = "#B48EAD" 
+    none = "NONE"
+
+    return Theme(
+        name="artifice",
+        primary=blue,
+        secondary=green,
+        accent=teal,
+        foreground=white,
+        #background=black,
+        success=green,
+        warning=glacier,
+        error=red,
+        surface=dark_gray,
+        panel=gray,
+        dark=True,
+    )
 
 
 class ArtificeApp(App):
@@ -111,6 +138,10 @@ class ArtificeApp(App):
         footer.display = False
         yield footer
 
+    def on_mount(self) -> None:
+        self.register_theme(create_artifice_theme())
+        self.theme = "artifice"
+
     def action_toggle_footer(self) -> None:
         """Toggle the visibility of the footer."""
         footer = self.query_one(Footer)
@@ -127,8 +158,10 @@ def main():
         default=None,
         help="Type of agent to use (claude, copilot, ollama, or simulated). Overrides config."
     )
-    parser.add_argument("--banner", action="store_true", default=None, help="Show the banner")
     parser.add_argument("--model", default=None, help="Model to use (overrides config)")
+    parser.add_argument("--system-prompt", default=None, help="System prompt to use for the agent")
+    parser.add_argument("--banner", action="store_true", default=None, help="Show the banner")
+    parser.add_argument("--fullscreen", action="store_true", default=None, help="Full screen")
     args = parser.parse_args()
 
     # Load configuration from ~/.config/artifice/init.py
@@ -141,6 +174,8 @@ def main():
         config.banner = args.banner
     if args.model is not None:
         config.model = args.model
+    if args.system_prompt:
+        config.system_prompt = args.system_prompt
 
     app = ArtificeApp(config)
     
@@ -148,7 +183,10 @@ def main():
     if config_error:
         app.call_later(lambda: app.notify(f"Config error: {config_error}", severity="warning", timeout=10))
     
-    app.run(inline=True, inline_no_clear=True)
+    if args.fullscreen:
+        app.run()
+    else:
+        app.run(inline=True, inline_no_clear=True)
 
 
 if __name__ == "__main__":
