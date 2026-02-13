@@ -301,7 +301,7 @@ class TerminalInput(Static):
         self.query_one("#activity-indicator", LoadingIndicator).styles.display = "none"
         self._update_prompt()
 
-    def on_terminal_input_submit_requested(self, event: SubmitRequested) -> None:
+    def on_terminal_input_submit_requested(self, _: SubmitRequested) -> None:
         """Handle submission request from TextArea."""
         self.action_submit()
 
@@ -315,7 +315,7 @@ class TerminalInput(Static):
             self.mode = mode
             self._update_prompt()
 
-    def on_terminal_input_cycle_mode(self, event: CycleMode) -> None:
+    def on_terminal_input_cycle_mode(self, _: CycleMode) -> None:
         """Handle Insert key press - cycle through modes while keeping input."""
         # Cycle: python -> ai -> shell -> python
         if self.mode == "python":
@@ -326,11 +326,11 @@ class TerminalInput(Static):
             self.mode = "python"
         self._update_prompt()
 
-    def on_terminal_input_history_previous(self, event: HistoryPrevious) -> None:
+    def on_terminal_input_history_previous(self, _: HistoryPrevious) -> None:
         """Handle up arrow key press at top of input - navigate to previous history."""
         self.action_history_back()
 
-    def on_terminal_input_history_next(self, event: HistoryNext) -> None:
+    def on_terminal_input_history_next(self, _: HistoryNext) -> None:
         """Handle down arrow key press at bottom of input - navigate to next history."""
         self.action_history_forward()
 
@@ -393,7 +393,7 @@ class TerminalInput(Static):
         if entry is not None:
             self.code = entry
 
-    def on_terminal_input_history_search_requested(self, event: HistorySearchRequested) -> None:
+    def on_terminal_input_history_search_requested(self, _: HistorySearchRequested) -> None:
         """Handle CTRL+R to enter history search mode."""
         self.action_history_search()
 
@@ -425,6 +425,9 @@ class TerminalInput(Static):
         def get_history_candidates(state: TargetState) -> list[DropdownItem]:
             """Get filtered history items based on search input."""
             search_text = state.text.lower()
+
+            if self._history is None:
+                return []
 
             # Get history for current mode
             if self.mode == "ai":

@@ -127,7 +127,7 @@ class CodeExecutor:
 
         return result
 
-    def _execute_sync(self, code: str, output_queue: Queue) -> tuple[Any, str, str]:
+    def _execute_sync(self, code: str, output_queue: Queue, debounce: bool = False) -> tuple[Any, str, str]:
         """Execute code synchronously (called in thread pool)."""
         with self._exec_lock:
             old_stdout, old_stderr = sys.stdout, sys.stderr
@@ -153,7 +153,7 @@ class CodeExecutor:
                         # Error during exec - re-raise without showing the eval attempt
                         raise exec_error from None
 
-                if False:
+                if debounce:
                     # Keep streams captured for debounce period to catch delayed output
                     debounce_period = 3.0
                     start_time = time.time()

@@ -214,7 +214,7 @@ class BufferedOutputBlock(BaseBlock):
 
     def __init__(self, output="", render_markdown=False) -> None:
         super().__init__()
-        self._full = output
+        self._full: str = output
         self._render_markdown = render_markdown
         self._dirty = False
         self._contents = Horizontal()
@@ -316,10 +316,6 @@ class CodeOutputBlock(BufferedOutputBlock):
                 # Apply error styling to markdown output as well
                 self._markdown.remove_class("markdown-output")
                 self._markdown.add_class("error-output")
-
-    def _format_plain_text(self) -> str:
-        """Convert ANSI escape codes to Textual markup."""
-        return ansi_to_textual(self._full.rstrip('\n'))
 
 class WidgetOutputBlock(BaseBlock):
     """Block that displays an arbitrary Textual widget."""

@@ -135,16 +135,6 @@ class TestPersistence:
         assert h2._ai_history == ["ai_cmd"]
         assert h2._shell_history == ["sh_cmd"]
 
-    def test_load_old_format(self, tmp_history_file):
-        """Old format was a plain list - should be loaded as Python history."""
-        with open(tmp_history_file, "w") as f:
-            json.dump(["old1", "old2"], f)
-
-        h = History(history_file=tmp_history_file)
-        assert h._python_history == ["old1", "old2"]
-        assert h._ai_history == []
-        assert h._shell_history == []
-
     def test_load_corrupted_json(self, tmp_history_file):
         with open(tmp_history_file, "w") as f:
             f.write("{invalid json!!!")

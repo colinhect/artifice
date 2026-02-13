@@ -46,24 +46,24 @@ class ArtificeHeader(Static):
 
 from textual.theme import Theme
 def create_artifice_theme() -> Theme:
-    black = "#07080A" 
+    #black = "#07080A" 
     dark_gray = "#3B4252" 
     gray = "#434C5E" 
-    light_gray = "#4C566A" 
-    light_gray_bright = "#616E88" 
-    darkest_white = "#D8DEE9" 
-    darker_white = "#E5E9F0" 
+    #light_gray = "#4C566A" 
+    #light_gray_bright = "#616E88" 
+    #darkest_white = "#D8DEE9" 
+    #darker_white = "#E5E9F0" 
     white = "#ECEFF4" 
     teal = "#8FBCBB" 
-    off_blue = "#88C0D0" 
+    #off_blue = "#88C0D0" 
     glacier = "#81A1C1" 
     blue = "#5E81AC" 
     red = "#BF616A" 
-    orange = "#D08770" 
-    yellow = "#EBCB8B" 
+    #orange = "#D08770" 
+    #yellow = "#EBCB8B" 
     green = "#A3BE8C" 
-    purple = "#B48EAD" 
-    none = "NONE"
+    #purple = "#B48EAD" 
+    #none = "NONE"
 
     return Theme(
         name="artifice",
@@ -151,6 +151,7 @@ def main():
     )
     parser.add_argument("--model", default=None, help="Model to use (overrides config)")
     parser.add_argument("--system-prompt", default=None, help="System prompt to use for the agent")
+    parser.add_argument("--prompt-prefix", default=None, help="Prefix to user prompts")
     parser.add_argument("--banner", action="store_true", default=None, help="Show the banner")
     parser.add_argument("--fullscreen", action="store_true", default=None, help="Full screen")
     parser.add_argument("--logging", action="store_true", default=None, help="Enable logging")
@@ -168,6 +169,8 @@ def main():
         config.model = args.model
     if args.system_prompt:
         config.system_prompt = args.system_prompt
+    if args.prompt_prefix:
+        config.prompt_prefix = args.prompt_prefix
     if args.logging:
         import logging
         logging.basicConfig(

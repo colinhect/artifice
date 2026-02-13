@@ -22,6 +22,7 @@ class ShellExecutor:
 
     def __init__(self) -> None:
         self.working_directory = os.getcwd()
+        self.init_script: str | None = None
 
     async def execute(
         self,

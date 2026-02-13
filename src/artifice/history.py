@@ -173,14 +173,7 @@ class History:
             if self._history_file.exists():
                 with open(self._history_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    # Support both old format (list) and new format (dict)
-                    if isinstance(data, list):
-                        # Old format: treat as Python history
-                        self._python_history = data[-self._max_history_size:]
-                        self._ai_history = []
-                        self._shell_history = []
-                    elif isinstance(data, dict):
-                        # New format: separate Python, AI, and Shell histories
+                    if isinstance(data, dict):
                         self._python_history = data.get("python", [])[-self._max_history_size:]
                         self._ai_history = data.get("ai", [])[-self._max_history_size:]
                         self._shell_history = data.get("shell", [])[-self._max_history_size:]

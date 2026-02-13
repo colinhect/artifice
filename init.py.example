@@ -13,6 +13,7 @@ config.system_prompt =(
     "If you give more than one option then the first is considered the main option. "
     "Always use ```python or ```shell to mark code or shell command."
 )
+config.prompt_prefix = ""
 
 # ============================================================================
 # Agent Configuration

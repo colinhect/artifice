@@ -15,10 +15,11 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 
+from .agent import AgentBase
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
-from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput, BaseBlock
+from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput, BaseBlock, BufferedOutputBlock
 from .config import ArtificeConfig, get_sessions_dir, ensure_sessions_dir
 from .session import SessionTranscript
 
@@ -228,7 +229,8 @@ class StreamingFenceDetector:
             if current_is_empty:
                 if self._current_block is self.first_agent_block:
                     self.first_agent_block = None
-                self._remove_block(self._current_block)
+                if self._current_block is not None:
+                    self._remove_block(self._current_block)
             elif isinstance(self._current_block, AgentOutputBlock):
                 self._current_block.mark_success()
 
@@ -446,7 +448,7 @@ class ArtificeTerminal(Widget):
                 logger.error(f"Failed to initialize session transcript: {e}")
 
         # Create agent
-        self._agent = None
+        self._agent: AgentBase | None = None
         model = self._config.model
         system_prompt = self._config.system_prompt
         if app.provider.lower() == "claude":
@@ -619,7 +621,7 @@ class ArtificeTerminal(Widget):
             block.remove_class("in-context")
         self._context_blocks.clear()
 
-    async def _stream_agent_response(self, prompt: str) -> tuple[StreamingFenceDetector, object]:
+    async def _stream_agent_response(self, agent: AgentBase, prompt: str) -> tuple[StreamingFenceDetector, object]:
         """Stream an agent response, splitting into prose and code blocks.
 
         Returns the detector (with all_blocks, first_agent_block) and the AgentResponse.
@@ -639,7 +641,10 @@ class ArtificeTerminal(Widget):
         def on_chunk(text):
             self.post_message(StreamChunk(text))
 
-        response = await self._agent.send_prompt(prompt, on_chunk=on_chunk)
+        if self._config.prompt_prefix:
+            prompt = self._config.prompt_prefix + " " + prompt
+
+        response = await agent.send_prompt(prompt, on_chunk=on_chunk)
 
         # Flush any remaining buffered chunks and finalize directly
         # (no message-based race — send_prompt has returned, no more chunks coming)
@@ -704,7 +709,7 @@ class ArtificeTerminal(Widget):
             agent_output_block.mark_failed()
             return
 
-        await self._stream_agent_response(prompt)
+        await self._stream_agent_response(self._agent, prompt)
 
         # After sending a prompt to the agent, enable auto-send mode
         if not self._auto_send_to_agent:
@@ -713,8 +718,9 @@ class ArtificeTerminal(Widget):
 
     async def _send_execution_result_to_agent(self, code: str, result: ExecutionResult) -> None:
         """Send execution results back to the agent and split the response."""
-        prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n" + result.output + result.error + "\n"
-        await self._stream_agent_response(prompt)
+        if self._agent is not None:
+            prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n" + result.output + result.error + "\n"
+            await self._stream_agent_response(self._agent, prompt)
 
     async def on_terminal_output_pin_requested(self, event: TerminalOutput.PinRequested) -> None:
         """Handle pin request: move widget block from output to pinned area."""

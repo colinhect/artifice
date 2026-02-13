@@ -33,3 +33,7 @@ class AgentBase(ABC):
             AgentResponse with the complete response.
         """
         pass
+
+    @abstractmethod
+    def clear_conversation(self):
+        pass
