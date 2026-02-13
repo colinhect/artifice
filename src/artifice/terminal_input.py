@@ -110,7 +110,7 @@ class InputTextArea(TextArea):
         if event.key == "escape":
             event.prevent_default()
             event.stop()
-            self.post_message(TerminalInput.PythonMode())
+            self.post_message(TerminalInput.SetMode("python"))
             return
         # Up/Down for history navigation when at top/bottom of input
         if event.key == "up":
@@ -135,17 +135,17 @@ class InputTextArea(TextArea):
             if event.key == "greater_than_sign":
                 event.prevent_default()
                 event.stop()
-                self.post_message(TerminalInput.AgentMode())
+                self.post_message(TerminalInput.SetMode("ai"))
                 return
             if event.key == "dollar_sign":
                 event.prevent_default()
                 event.stop()
-                self.post_message(TerminalInput.ShellMode())
+                self.post_message(TerminalInput.SetMode("shell"))
                 return
             if event.key == "right_square_bracket":
                 event.prevent_default()
                 event.stop()
-                self.post_message(TerminalInput.PythonMode())
+                self.post_message(TerminalInput.SetMode("python"))
                 return
         # Let parent handle other keys
         await super()._on_key(event)
@@ -233,14 +233,11 @@ class TerminalInput(Static):
         """Internal message from TextArea requesting submission."""
         pass
 
-    class AgentMode(Message):
-        pass
-
-    class ShellMode(Message):
-        pass
-
-    class PythonMode(Message):
-        pass
+    class SetMode(Message):
+        """Message requesting a mode switch."""
+        def __init__(self, mode: str) -> None:
+            super().__init__()
+            self.mode = mode
 
     class CycleMode(Message):
         """Message requesting to cycle through modes."""
@@ -267,6 +264,12 @@ class TerminalInput(Static):
             self.is_shell_command = is_shell_command
             super().__init__()
 
+    _MODE_CONFIG = {
+        "ai": (">", "ai prompt...       [red]][/] python  [cyan]$[/] shell", None),
+        "shell": ("$", "shell command...   [cyan]>[/] ai  [cyan]][/] python", "bash"),
+        "python": ("]", "python code...     [cyan]>[/] ai  [cyan]$[/] shell", "python"),
+    }
+
     def __init__(
         self,
         history: History | None = None,
@@ -276,9 +279,6 @@ class TerminalInput(Static):
         classes: str | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self._ai_prompt = ">"
-        self._python_prompt = "]"
-        self._shell_prompt = "$"
         self.mode = "ai"
         self._history = history
         self._search_mode = False
@@ -291,7 +291,7 @@ class TerminalInput(Static):
         with Horizontal():
             with Vertical(classes="prompt-container"):
                 yield LoadingIndicator(id="activity-indicator")
-                yield Static(self._python_prompt, classes="prompt", id="prompt-display")
+                yield Static("]", classes="prompt", id="prompt-display")
             yield InputTextArea(id="code-input")
 
     def on_mount(self) -> None:
@@ -305,22 +305,14 @@ class TerminalInput(Static):
         """Handle submission request from TextArea."""
         self.action_submit()
 
-    def on_terminal_input_agent_mode(self, event: AgentMode) -> None:
-        """Handle > key press when input is empty - switch to AI mode."""
-        if self.mode != "ai":
-            self.mode = "ai"
-            self._update_prompt()
+    def on_terminal_input_set_mode(self, event: SetMode) -> None:
+        """Handle mode switch request."""
+        self.set_mode(event.mode)
 
-    def on_terminal_input_python_mode(self, event: PythonMode) -> None:
-        """Handle ] key press when input is empty - switch to Python mode."""
-        if self.mode != "python":
-            self.mode = "python"
-            self._update_prompt()
-
-    def on_terminal_input_shell_mode(self, event: ShellMode) -> None:
-        """Handle $ key press when input is empty - switch to Shell mode."""
-        if self.mode != "shell":
-            self.mode = "shell"
+    def set_mode(self, mode: str) -> None:
+        """Switch to the given mode if not already active."""
+        if self.mode != mode:
+            self.mode = mode
             self._update_prompt()
 
     def on_terminal_input_cycle_mode(self, event: CycleMode) -> None:
@@ -344,22 +336,14 @@ class TerminalInput(Static):
 
     def _update_prompt(self) -> None:
         """Update the prompt display based on current mode."""
+        prompt_char, placeholder, lang = self._MODE_CONFIG[self.mode]
         prompt_widget = self.query_one("#prompt-display", Static)
         text_area = self.query_one("#code-input", InputTextArea)
 
         with self.app.batch_update():
-            if self.mode == "ai":
-                prompt_widget.update(self._ai_prompt)
-                text_area.set_focused_placeholder("ai prompt...       [red]][/] python  [cyan]$[/] shell")
-                text_area.set_syntax_highlighting(None)
-            elif self.mode == "shell":
-                prompt_widget.update(self._shell_prompt)
-                text_area.set_focused_placeholder("shell command...   [cyan]>[/] ai  [cyan]][/] python")
-                text_area.set_syntax_highlighting("bash")
-            else:
-                prompt_widget.update(self._python_prompt)
-                text_area.set_focused_placeholder("python code...     [cyan]>[/] ai  [cyan]$[/] shell")
-                text_area.set_syntax_highlighting("python")
+            prompt_widget.update(prompt_char)
+            text_area.set_focused_placeholder(placeholder)
+            text_area.set_syntax_highlighting(lang)
 
     @property
     def code(self) -> str:
@@ -425,18 +409,18 @@ class TerminalInput(Static):
 
         # Enter search mode
         self._search_mode = True
-        
+
         # Get the text area and horizontal container
         text_area = self.query_one("#code-input", InputTextArea)
         horizontal = self.query_one(Horizontal)
-        
+
         # Hide the text area
         text_area.display = False
-        
+
         # Create search input
         self._search_input = Input(placeholder="Search history...", id="history-search-input")
         horizontal.mount(self._search_input)
-        
+
         # Create autocomplete with history items
         def get_history_candidates(state: TargetState) -> list[DropdownItem]:
             """Get filtered history items based on search input."""
@@ -486,18 +470,18 @@ class TerminalInput(Static):
         """Exit history search mode."""
         if not self._search_mode:
             return
-        
+
         self._search_mode = False
-        
+
         # Remove autocomplete and search input
         if self._autocomplete is not None:
             self._autocomplete.remove()
             self._autocomplete = None
-        
+
         if self._search_input is not None:
             self._search_input.remove()
             self._search_input = None
-        
+
         # Show and focus the text area
         text_area = self.query_one("#code-input", InputTextArea)
         text_area.display = True
@@ -510,45 +494,24 @@ class TerminalInput(Static):
             event.prevent_default()
             event.stop()
 
-    def show_activity(self) -> None:
-        """Show the activity indicator and disable input."""
-        if self._activity_mode:
+    def set_activity(self, active: bool) -> None:
+        """Show or hide the activity indicator and update input state."""
+        if self._activity_mode == active:
             return
 
-        self._activity_mode = True
+        self._activity_mode = active
         loading_indicator = self.query_one("#activity-indicator", LoadingIndicator)
         prompt_display = self.query_one("#prompt-display", Static)
-        text_area = self.query_one("#code-input", InputTextArea)
 
-        # Show loading indicator, hide prompt
-        loading_indicator.styles.display = "block"
-        prompt_display.styles.display = "none"
-
-        # Change placeholder to show cancel instruction
-        text_area.placeholder = str(Text.from_markup(" [cyan]ctrl+c[/] to cancel"))
-
-        # Disable text area (but ctrl+c still works via action bindings)
-        #text_area.disabled = True
-
-    def hide_activity(self) -> None:
-        """Hide the activity indicator and re-enable input."""
-        if not self._activity_mode:
-            return
-
-        self._activity_mode = False
-        loading_indicator = self.query_one("#activity-indicator", LoadingIndicator)
-        prompt_display = self.query_one("#prompt-display", Static)
-        text_area = self.query_one("#code-input", InputTextArea)
-
-        # Hide loading indicator, show prompt
-        loading_indicator.styles.display = "none"
-        prompt_display.styles.display = "block"
-
-        # Re-enable text area
-        #text_area.disabled = False
-
-        # Restore original placeholder based on mode
-        self._update_prompt()
+        if active:
+            loading_indicator.styles.display = "block"
+            prompt_display.styles.display = "none"
+            text_area = self.query_one("#code-input", InputTextArea)
+            text_area.placeholder = str(Text.from_markup(" [cyan]ctrl+c[/] to cancel"))
+        else:
+            loading_indicator.styles.display = "none"
+            prompt_display.styles.display = "block"
+            self._update_prompt()
 
     def focus_input(self) -> None:
         """Focus the input text area."""

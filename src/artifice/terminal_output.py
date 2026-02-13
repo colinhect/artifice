@@ -183,7 +183,80 @@ class CodeInputBlock(BaseBlock):
         # Update syntax highlighting and markdown
         self._code.update(highlight.highlight(self._original_code.strip(), language=self._language))
 
-class CodeOutputBlock(BaseBlock):
+
+class BufferedOutputBlock(BaseBlock):
+    """Base class for output blocks with buffered text and markdown toggle.
+
+    Subclasses set _STATIC_CSS_CLASS and _MARKDOWN_CSS_CLASS to control
+    which CSS classes are applied to the Static/Markdown child widgets.
+    """
+
+    DEFAULT_CSS = """
+    BufferedOutputBlock Markdown MarkdownBlock:last-child {
+        margin-bottom: 0;
+    }
+
+    BufferedOutputBlock Markdown MarkdownFence {
+        margin: 0;
+    }
+
+    BufferedOutputBlock Markdown MarkdownTable {
+        width: auto;
+    }
+
+    BufferedOutputBlock Markdown MarkdownH1 {
+        text-align: left;
+    }
+    """
+
+    _STATIC_CSS_CLASS: str = ""
+    _MARKDOWN_CSS_CLASS: str = ""
+
+    def __init__(self, output="", render_markdown=False) -> None:
+        super().__init__()
+        self._full = output
+        self._render_markdown = render_markdown
+        self._dirty = False
+        self._contents = Horizontal()
+
+        if render_markdown:
+            self._output = None
+            self._markdown = Markdown(output, classes=self._MARKDOWN_CSS_CLASS)
+        else:
+            self._output = Static(output, classes=self._STATIC_CSS_CLASS)
+            self._markdown = None
+
+    def flush(self) -> None:
+        """Push accumulated text to the widget. Call after batching appends."""
+        if not self._dirty:
+            return
+        self._dirty = False
+        if self._markdown:
+            self._markdown.update(self._full.strip())
+        elif self._output:
+            self._output.update(self._full.strip())
+
+    def toggle_markdown(self) -> None:
+        self._render_markdown = not self._render_markdown
+        if self._render_markdown:
+            if self._output:
+                self._output.remove()
+                self._output = None
+            self._markdown = Markdown(self._full, classes=self._MARKDOWN_CSS_CLASS)
+            self._contents.mount(self._markdown)
+        else:
+            if self._markdown:
+                self._markdown.remove()
+                self._markdown = None
+            self._output = Static(self._format_plain_text(), classes=self._STATIC_CSS_CLASS)
+            self._contents.mount(self._output)
+
+    def _format_plain_text(self) -> str:
+        """Format text for the plain Static widget. Override for custom formatting."""
+        return self._full
+
+
+class CodeOutputBlock(BufferedOutputBlock):
     DEFAULT_CSS = """
     CodeOutputBlock .code-output {
         background: $surface-darken-1;
@@ -205,34 +278,15 @@ class CodeOutputBlock(BaseBlock):
         padding-right: 0;
         layout: stream;
     }
-
-    CodeOutputBlock .markdown-output MarkdownBlock:last-child {
-        margin-bottom: 0;
-    }
-
-    CodeOutputBlock .markdown-output MarkdownFence {
-        margin: 0;
-    }
-
-    CodeOutputBlock .markdown-output MarkdownTable {
-        width: auto;
-    }
-
-    CodeOutputBlock .markdown-output MarkdownH1 {
-        text-align: left;
-    }
     """
 
+    _STATIC_CSS_CLASS = "code-output"
+    _MARKDOWN_CSS_CLASS = "markdown-output"
+
     def __init__(self, output="", render_markdown=False, in_context=False) -> None:
-        super().__init__()
+        super().__init__(output=output, render_markdown=render_markdown)
         self._status_indicator = Static(classes="status-indicator")
-        self._output = Static(output, classes="code-output") if not render_markdown else None
-        self._markdown = Markdown(output, classes="markdown-output") if render_markdown else None
-        self._full = output
-        self._render_markdown = render_markdown
         self._has_error = False
-        self._dirty = False  # True when _full has changed but widget not yet updated
-        self._contents = Horizontal()
         if in_context:
             self.add_class("in-context")
 
@@ -247,16 +301,6 @@ class CodeOutputBlock(BaseBlock):
     def append_output(self, output) -> None:
         self._full += output
         self._dirty = True
-
-    def flush(self) -> None:
-        """Push accumulated text to the widget. Call after batching appends."""
-        if not self._dirty:
-            return
-        self._dirty = False
-        if self._markdown:
-            self._markdown.update(self._full.strip())
-        elif self._output:
-            self._output.update(self._full.strip())
 
     def append_error(self, output) -> None:
         self.append_output(output)
@@ -273,22 +317,9 @@ class CodeOutputBlock(BaseBlock):
                 self._markdown.remove_class("markdown-output")
                 self._markdown.add_class("error-output")
 
-    def toggle_markdown(self) -> None:
-        self._render_markdown = not self._render_markdown
-        if self._render_markdown:
-            if self._output:
-                self._output.remove()
-                self._output = None
-            self._markdown = Markdown(self._full, classes="markdown-output")
-            self._contents.mount(self._markdown)
-        else:
-            if self._markdown:
-                self._markdown.remove()
-                self._markdown = None
-            # Convert ANSI escape codes to Textual markup
-            textual_output = ansi_to_textual(self._full.rstrip('\n'))
-            self._output = Static(textual_output, classes="code-output")
-            self._contents.mount(self._output)
+    def _format_plain_text(self) -> str:
+        """Convert ANSI escape codes to Textual markup."""
+        return ansi_to_textual(self._full.rstrip('\n'))
 
 class WidgetOutputBlock(BaseBlock):
     """Block that displays an arbitrary Textual widget."""
@@ -341,7 +372,7 @@ class AgentInputBlock(BaseBlock):
         """Get the mode for this block (ai)."""
         return "ai"
 
-class AgentOutputBlock(BaseBlock):
+class AgentOutputBlock(BufferedOutputBlock):
     DEFAULT_CSS = """
     AgentOutputBlock .agent-output {
         padding-left: 0;
@@ -354,51 +385,26 @@ class AgentOutputBlock(BaseBlock):
         height: 1;
     }
 
-    AgentOutputBlock .agent-output MarkdownBlock:last-child {
-        margin-bottom: 0;
-    }
-
-    AgentOutputBlock .agent-output MarkdownFence {
-        margin: 0;
-    }
-
-    AgentOutputBlock .agent-output MarkdownTable {
-        width: auto;
-    }
-
-    AgentOutputBlock .agent-output MarkdownH1 {
-        text-align: left;
-    }
-
     AgentOutputBlock .text-output {
         padding: 0;
         margin: 0;
     }
     """
 
+    _STATIC_CSS_CLASS = "text-output"
+    _MARKDOWN_CSS_CLASS = "agent-output"
+
     _FLUSH_INTERVAL = 0.1  # Minimum seconds between Markdown re-renders during streaming
 
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
-        super().__init__()
+        super().__init__(output=output, render_markdown=render_markdown)
         self._loading_indicator = LoadingIndicator(classes="loading-indicator")
         self._status_indicator = Static("", classes="status-indicator")
         self._status_indicator.styles.display = "none"
-        self._full = output
-        self._render_markdown = render_markdown
         self._streaming = activity
-        self._dirty = False  # True when _full has changed but widget not yet updated
         self._last_flush_time: float = 0.0
         self._flush_timer_pending: bool = False
-        self._contents = Horizontal()
         self.add_class("in-context")
-
-        # Always use Markdown if render_markdown is True (even during streaming)
-        if render_markdown:
-            self._output = None
-            self._markdown = Markdown(output, classes="agent-output")
-        else:
-            self._output = Static(output, classes="text-output")
-            self._markdown = None
 
         if not activity:
             self.mark_success()
@@ -464,22 +470,61 @@ class AgentOutputBlock(BaseBlock):
         self._loading_indicator.styles.display = "none"
         self._status_indicator.styles.display = "block"
 
-    def toggle_markdown(self) -> None:
-        self._render_markdown = not self._render_markdown
-        if self._render_markdown:
-            if self._output:
-                self._output.remove()
-                self._output = None
-            self._markdown = Markdown(self._full, classes="agent-output")
-            self._contents.mount(self._markdown)
-        else:
-            if self._markdown:
-                self._markdown.remove()
-                self._markdown = None
-            self._output = Static(self._full, classes="text-output")
-            self._contents.mount(self._output)
 
-class TerminalOutput(VerticalScroll):
+class HighlightableContainerMixin:
+    """Mixin for containers that support block highlighting and navigation."""
+
+    def _init_highlight(self) -> None:
+        self._blocks: list = []
+        self._highlighted_index: int | None = None
+
+    def highlight_next(self) -> bool:
+        """Move highlight to next block. Returns True if the index changed."""
+        if not self._blocks:
+            return False
+        original_index = self._highlighted_index
+        if self._highlighted_index is None:
+            self._highlighted_index = 0
+        else:
+            self._highlighted_index = min(self._highlighted_index + 1, len(self._blocks) - 1)
+        self._update_highlight()
+        return original_index != self._highlighted_index
+
+    def highlight_previous(self) -> None:
+        """Move highlight to previous block."""
+        if not self._blocks:
+            return
+        if self._highlighted_index is None:
+            self._highlighted_index = len(self._blocks) - 1
+        else:
+            self._highlighted_index = max(self._highlighted_index - 1, 0)
+        self._update_highlight()
+
+    def _update_highlight(self) -> None:
+        """Update visual highlight on blocks."""
+        for i, block in enumerate(self._blocks):
+            if i == self._highlighted_index:
+                block.add_class("highlighted")
+                # Auto-scroll to make the highlighted block visible
+                self.scroll_to_widget(block, animate=True)
+            else:
+                block.remove_class("highlighted")
+
+    def get_highlighted_block(self):
+        """Get the currently highlighted block, if any."""
+        if self._highlighted_index is None or not self._blocks:
+            return None
+        if 0 <= self._highlighted_index < len(self._blocks):
+            return self._blocks[self._highlighted_index]
+        return None
+
+    def on_blur(self) -> None:
+        """When unfocusing, unhighlight the highlighted block."""
+        self._highlighted_index = None
+        self._update_highlight()
+
+
+class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     """Container for REPL output blocks."""
 
     DEFAULT_CSS = """
@@ -529,8 +574,7 @@ class TerminalOutput(VerticalScroll):
         classes: str | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self._blocks = []
-        self._highlighted_index: int | None = None
+        self._init_highlight()
         self._next_command_number: int = 1
 
     def append_block(self, block: BaseBlock):
@@ -565,28 +609,6 @@ class TerminalOutput(VerticalScroll):
         self._blocks.clear()
         self._highlighted_index = None
         self._next_command_number = 1
-
-    def highlight_next(self) -> bool:
-        """Move highlight to next block."""
-        if not self._blocks:
-            return False
-        original_index = self._highlighted_index
-        if self._highlighted_index is None:
-            self._highlighted_index = 0
-        else:
-            self._highlighted_index = min(self._highlighted_index + 1, len(self._blocks) - 1)
-        self._update_highlight()
-        return original_index != self._highlighted_index
-
-    def highlight_previous(self) -> None:
-        """Move highlight to previous block."""
-        if not self._blocks:
-            return
-        if self._highlighted_index is None:
-            self._highlighted_index = len(self._blocks) - 1
-        else:
-            self._highlighted_index = max(self._highlighted_index - 1, 0)
-        self._update_highlight()
 
     def action_activate_block(self) -> None:
         """Copy the highlighted block's code to the input with the correct mode."""
@@ -699,31 +721,8 @@ class TerminalOutput(VerticalScroll):
             self._highlighted_index = len(self._blocks) - 1
             self._update_highlight()
 
-    def on_blur(self) -> None:
-        """When unfocusing, unhighlight the highlighted block."""
-        self._highlighted_index = None
-        self._update_highlight()
 
-    def _update_highlight(self) -> None:
-        """Update visual highlight on blocks."""
-        for i, block in enumerate(self._blocks):
-            if i == self._highlighted_index:
-                block.add_class("highlighted")
-                # Auto-scroll to make the highlighted block visible
-                self.scroll_to_widget(block, animate=True)
-            else:
-                block.remove_class("highlighted")
-
-    def get_highlighted_block(self) -> BaseBlock | None:
-        """Get the currently highlighted block, if any."""
-        if self._highlighted_index is None or not self._blocks:
-            return None
-        if 0 <= self._highlighted_index < len(self._blocks):
-            return self._blocks[self._highlighted_index]
-        return None
-
-
-class PinnedOutput(Vertical):
+class PinnedOutput(HighlightableContainerMixin, Vertical):
     """Container for pinned output blocks, displayed below the input."""
 
     DEFAULT_CSS = """
@@ -756,77 +755,45 @@ class PinnedOutput(Vertical):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._pinned_blocks: list[WidgetOutputBlock] = []
-        self._highlighted_index: int | None = None
+        self._init_highlight()
 
     can_focus = True
 
     async def add_pinned_block(self, block: WidgetOutputBlock) -> None:
-        self._pinned_blocks.append(block)
+        self._blocks.append(block)
         await self.mount(block)
         await block.recompose()
         self.add_class("has-pins")
 
     async def remove_pinned_block(self, block: WidgetOutputBlock) -> None:
-        if block in self._pinned_blocks:
-            idx = self._pinned_blocks.index(block)
-            self._pinned_blocks.remove(block)
+        if block in self._blocks:
+            idx = self._blocks.index(block)
+            self._blocks.remove(block)
             await block.remove()
             # Adjust highlighted index
-            if not self._pinned_blocks:
+            if not self._blocks:
                 self._highlighted_index = None
                 self.remove_class("has-pins")
             elif self._highlighted_index is not None:
                 if idx <= self._highlighted_index:
                     self._highlighted_index = max(0, self._highlighted_index - 1)
-                if self._highlighted_index >= len(self._pinned_blocks):
-                    self._highlighted_index = len(self._pinned_blocks) - 1
+                if self._highlighted_index >= len(self._blocks):
+                    self._highlighted_index = len(self._blocks) - 1
             self._update_highlight()
 
     def action_highlight_previous(self) -> None:
-        if not self._pinned_blocks:
-            return
-        if self._highlighted_index is None:
-            self._highlighted_index = len(self._pinned_blocks) - 1
-        else:
-            self._highlighted_index = max(self._highlighted_index - 1, 0)
-        self._update_highlight()
+        self.highlight_previous()
 
     def action_highlight_next(self) -> None:
-        if not self._pinned_blocks:
-            return
-        if self._highlighted_index is None:
-            self._highlighted_index = 0
-        else:
-            self._highlighted_index = min(self._highlighted_index + 1, len(self._pinned_blocks) - 1)
-        self._update_highlight()
+        if not self.highlight_next():
+            pass  # Already at end
 
     def action_unpin_block(self) -> None:
-        block = self._get_highlighted_block()
+        block = self.get_highlighted_block()
         if block:
             self.post_message(self.UnpinRequested(block))
 
     def on_focus(self) -> None:
-        if self._pinned_blocks:
+        if self._blocks:
             self._highlighted_index = 0
             self._update_highlight()
-
-    def on_blur(self) -> None:
-        self._highlighted_index = None
-        self._update_highlight()
-
-    def _update_highlight(self) -> None:
-        for i, block in enumerate(self._pinned_blocks):
-            if i == self._highlighted_index:
-                block.add_class("highlighted")
-                # Auto-scroll to make the highlighted block visible
-                self.scroll_to_widget(block, animate=True)
-            else:
-                block.remove_class("highlighted")
-
-    def _get_highlighted_block(self) -> WidgetOutputBlock | None:
-        if self._highlighted_index is None or not self._pinned_blocks:
-            return None
-        if 0 <= self._highlighted_index < len(self._pinned_blocks):
-            return self._pinned_blocks[self._highlighted_index]
-        return None

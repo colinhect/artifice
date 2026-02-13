@@ -45,6 +45,83 @@ class StreamChunk(Message):
         self.text = text
 
 
+class StringTracker:
+    """Tracks whether we're inside a string literal in streaming code.
+
+    Handles single quotes, double quotes, triple quotes, and escape sequences.
+    This allows us to avoid detecting code fences that appear inside strings.
+    """
+
+    def __init__(self) -> None:
+        self._in_string: str | None = None  # None, "'", '"', "'''", or '"""'
+        self._escape_next = False
+        self._quote_buffer = ""
+
+    @property
+    def in_string(self) -> bool:
+        return self._in_string is not None
+
+    def reset(self) -> None:
+        self._in_string = None
+        self._escape_next = False
+        self._quote_buffer = ""
+
+    def track(self, ch: str) -> None:
+        """Update string tracking state for the given character."""
+        # Handle escape sequences
+        if self._escape_next:
+            self._escape_next = False
+            self._quote_buffer = ""
+            return
+
+        if ch == '\\':
+            self._escape_next = True
+            self._quote_buffer = ""
+            return
+
+        # Track quotes to detect string boundaries
+        if ch in ('"', "'"):
+            # Build up quote buffer to detect triple quotes
+            if self._quote_buffer and self._quote_buffer[0] == ch:
+                self._quote_buffer += ch
+            else:
+                self._quote_buffer = ch
+
+            # Check if we're entering or exiting a string
+            if self._in_string:
+                # Currently in a string - check if this closes it
+                if self._in_string == self._quote_buffer:
+                    # Closing the current string
+                    self._in_string = None
+                    self._quote_buffer = ""
+            else:
+                # Not in a string - check if this opens one
+                # For triple quotes, wait until we have all three
+                if len(self._quote_buffer) == 3:
+                    # Opening triple-quoted string
+                    self._in_string = self._quote_buffer
+                    self._quote_buffer = ""
+                elif len(self._quote_buffer) == 1:
+                    # Could be single quote or start of triple quote
+                    # We'll resolve this on the next character
+                    pass
+        else:
+            # Non-quote character
+            if self._quote_buffer and not self._in_string:
+                # We had 1 or 2 quotes followed by a non-quote
+                # This means it was a single or double quote string
+                if len(self._quote_buffer) <= 2:
+                    self._in_string = self._quote_buffer[0]
+                    self._quote_buffer = ""
+            elif self._quote_buffer:
+                # We're in a string and hit a non-quote, reset buffer
+                self._quote_buffer = ""
+
+            # Newlines can end single-line strings in most languages
+            # but not triple-quoted strings
+            if ch == '\n' and self._in_string in ('"', "'"):
+                self._in_string = None
+
 
 class StreamingFenceDetector:
     """Detects code fences in streaming text and splits into blocks in real-time.
@@ -68,10 +145,7 @@ class StreamingFenceDetector:
         self._current_block: BaseBlock | None = None  # The block we're currently appending to
         self.all_blocks: list[BaseBlock] = []
         self.first_agent_block: AgentOutputBlock | None = None
-        # String literal tracking for smart fence detection
-        self._in_string: str | None = None  # None, "'", '"', "'''", or '"""'
-        self._escape_next = False  # Track if next char is escaped
-        self._quote_buffer = ""  # Buffer for detecting triple quotes
+        self._string_tracker = StringTracker()
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
         self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=True, in_context=True, command_number=self._output.next_command_number())
@@ -106,6 +180,18 @@ class StreamingFenceDetector:
         elif self._state == _FenceState.CODE:
             self._feed_code(ch)
 
+    def _flush_backticks_to_pending(self) -> None:
+        """Flush accumulated backticks (that weren't a fence) to the pending buffer."""
+        if self._backtick_count > 0:
+            self._pending_buffer += '`' * self._backtick_count
+            self._backtick_count = 0
+
+    def _flush_and_update_chunk(self) -> None:
+        """Flush pending text and update the current block with the chunk buffer."""
+        if self._chunk_buffer and self._current_block:
+            self._update_current_block_with_chunk()
+            self._chunk_buffer = ""
+
     def _feed_prose(self, ch: str) -> None:
         """Process prose text, looking for opening fence."""
         if ch == '`':
@@ -119,10 +205,7 @@ class StreamingFenceDetector:
                 self._state = _FenceState.LANG_LINE
         else:
             # Not a fence marker
-            if self._backtick_count > 0:
-                # We had some backticks that weren't a fence
-                self._pending_buffer += '`' * self._backtick_count
-                self._backtick_count = 0
+            self._flush_backticks_to_pending()
             self._pending_buffer += ch
 
     def _feed_lang_line(self, ch: str) -> None:
@@ -135,9 +218,7 @@ class StreamingFenceDetector:
             self._current_lang = lang
 
             # Update current block with accumulated chunk
-            if self._chunk_buffer and self._current_block:
-                self._update_current_block_with_chunk()
-                self._chunk_buffer = ""
+            self._flush_and_update_chunk()
 
             # Remove empty prose block, or mark it complete
             current_is_empty = (
@@ -164,25 +245,21 @@ class StreamingFenceDetector:
     def _feed_code(self, ch: str) -> None:
         """Process code text, looking for closing fence (but not in strings)."""
         # Track string literals to avoid detecting fences inside strings
-        self._update_string_state(ch)
-        
+        self._string_tracker.track(ch)
+
         # Only detect fences when not inside a string literal
-        if not self._in_string and ch == '`':
+        if not self._string_tracker.in_string and ch == '`':
             self._backtick_count += 1
             if self._backtick_count == 3:
                 # Found closing fence - flush pending code and transition
                 self._flush_pending_to_chunk()
 
                 # Update code block with accumulated chunk
-                if self._chunk_buffer and self._current_block:
-                    self._update_current_block_with_chunk()
-                    self._chunk_buffer = ""
+                self._flush_and_update_chunk()
 
                 self._backtick_count = 0
                 # Reset string tracking for next code block
-                self._in_string = None
-                self._escape_next = False
-                self._quote_buffer = ""
+                self._string_tracker.reset()
 
                 # Start new prose block
                 if isinstance(self._current_block, CodeInputBlock):
@@ -195,72 +272,9 @@ class StreamingFenceDetector:
             # Don't add character to pending buffer yet - we're accumulating backticks
         else:
             # Not a backtick, or we're in a string
-            if self._backtick_count > 0:
-                # We had some backticks that weren't a fence - add them
-                self._pending_buffer += '`' * self._backtick_count
-                self._backtick_count = 0
+            self._flush_backticks_to_pending()
             # Always add the current character
             self._pending_buffer += ch
-
-    def _update_string_state(self, ch: str) -> None:
-        """Track whether we're inside a string literal.
-        
-        Handles single quotes, double quotes, triple quotes, and escape sequences.
-        This allows us to avoid detecting code fences that appear inside strings.
-        """
-        # Handle escape sequences
-        if self._escape_next:
-            self._escape_next = False
-            self._quote_buffer = ""
-            return
-        
-        if ch == '\\':
-            self._escape_next = True
-            self._quote_buffer = ""
-            return
-        
-        # Track quotes to detect string boundaries
-        if ch in ('"', "'"):
-            # Build up quote buffer to detect triple quotes
-            if self._quote_buffer and self._quote_buffer[0] == ch:
-                self._quote_buffer += ch
-            else:
-                self._quote_buffer = ch
-            
-            # Check if we're entering or exiting a string
-            if self._in_string:
-                # Currently in a string - check if this closes it
-                if self._in_string == self._quote_buffer:
-                    # Closing the current string
-                    self._in_string = None
-                    self._quote_buffer = ""
-            else:
-                # Not in a string - check if this opens one
-                # For triple quotes, wait until we have all three
-                if len(self._quote_buffer) == 3:
-                    # Opening triple-quoted string
-                    self._in_string = self._quote_buffer
-                    self._quote_buffer = ""
-                elif len(self._quote_buffer) == 1:
-                    # Could be single quote or start of triple quote
-                    # We'll resolve this on the next character
-                    pass
-        else:
-            # Non-quote character
-            if self._quote_buffer and not self._in_string:
-                # We had 1 or 2 quotes followed by a non-quote
-                # This means it was a single or double quote string
-                if len(self._quote_buffer) <= 2:
-                    self._in_string = self._quote_buffer[0]
-                    self._quote_buffer = ""
-            elif self._quote_buffer:
-                # We're in a string and hit a non-quote, reset buffer
-                self._quote_buffer = ""
-            
-            # Newlines can end single-line strings in most languages
-            # but not triple-quoted strings
-            if ch == '\n' and self._in_string in ('"', "'"):
-                self._in_string = None
 
     def _flush_pending_to_chunk(self) -> None:
         """Move pending buffer to chunk buffer."""
@@ -324,7 +338,7 @@ class StreamingFenceDetector:
             if isinstance(b, AgentOutputBlock) and b is not self.first_agent_block and not b._full.strip()
         ]:
             self._remove_block(block)
-        
+
         # Save all blocks to session now that they're finalized
         if self._save_callback:
             for block in self.all_blocks:
@@ -388,6 +402,12 @@ class ArtificeTerminal(Widget):
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
     ]
 
+    _MARKDOWN_SETTINGS = {
+        "ai": ("_agent_markdown_enabled", "AI agent output"),
+        "shell": ("_shell_markdown_enabled", "shell command output"),
+        "python": ("_python_markdown_enabled", "Python code output"),
+    }
+
     def __init__(
         self,
         app: ArtificeApp,
@@ -398,11 +418,11 @@ class ArtificeTerminal(Widget):
         max_history_size: int = 1000,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        
+
         self._config = app.config
         self._executor = CodeExecutor()
         self._shell_executor = ShellExecutor()
-        
+
         # Set shell init script from config
         if self._config.shell_init_script:
             self._shell_executor.init_script = self._config.shell_init_script
@@ -414,7 +434,7 @@ class ArtificeTerminal(Widget):
         self._python_markdown_enabled = self._config.python_markdown
         self._agent_markdown_enabled = self._config.agent_markdown
         self._shell_markdown_enabled = self._config.shell_markdown
-        
+
         # Initialize session transcript if enabled
         self._session_transcript: SessionTranscript | None = None
         if self._config.save_sessions:
@@ -444,7 +464,7 @@ class ArtificeTerminal(Widget):
             self._agent.default_scenarios_and_response()
         elif app.provider:
             raise Exception(f"Unsupported agent {app.provider}")
-        
+
         # Use auto-send setting from config
         self._auto_send_to_agent: bool = self._config.auto_send_to_agent
 
@@ -463,7 +483,7 @@ class ArtificeTerminal(Widget):
             yield Static(id="flash")
             yield self.input
             yield self.pinned_output
-    
+
     def _save_block_to_session(self, block: BaseBlock) -> None:
         """Save a block to the session transcript if enabled."""
         if self._session_transcript:
@@ -472,36 +492,44 @@ class ArtificeTerminal(Widget):
             except Exception as e:
                 logger.error(f"Failed to save block to session: {e}")
 
+    async def _run_cancellable(self, coro, *, finally_callback=None):
+        """Run a coroutine with standard cancel handling.
+
+        On CancelledError, shows a [Cancelled] block. Always clears _current_task
+        and calls finally_callback if provided.
+        """
+        try:
+            await coro
+        except asyncio.CancelledError:
+            block = CodeOutputBlock(render_markdown=False)
+            self.output.append_block(block)
+            block.append_error("\n[Cancelled]\n")
+            block.flush()
+            raise
+        finally:
+            self._current_task = None
+            if finally_callback:
+                finally_callback()
+
     async def on_terminal_input_submitted(self, event: TerminalInput.Submitted) -> None:
         """Handle code submission from input."""
         code = event.code
 
         self.input.clear()
 
-        # Create a task to track execution
-        async def execute():
-            try:
-                if event.is_agent_prompt:
-                    await self._handle_agent_prompt(code)
-                elif event.is_shell_command:
-                    result = await self._execute_code(code, language="bash", in_context=self._auto_send_to_agent)
-                    if self._auto_send_to_agent:
-                        await self._send_execution_result_to_agent(code, result)
-                else:
-                    result = await self._execute_code(code, language="python", in_context=self._auto_send_to_agent)
-                    if self._auto_send_to_agent:
-                        await self._send_execution_result_to_agent(code, result)
-            except asyncio.CancelledError:
-                # Task was cancelled - show message
-                code_output_block = CodeOutputBlock(render_markdown=False)
-                self.output.append_block(code_output_block)
-                code_output_block.append_error("\n[Cancelled]\n")
-                code_output_block.flush()
-                raise
-            finally:
-                self._current_task = None
+        async def do_execute():
+            if event.is_agent_prompt:
+                await self._handle_agent_prompt(code)
+            elif event.is_shell_command:
+                result = await self._execute_code(code, language="bash", in_context=self._auto_send_to_agent)
+                if self._auto_send_to_agent:
+                    await self._send_execution_result_to_agent(code, result)
+            else:
+                result = await self._execute_code(code, language="python", in_context=self._auto_send_to_agent)
+                if self._auto_send_to_agent:
+                    await self._send_execution_result_to_agent(code, result)
 
-        self._current_task = asyncio.create_task(execute())
+        self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
 
     def _make_output_callbacks(self, markdown_enabled: bool, in_context: bool = False):
         """Create on_output/on_error/flush callbacks that lazily create a CodeOutputBlock.
@@ -601,7 +629,7 @@ class ArtificeTerminal(Widget):
 
         # Create detector and store it so message handlers can access it
         self._current_detector = StreamingFenceDetector(
-            self.output, 
+            self.output,
             self.output.auto_scroll,
             save_callback=self._save_block_to_session
         )
@@ -721,37 +749,28 @@ class ArtificeTerminal(Widget):
         # Focus input immediately so user can continue working
         self.input.query_one("#code-input", InputTextArea).focus()
 
-        # Create a task to track execution
-        async def execute():
-            result = ExecutionResult(code=code, status=ExecutionStatus.ERROR)
-            sent_to_agent = False
-            try:
-                result = await self._execute_code(
-                    code, language=language,
-                    code_input_block=block, in_context=self._auto_send_to_agent,
-                )
-                block.update_status(result)
-                if self._auto_send_to_agent:
-                    sent_to_agent = True
-                    await self._send_execution_result_to_agent(code, result)
-            except asyncio.CancelledError:
-                code_output_block = CodeOutputBlock(render_markdown=False)
-                self.output.append_block(code_output_block)
-                code_output_block.append_error("\n[Cancelled]\n")
-                code_output_block.flush()
-                raise
-            finally:
-                if result:
-                    block.update_status(result)
-                block.finish_streaming()
-                self._current_task = None
-                # Only focus input if we didn't send results to the agent;
-                # _stream_agent_response already set focus to the first
-                # suggested code block when applicable.
-                if not sent_to_agent:
-                    self.input.focus_input()
+        state = {"result": ExecutionResult(code=code, status=ExecutionStatus.ERROR), "sent_to_agent": False}
 
-        self._current_task = asyncio.create_task(execute())
+        async def do_execute():
+            state["result"] = await self._execute_code(
+                code, language=language,
+                code_input_block=block, in_context=self._auto_send_to_agent,
+            )
+            block.update_status(state["result"])
+            if self._auto_send_to_agent:
+                state["sent_to_agent"] = True
+                await self._send_execution_result_to_agent(code, state["result"])
+
+        def cleanup():
+            if state["result"]:
+                block.update_status(state["result"])
+            block.finish_streaming()
+            if not state["sent_to_agent"]:
+                self.input.focus_input()
+
+        self._current_task = asyncio.create_task(
+            self._run_cancellable(do_execute(), finally_callback=cleanup)
+        )
 
     def on_stream_chunk(self, event: StreamChunk) -> None:
         """Handle streaming chunk message - buffer and batch process chunks."""
@@ -797,19 +816,10 @@ class ArtificeTerminal(Widget):
 
     async def action_toggle_mode_markdown(self) -> None:
         """Toggle markdown rendering for the current input mode (affects future blocks only)."""
-        # Determine current mode and toggle its setting
-        if self.input.mode == "ai":
-            self._agent_markdown_enabled = not self._agent_markdown_enabled
-            enabled_str = "enabled" if self._agent_markdown_enabled else "disabled"
-            self.app.notify(f"Markdown {enabled_str} for AI agent output")
-        elif self.input.mode == "shell":
-            self._shell_markdown_enabled = not self._shell_markdown_enabled
-            enabled_str = "enabled" if self._shell_markdown_enabled else "disabled"
-            self.app.notify(f"Markdown {enabled_str} for shell command output")
-        else:
-            self._python_markdown_enabled = not self._python_markdown_enabled
-            enabled_str = "enabled" if self._python_markdown_enabled else "disabled"
-            self.app.notify(f"Markdown {enabled_str} for Python code output")
+        attr, label = self._MARKDOWN_SETTINGS[self.input.mode]
+        setattr(self, attr, not getattr(self, attr))
+        enabled_str = "enabled" if getattr(self, attr) else "disabled"
+        self.app.notify(f"Markdown {enabled_str} for {label}")
 
     def reset(self) -> None:
         """Reset the REPL state."""
@@ -857,4 +867,3 @@ class ArtificeTerminal(Widget):
 
         # Remove highlighting from all context blocks
         self._clear_all_context_highlights()
-
