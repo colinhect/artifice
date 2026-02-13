@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from typing import Optional, Callable
 
 from .common import AgentBase, AgentResponse
@@ -93,13 +92,6 @@ class OllamaAgent(AgentBase):
                 chunks = []
                 thinking_chunks = []
 
-                # Pattern to detect thinking tags
-                # Matches: <think>, <thinking>, <reasoning>, etc.
-                thinking_pattern = re.compile(r'<(think|thinking|reasoning)>(.*?)</\1>', re.DOTALL)
-
-                # Accumulator for incomplete content (to handle tags split across chunks)
-                buffer = ""
-
                 # Build message list with system prompt if provided
                 messages = []
                 if self.system_prompt and len(self.messages) == 1:
@@ -115,71 +107,26 @@ class OllamaAgent(AgentBase):
                     think=True
                 )
 
-                def process_buffer():
-                    """Process buffer and extract complete thinking blocks."""
-                    nonlocal buffer
-
-                    # Find all complete thinking blocks
-                    matches = list(thinking_pattern.finditer(buffer))
-
-                    if matches:
-                        # Process text and thinking blocks in order
-                        last_end = 0
-                        for match in matches:
-                            # Text before the thinking block
-                            pre_text = buffer[last_end:match.start()]
-                            if pre_text:
-                                chunks.append(pre_text)
-                                if on_chunk:
-                                    on_chunk(pre_text)
-
-                            # Thinking content (without tags)
-                            thinking_text = match.group(2)
-                            thinking_chunks.append(thinking_text)
-                            if on_thinking_chunk:
-                                on_thinking_chunk(thinking_text)
-
-                            last_end = match.end()
-
-                        # Keep remainder in buffer (might be incomplete tag)
-                        buffer = buffer[last_end:]
-
-                    # Check if we should flush the buffer
-                    # Flush if: buffer doesn't start with "<" or doesn't look like start of a tag
-                    if buffer and not buffer.startswith('<'):
-                        # Find the last position before any potential tag start
-                        tag_start = buffer.rfind('<')
-                        if tag_start == -1:
-                            # No potential tag, flush everything
-                            chunks.append(buffer)
-                            if on_chunk:
-                                on_chunk(buffer)
-                            buffer = ""
-                        elif tag_start > 0:
-                            # Flush everything before the potential tag
-                            text_to_flush = buffer[:tag_start]
-                            chunks.append(text_to_flush)
-                            if on_chunk:
-                                on_chunk(text_to_flush)
-                            buffer = buffer[tag_start:]
-
                 stop_reason = None
                 for chunk in stream:
                     if "message" in chunk:
+                        # Regular content
                         content = chunk["message"].get("content", "")
                         if content:
-                            buffer += content
-                            process_buffer()
+                            chunks.append(content)
+                            if on_chunk:
+                                on_chunk(content)
+
+                        # Thinking content (separate field from Ollama API)
+                        thinking = chunk["message"].get("thinking", "")
+                        if thinking:
+                            thinking_chunks.append(thinking)
+                            if on_thinking_chunk:
+                                on_thinking_chunk(thinking)
 
                     # Check if this is the final chunk
                     if chunk.get("done", False):
                         stop_reason = chunk.get("done_reason", "end_turn")
-                        # Flush any remaining buffer as regular text
-                        if buffer:
-                            chunks.append(buffer)
-                            if on_chunk:
-                                on_chunk(buffer)
-                            buffer = ""
 
                 thinking_text = "".join(thinking_chunks) if thinking_chunks else None
                 return "".join(chunks), stop_reason, thinking_text
