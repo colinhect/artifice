@@ -7,15 +7,6 @@ from textual.widgets import Footer, Static
 from artifice import ArtificeTerminal
 from artifice.config import load_config, ArtificeConfig
 
-#import logging
-#logging.basicConfig(
-#  level=logging.INFO,
-#  format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-#  filename='artifice_agent.log',
-#  filemode='a'  # append mode
-#)
-#logging.getLogger('artifice.agent').setLevel(logging.DEBUG)
-
 class ArtificeHeader(Static):
     """Custom header with gradient fade effect."""
 
@@ -162,6 +153,7 @@ def main():
     parser.add_argument("--system-prompt", default=None, help="System prompt to use for the agent")
     parser.add_argument("--banner", action="store_true", default=None, help="Show the banner")
     parser.add_argument("--fullscreen", action="store_true", default=None, help="Full screen")
+    parser.add_argument("--logging", action="store_true", default=None, help="Enable logging")
     args = parser.parse_args()
 
     # Load configuration from ~/.config/artifice/init.py
@@ -176,6 +168,15 @@ def main():
         config.model = args.model
     if args.system_prompt:
         config.system_prompt = args.system_prompt
+    if args.logging:
+        import logging
+        logging.basicConfig(
+          level=logging.INFO,
+          format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+          filename='artifice_agent.log',
+          filemode='a'  # append mode
+        )
+        logging.getLogger('artifice.agent').setLevel(logging.DEBUG)
 
     app = ArtificeApp(config)
     
