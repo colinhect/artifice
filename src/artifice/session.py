@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+from .config import ArtificeConfig
 
 if TYPE_CHECKING:
     from .terminal_output import BaseBlock, CodeInputBlock, CodeOutputBlock, AgentInputBlock, AgentOutputBlock
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 class SessionTranscript:
     """Manages saving session transcripts to markdown files."""
     
-    def __init__(self, sessions_dir: Path):
+    def __init__(self, sessions_dir: Path, config: ArtificeConfig):
         """Initialize session transcript manager.
         
         Args:
@@ -25,6 +26,7 @@ class SessionTranscript:
         """
         self.sessions_dir = sessions_dir
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
+        self.config = config
         
         # Generate session filename with timestamp
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -41,6 +43,9 @@ class SessionTranscript:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         header = f"""# Artifice Session
 **Started:** {timestamp}
+**Provider:** {self.config.provider}
+**Model:** {self.config.model}
+**System Prompt:** {self.config.system_prompt}
 
 ---
 

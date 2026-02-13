@@ -399,12 +399,8 @@ class ArtificeTerminal(Widget):
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
         
-        # Store config reference
         self._config = app.config
-        
         self._executor = CodeExecutor()
-        
-        # Create shell executor
         self._shell_executor = ShellExecutor()
         
         # Set shell init script from config
@@ -425,71 +421,27 @@ class ArtificeTerminal(Widget):
             try:
                 ensure_sessions_dir(self._config)
                 sessions_dir = get_sessions_dir(self._config)
-                self._session_transcript = SessionTranscript(sessions_dir)
+                self._session_transcript = SessionTranscript(sessions_dir, self._config)
             except Exception as e:
                 logger.error(f"Failed to initialize session transcript: {e}")
 
-        # System prompt to guide the agent's behavior
-        system_prompt = (
-            "You are collaborating with the user to interface with their Linux system with access to a bash shell and a Python session. "
-            "All Python code or shell commands in your responses are interpreted as requests by you to execute that code. Make one request at a time. "
-            "Do not over explain unless asked to. Explanations precede the code. "
-            "If you give more than one option then the first is considered the main option. "
-            "Always use ```python or ```shell to mark code or shell command."
-        )
-
-        if self._config.system_prompt:
-            system_prompt += "\n\n" + self._config.system_prompt
-        
         # Create agent
         self._agent = None
+        model = self._config.model
+        system_prompt = self._config.system_prompt
         if app.provider.lower() == "claude":
             from .agent import ClaudeAgent
-            # Use configured model if available
-            if self._config.model:
-                self._agent = ClaudeAgent(model=self._config.model, system_prompt=system_prompt)
-            else:
-                self._agent = ClaudeAgent(system_prompt=system_prompt)
+            self._agent = ClaudeAgent(model=model, system_prompt=system_prompt)
         elif app.provider.lower() == "copilot":
             from .agent import CopilotAgent
-            if self._config.model:
-                self._agent = CopilotAgent(model=self._config.model, system_prompt=system_prompt)
-            else:
-                self._agent = CopilotAgent(system_prompt=system_prompt)
-        elif app.provider.lower() == "simulated":
-            from artifice.agent.simulated import SimulatedAgent
-            self._agent = SimulatedAgent(response_delay=0.0001)
-
-            # Configure scenarios with pattern matching
-            self._agent.configure_scenarios([
-                {
-                    'pattern': r'hello|hi|hey',
-                    'response': 'Hello! I\'m a **simulated** agent. How can I help you today?'
-                },
-                {
-                    'pattern': r'blank',
-                    'response': '```python\nimport time\ntime.sleep(3)\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
-                },
-                {
-                    'pattern': r'calculate|math|sum|add',
-                    'response': 'I can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
-                },
-                {
-                    'pattern': r'goodbye|bye|exit',
-                    'response': 'Goodbye! Thanks for chatting with me.'
-                },
-            ])
-
-            self._agent.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
+            self._agent = CopilotAgent(model=model, system_prompt=system_prompt)
         elif app.provider.lower() == "ollama":
             from .agent import OllamaAgent
-            # Use configured model and host if available
-            kwargs = {"system_prompt": system_prompt}
-            if self._config.model:
-                kwargs["model"] = self._config.model
-            if self._config.ollama_host:
-                kwargs["host"] = self._config.ollama_host
-            self._agent = OllamaAgent(**kwargs)
+            self._agent = OllamaAgent(model=model, system_prompt=system_prompt)
+        elif app.provider.lower() == "simulated":
+            from artifice.agent.simulated import SimulatedAgent
+            self._agent = SimulatedAgent(response_delay=0.001)
+            self._agent.default_scenarios_and_response()
         elif app.provider:
             raise Exception(f"Unsupported agent {app.provider}")
         

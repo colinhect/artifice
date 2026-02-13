@@ -45,6 +45,27 @@ class SimulatedAgent(AgentBase):
         if on_connect:
             on_connect("Artifice")
 
+    def default_scenarios_and_response(self):
+        self.configure_scenarios([
+            {
+                'pattern': r'hello|hi|hey',
+                'response': 'Hello! I\'m a **simulated** agent. How can I help you today?'
+            },
+            {
+                'pattern': r'blank',
+                'response': '```python\nimport time\ntime.sleep(3)\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
+            },
+            {
+                'pattern': r'calculate|math|sum|add',
+                'response': 'I can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
+            },
+            {
+                'pattern': r'goodbye|bye|exit',
+                'response': 'Goodbye! Thanks for chatting with me.'
+            },
+        ])
+        self.set_default_response("I'm not sure how to respond to that. Try asking about math or saying hello!")
+
     def configure_scenarios(self, scenarios: list[dict[str, Any]]) -> None:
         """Configure the agent with predefined scenarios.
 

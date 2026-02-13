@@ -21,9 +21,7 @@ class OllamaAgent(AgentBase):
 
     def __init__(
         self,
-        model: str = "llama3.2:1b",
-        #model: str = "tinyllama:1.1b",
-        #model: str = "qwen2.5:3b",
+        model: str | None,
         system_prompt: str | None = None,
         on_connect: Callable | None = None,
         host: str | None = None,
@@ -38,7 +36,10 @@ class OllamaAgent(AgentBase):
         """
         import os
         self.host = host or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-        self.model = model
+        if model:
+            self.model = model
+        else:
+            self.model = "llama3.2:1b"
         self.system_prompt = system_prompt
         self.on_connect = on_connect
         self._client = None

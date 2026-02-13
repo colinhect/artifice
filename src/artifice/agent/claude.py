@@ -20,8 +20,7 @@ class ClaudeAgent(AgentBase):
 
     def __init__(
         self,
-        #model: str = "claude-sonnet-4-5-20250929",
-        model: str = "claude-haiku-4-5-20251001",
+        model: str | None,
         system_prompt: str | None = None,
         on_connect: Callable | None = None,
     ):
@@ -33,7 +32,10 @@ class ClaudeAgent(AgentBase):
             on_connect: Optional callback called when the client first connects.
         """
         self.api_key = os.environ.get("ANTHROPIC_API_KEY")
-        self.model = model
+        if model:
+            self.model = model
+        else:
+            self.model = "claude-haiku-4-5"
         self.system_prompt = system_prompt
         self.on_connect = on_connect
         self._client = None

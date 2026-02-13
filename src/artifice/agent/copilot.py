@@ -25,7 +25,7 @@ class CopilotAgent(AgentBase):
 
     def __init__(
         self,
-        model: str = "gpt-5",
+        model: str | None,
         system_prompt: str | None = None,
         on_connect: Callable | None = None,
     ):
@@ -36,7 +36,10 @@ class CopilotAgent(AgentBase):
             system_prompt: Optional system prompt to guide the agent's behavior.
             on_connect: Optional callback called when the client first connects.
         """
-        self.model = model
+        if model:
+            self.model = model
+        else:
+            self.model = "claude-haiku-4.5"
         self.system_prompt = system_prompt
         self.on_connect = on_connect
         self._client = None
