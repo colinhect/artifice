@@ -15,7 +15,7 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 
-from .agent import AgentBase
+from .agent import AgentBase, create_agent
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
@@ -440,10 +440,10 @@ class ArtificeTerminal(Widget):
         # Create history manager
         self._history = History(history_file=history_file, max_history_size=max_history_size)
 
-        # Per-mode markdown rendering settings (from config)
         self._python_markdown_enabled = self._config.python_markdown
         self._agent_markdown_enabled = self._config.agent_markdown
         self._shell_markdown_enabled = self._config.shell_markdown
+        self._auto_send_to_agent: bool = self._config.auto_send_to_agent
 
         # Initialize session transcript if enabled
         self._session_transcript: SessionTranscript | None = None
@@ -457,26 +457,7 @@ class ArtificeTerminal(Widget):
 
         # Create agent
         self._agent: AgentBase | None = None
-        model = self._config.model
-        system_prompt = self._config.system_prompt
-        if app.provider.lower() == "anthropic":
-            from .agent import ClaudeAgent
-            self._agent = ClaudeAgent(model=model, system_prompt=system_prompt, thinking_budget=self._config.thinking_budget)
-        elif app.provider.lower() == "copilot":
-            from .agent import CopilotAgent
-            self._agent = CopilotAgent(model=model, system_prompt=system_prompt)
-        elif app.provider.lower() == "ollama":
-            from .agent import OllamaAgent
-            self._agent = OllamaAgent(model=model, system_prompt=system_prompt)
-        elif app.provider.lower() == "simulated":
-            from artifice.agent.simulated import SimulatedAgent
-            self._agent = SimulatedAgent(response_delay=0.001)
-            self._agent.default_scenarios_and_response()
-        elif app.provider:
-            raise Exception(f"Unsupported agent {app.provider}")
-
-        # Use auto-send setting from config
-        self._auto_send_to_agent: bool = self._config.auto_send_to_agent
+        self._agent = create_agent(self._config)
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")

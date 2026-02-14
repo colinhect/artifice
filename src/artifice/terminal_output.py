@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import pyperclip
 
 from textual import highlight
 from textual.app import ComposeResult
@@ -656,10 +657,12 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         # Extract code and mode from the block
         if isinstance(block, CodeInputBlock):
             code = block.get_code()
+            pyperclip.copy(code)
             mode = block.get_mode()
             self.post_message(self.BlockActivated(code, mode))
         elif isinstance(block, AgentInputBlock):
             code = block.get_prompt()
+            pyperclip.copy(code)
             mode = block.get_mode()
             self.post_message(self.BlockActivated(code, mode))
 

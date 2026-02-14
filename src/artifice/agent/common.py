@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import asyncio
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -42,3 +43,12 @@ class AgentBase(ABC):
     @abstractmethod
     def clear_conversation(self):
         pass
+
+    def send_prompt_and_wait_full_response(self, prompt):
+        response: str = ""
+        def on_chunk(text):
+            nonlocal response
+            response += text
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.send_prompt(prompt, on_chunk=on_chunk))
+        return response

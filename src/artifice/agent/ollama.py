@@ -25,6 +25,7 @@ class OllamaAgent(AgentBase):
         system_prompt: str | None = None,
         on_connect: Callable | None = None,
         host: str | None = None,
+        thinking_budget: int | None = None,
     ):
         """Initialize Ollama agent.
 
@@ -42,6 +43,7 @@ class OllamaAgent(AgentBase):
             self.model = "llama3.2:1b"
         self.system_prompt = system_prompt
         self.on_connect = on_connect
+        self.thinking_budget = thinking_budget
         self._client = None
         self.messages = []  # Persistent conversation history
 
@@ -104,7 +106,7 @@ class OllamaAgent(AgentBase):
                     model=self.model,
                     messages=messages,
                     stream=True,
-                    think=True
+                    think=self.thinking_budget is not None and self.thinking_budget > 0
                 )
 
                 stop_reason = None
