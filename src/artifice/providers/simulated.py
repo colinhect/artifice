@@ -38,10 +38,6 @@ def example():
        return "Hello, Markdown!"
 ```
 
-## Assistant
-
----
-
 ## Results  
 Key findings from the experiment:  
 - **Bold text** draws attention  
