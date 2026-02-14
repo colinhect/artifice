@@ -1,4 +1,3 @@
-
 """Main Artifice terminal widget."""
 
 from __future__ import annotations
@@ -15,6 +14,7 @@ from .terminal_output import (
 )
 
 _LANG_ALIASES = {"py": "python", "shell": "bash", "sh": "bash", "zsh": "bash"}
+
 
 class _FenceState(enum.Enum):
     PROSE = "prose"
@@ -253,4 +253,3 @@ class StreamingFenceDetector:
         if self._save_callback:
             for block in self.all_blocks:
                 self._save_callback(block)
-

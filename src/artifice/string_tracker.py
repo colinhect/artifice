@@ -1,5 +1,5 @@
-
 from __future__ import annotations
+
 
 class StringTracker:
     """Tracks whether we're inside a string literal in streaming code.
@@ -77,5 +77,3 @@ class StringTracker:
             # but not triple-quoted strings
             if ch == "\n" and self._in_string in ('"', "'"):
                 self._in_string = None
-
-

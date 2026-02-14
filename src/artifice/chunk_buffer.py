@@ -1,8 +1,8 @@
-
 from __future__ import annotations
 
 import asyncio
 import time
+
 
 class ChunkBuffer:
     """Accumulates text chunks and drains them in a single batch via call_later.
@@ -66,5 +66,3 @@ class ChunkBuffer:
     def pending(self) -> bool:
         """True if the buffer has un-drained text."""
         return bool(self._buffer)
-
-
