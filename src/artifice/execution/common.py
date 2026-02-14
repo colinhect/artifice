@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any
 
+
 class ExecutionStatus(Enum):
     """Status of code execution."""
 
@@ -33,5 +34,3 @@ class ExecutionResult:
     def is_success(self) -> bool:
         """Check if execution was successful."""
         return self.status == ExecutionStatus.SUCCESS
-
-

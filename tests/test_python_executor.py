@@ -45,7 +45,9 @@ class TestStatementExecution:
     @pytest.mark.asyncio
     async def test_print_output(self, executor):
         captured = []
-        result = await executor.execute("print('hello')", on_output=lambda t: captured.append(t))
+        result = await executor.execute(
+            "print('hello')", on_output=lambda t: captured.append(t)
+        )
         assert result.status == ExecutionStatus.SUCCESS
         assert "hello" in result.output or "hello" in "".join(captured)
 
@@ -111,7 +113,9 @@ class TestStreamingOutput:
     @pytest.mark.asyncio
     async def test_output_callback(self, executor):
         chunks = []
-        await executor.execute("print('line1')\nprint('line2')", on_output=lambda t: chunks.append(t))
+        await executor.execute(
+            "print('line1')\nprint('line2')", on_output=lambda t: chunks.append(t)
+        )
         combined = "".join(chunks)
         assert "line1" in combined
         assert "line2" in combined

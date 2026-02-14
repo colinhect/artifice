@@ -39,7 +39,9 @@ class TestOutputStreaming:
     @pytest.mark.asyncio
     async def test_stdout_callback(self, executor):
         lines = []
-        await executor.execute("echo one; echo two", on_output=lambda t: lines.append(t))
+        await executor.execute(
+            "echo one; echo two", on_output=lambda t: lines.append(t)
+        )
         assert any("one" in line for line in lines)
         assert any("two" in line for line in lines)
 

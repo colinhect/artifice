@@ -36,6 +36,7 @@ class OllamaAgent(AgentBase):
             host: Optional Ollama host URL. Falls back to OLLAMA_HOST env var.
         """
         import os
+
         self.host = host or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
         if model:
             self.model = model
@@ -52,6 +53,7 @@ class OllamaAgent(AgentBase):
         if self._client is None:
             try:
                 import ollama
+
                 self._client = ollama.Client(host=self.host)
                 if self.on_connect:
                     self.on_connect(f"Ollama ({self.model})")
@@ -106,7 +108,7 @@ class OllamaAgent(AgentBase):
                     model=self.model,
                     messages=messages,
                     stream=True,
-                    think=self.thinking_budget is not None and self.thinking_budget > 0
+                    think=self.thinking_budget is not None and self.thinking_budget > 0,
                 )
 
                 stop_reason = None
@@ -134,13 +136,19 @@ class OllamaAgent(AgentBase):
                 return "".join(chunks), stop_reason, thinking_text
 
             # Execute streaming in thread pool
-            text, stop_reason, thinking_text = await loop.run_in_executor(None, sync_stream)
+            text, stop_reason, thinking_text = await loop.run_in_executor(
+                None, sync_stream
+            )
 
             # Log and add assistant's response to conversation history
             if text:
-                logger.info(f"[OllamaAgent] Received response ({len(text)} chars, stop_reason={stop_reason}): {text}")
+                logger.info(
+                    f"[OllamaAgent] Received response ({len(text)} chars, stop_reason={stop_reason}): {text}"
+                )
                 if thinking_text:
-                    logger.info(f"[OllamaAgent] Thinking output ({len(thinking_text)} chars)")
+                    logger.info(
+                        f"[OllamaAgent] Thinking output ({len(thinking_text)} chars)"
+                    )
                 self.messages.append({"role": "assistant", "content": text})
 
             return AgentResponse(

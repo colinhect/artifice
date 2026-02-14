@@ -19,7 +19,17 @@ from .agent import AgentBase, create_agent
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
-from .terminal_output import TerminalOutput, AgentInputBlock, AgentOutputBlock, ThinkingOutputBlock, CodeInputBlock, CodeOutputBlock, WidgetOutputBlock, PinnedOutput, BaseBlock
+from .terminal_output import (
+    TerminalOutput,
+    AgentInputBlock,
+    AgentOutputBlock,
+    ThinkingOutputBlock,
+    CodeInputBlock,
+    CodeOutputBlock,
+    WidgetOutputBlock,
+    PinnedOutput,
+    BaseBlock,
+)
 from .config import get_sessions_dir, ensure_sessions_dir
 from .session import SessionTranscript
 
@@ -83,7 +93,7 @@ class StringTracker:
             self._quote_buffer = ""
             return
 
-        if ch == '\\':
+        if ch == "\\":
             self._escape_next = True
             self._quote_buffer = ""
             return
@@ -128,7 +138,7 @@ class StringTracker:
 
             # Newlines can end single-line strings in most languages
             # but not triple-quoted strings
-            if ch == '\n' and self._in_string in ('"', "'"):
+            if ch == "\n" and self._in_string in ('"', "'"):
                 self._in_string = None
 
 
@@ -151,13 +161,21 @@ class StreamingFenceDetector:
         self._pending_buffer = ""  # Text to add to current block
         self._chunk_buffer = ""  # Accumulates text for current chunk to display
         self._current_lang = "python"
-        self._current_block: BaseBlock | None = None  # The block we're currently appending to
+        self._current_block: BaseBlock | None = (
+            None  # The block we're currently appending to
+        )
         self.all_blocks: list[BaseBlock] = []
         self.first_agent_block: AgentOutputBlock | None = None
         self._string_tracker = StringTracker()
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
-        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=False, in_context=True, command_number=self._output.next_command_number())
+        self._make_code_block = lambda code, lang: CodeInputBlock(
+            code,
+            language=lang,
+            show_loading=False,
+            in_context=True,
+            command_number=self._output.next_command_number(),
+        )
 
     def start(self) -> None:
         """Create the initial AgentOutputBlock for streaming prose."""
@@ -192,7 +210,7 @@ class StreamingFenceDetector:
     def _flush_backticks_to_pending(self) -> None:
         """Flush accumulated backticks (that weren't a fence) to the pending buffer."""
         if self._backtick_count > 0:
-            self._pending_buffer += '`' * self._backtick_count
+            self._pending_buffer += "`" * self._backtick_count
             self._backtick_count = 0
 
     def _flush_and_update_chunk(self) -> None:
@@ -203,7 +221,7 @@ class StreamingFenceDetector:
 
     def _feed_prose(self, ch: str) -> None:
         """Process prose text, looking for opening fence."""
-        if ch == '`':
+        if ch == "`":
             self._backtick_count += 1
             if self._backtick_count == 3:
                 # Found opening fence - flush pending prose and transition
@@ -219,7 +237,7 @@ class StreamingFenceDetector:
 
     def _feed_lang_line(self, ch: str) -> None:
         """Process language line after opening fence."""
-        if ch == '\n':
+        if ch == "\n":
             # Language line complete - start code block
             lang = self._lang_buffer.strip() or "python"
             # Normalize language aliases
@@ -258,7 +276,7 @@ class StreamingFenceDetector:
         self._string_tracker.track(ch)
 
         # Only detect fences when not inside a string literal
-        if not self._string_tracker.in_string and ch == '`':
+        if not self._string_tracker.in_string and ch == "`":
             self._backtick_count += 1
             if self._backtick_count == 3:
                 # Found closing fence - flush pending code and transition
@@ -313,12 +331,12 @@ class StreamingFenceDetector:
         """Flush any remaining state at end of stream."""
         # Handle incomplete fences
         if self._state == _FenceState.LANG_LINE:
-            self._pending_buffer = '```' + self._lang_buffer
+            self._pending_buffer = "```" + self._lang_buffer
             self._state = _FenceState.PROSE
 
         # Flush trailing backticks that weren't a complete fence
         if self._backtick_count > 0:
-            self._pending_buffer += '`' * self._backtick_count
+            self._pending_buffer += "`" * self._backtick_count
             self._backtick_count = 0
 
         # Flush any remaining text ONLY if there's pending content
@@ -344,8 +362,11 @@ class StreamingFenceDetector:
 
         # Remove empty AgentOutputBlocks (keep first_agent_block for status indicator)
         for block in [
-            b for b in self.all_blocks
-            if isinstance(b, AgentOutputBlock) and b is not self.first_agent_block and not b._full.strip()
+            b
+            for b in self.all_blocks
+            if isinstance(b, AgentOutputBlock)
+            and b is not self.first_agent_block
+            and not b._full.strip()
         ]:
             self._remove_block(block)
 
@@ -395,7 +416,9 @@ class ArtificeTerminal(Widget):
             self._shell_executor.init_script = self._config.shell_init_script
 
         # Create history manager
-        self._history = History(history_file=history_file, max_history_size=max_history_size)
+        self._history = History(
+            history_file=history_file, max_history_size=max_history_size
+        )
 
         self._python_markdown_enabled = self._config.python_markdown
         self._agent_markdown_enabled = self._config.agent_markdown
@@ -412,7 +435,6 @@ class ArtificeTerminal(Widget):
             except Exception as e:
                 logger.error(f"Failed to initialize session transcript: {e}")
 
-
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
         self.agent_loading = LoadingIndicator()
@@ -421,13 +443,21 @@ class ArtificeTerminal(Widget):
         self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
         self._context_blocks: list[BaseBlock] = []  # Blocks in agent context
-        self._current_detector: StreamingFenceDetector | None = None  # Active streaming detector
+        self._current_detector: StreamingFenceDetector | None = (
+            None  # Active streaming detector
+        )
         self._chunk_buffer: str = ""  # Buffer for batching StreamChunk messages
-        self._chunk_processing_scheduled: bool = False  # Flag to avoid duplicate batch processing
+        self._chunk_processing_scheduled: bool = (
+            False  # Flag to avoid duplicate batch processing
+        )
         self._thinking_block: ThinkingOutputBlock | None = None  # Active thinking block
         self._thinking_buffer: str = ""  # Buffer for batching thinking chunks
-        self._thinking_processing_scheduled: bool = False  # Flag to avoid duplicate batch processing
-        self._loading_block: AgentOutputBlock | None = None  # Initial loading block before first chunk
+        self._thinking_processing_scheduled: bool = (
+            False  # Flag to avoid duplicate batch processing
+        )
+        self._loading_block: AgentOutputBlock | None = (
+            None  # Initial loading block before first chunk
+        )
 
         def on_connect(_):
             self.connection_status.add_class("connected")
@@ -485,11 +515,15 @@ class ArtificeTerminal(Widget):
             if event.is_agent_prompt:
                 await self._handle_agent_prompt(code)
             elif event.is_shell_command:
-                result = await self._execute_code(code, language="bash", in_context=self._auto_send_to_agent)
+                result = await self._execute_code(
+                    code, language="bash", in_context=self._auto_send_to_agent
+                )
                 if self._auto_send_to_agent:
                     await self._send_execution_result_to_agent(code, result)
             else:
-                result = await self._execute_code(code, language="python", in_context=self._auto_send_to_agent)
+                result = await self._execute_code(
+                    code, language="python", in_context=self._auto_send_to_agent
+                )
                 if self._auto_send_to_agent:
                     await self._send_execution_result_to_agent(code, result)
 
@@ -507,7 +541,9 @@ class ArtificeTerminal(Widget):
 
         def ensure_block():
             if state["block"] is None:
-                state["block"] = CodeOutputBlock(render_markdown=markdown_enabled, in_context=in_context)
+                state["block"] = CodeOutputBlock(
+                    render_markdown=markdown_enabled, in_context=in_context
+                )
                 if in_context:
                     self._context_blocks.append(state["block"])
                 self.output.append_block(state["block"])
@@ -539,7 +575,9 @@ class ArtificeTerminal(Widget):
         return on_output, on_error, flush
 
     async def _execute_code(
-        self, code: str, language: str = "python",
+        self,
+        code: str,
+        language: str = "python",
         code_input_block: CodeInputBlock | None = None,
         in_context: bool = False,
     ) -> ExecutionResult:
@@ -552,12 +590,20 @@ class ArtificeTerminal(Widget):
             in_context: Whether the output should be marked as in agent context.
         """
         if code_input_block is None:
-            code_input_block = CodeInputBlock(code, language=language, show_loading=True, in_context=in_context)
+            code_input_block = CodeInputBlock(
+                code, language=language, show_loading=True, in_context=in_context
+            )
             self.output.append_block(code_input_block)
             self._save_block_to_session(code_input_block)
 
-        markdown_enabled = self._shell_markdown_enabled if language == "bash" else self._python_markdown_enabled
-        on_output, on_error, flush_output = self._make_output_callbacks(markdown_enabled, in_context)
+        markdown_enabled = (
+            self._shell_markdown_enabled
+            if language == "bash"
+            else self._python_markdown_enabled
+        )
+        on_output, on_error, flush_output = self._make_output_callbacks(
+            markdown_enabled, in_context
+        )
 
         executor = self._shell_executor if language == "bash" else self._executor
         result = await executor.execute(code, on_output=on_output, on_error=on_error)
@@ -583,7 +629,9 @@ class ArtificeTerminal(Widget):
             block.remove_class("in-context")
         self._context_blocks.clear()
 
-    async def _stream_agent_response(self, agent: AgentBase, prompt: str) -> tuple[StreamingFenceDetector, object]:
+    async def _stream_agent_response(
+        self, agent: AgentBase, prompt: str
+    ) -> tuple[StreamingFenceDetector, object]:
         """Stream an agent response, splitting into prose and code blocks.
 
         Returns the detector (with all_blocks, first_agent_block) and the AgentResponse.
@@ -596,7 +644,7 @@ class ArtificeTerminal(Widget):
         self._current_detector = StreamingFenceDetector(
             self.output,
             self.output.auto_scroll,
-            save_callback=self._save_block_to_session
+            save_callback=self._save_block_to_session,
         )
         self._detector_started = False
 
@@ -617,7 +665,9 @@ class ArtificeTerminal(Widget):
         self.agent_loading.classes = "agent-active"
         self.connection_status.remove_class("agent-inactive")
         self.connection_status.add_class("agent-active")
-        response = await agent.send_prompt(prompt, on_chunk=on_chunk, on_thinking_chunk=on_thinking_chunk)
+        response = await agent.send_prompt(
+            prompt, on_chunk=on_chunk, on_thinking_chunk=on_thinking_chunk
+        )
         self.connection_status.add_class("agent-inactive")
         self.connection_status.remove_class("agent-active")
         self.agent_loading.classes = "agent-inactive"
@@ -657,7 +707,9 @@ class ArtificeTerminal(Widget):
             if self._current_detector.first_agent_block:
                 if response.error:
                     # Show the error message in the block
-                    self._current_detector.first_agent_block.append(f"\n**Error:** {response.error}\n")
+                    self._current_detector.first_agent_block.append(
+                        f"\n**Error:** {response.error}\n"
+                    )
                     self._current_detector.first_agent_block.flush()
                     self._current_detector.first_agent_block.mark_failed()
                 else:
@@ -712,23 +764,38 @@ class ArtificeTerminal(Widget):
             self._auto_send_to_agent = True
             self.input.add_class("in-context")
 
-    async def _send_execution_result_to_agent(self, code: str, result: ExecutionResult) -> None:
+    async def _send_execution_result_to_agent(
+        self, code: str, result: ExecutionResult
+    ) -> None:
         """Send execution results back to the agent and split the response."""
         if self._agent is not None:
-            prompt = "Executed:\n```\n" + code + "```\n\nOutput:\n" + result.output + result.error + "\n"
+            prompt = (
+                "Executed:\n```\n"
+                + code
+                + "```\n\nOutput:\n"
+                + result.output
+                + result.error
+                + "\n"
+            )
             await self._stream_agent_response(self._agent, prompt)
 
-    async def on_terminal_output_pin_requested(self, event: TerminalOutput.PinRequested) -> None:
+    async def on_terminal_output_pin_requested(
+        self, event: TerminalOutput.PinRequested
+    ) -> None:
         """Handle pin request: move widget block from output to pinned area."""
         block = event.block
         await block.remove()
         await self.pinned_output.add_pinned_block(block)
 
-    async def on_pinned_output_unpin_requested(self, event: PinnedOutput.UnpinRequested) -> None:
+    async def on_pinned_output_unpin_requested(
+        self, event: PinnedOutput.UnpinRequested
+    ) -> None:
         """Handle unpin request: remove block from pinned area."""
         await self.pinned_output.remove_pinned_block(event.block)
 
-    async def on_terminal_output_block_activated(self, event: TerminalOutput.BlockActivated) -> None:
+    async def on_terminal_output_block_activated(
+        self, event: TerminalOutput.BlockActivated
+    ) -> None:
         """Handle block activation: copy code to input with correct mode."""
         # Set the code in the input
         self.input.code = event.code
@@ -738,7 +805,9 @@ class ArtificeTerminal(Widget):
         # Focus the input
         self.input.query_one("#code-input", InputTextArea).focus()
 
-    async def on_terminal_output_block_execute_requested(self, event: TerminalOutput.BlockExecuteRequested) -> None:
+    async def on_terminal_output_block_execute_requested(
+        self, event: TerminalOutput.BlockExecuteRequested
+    ) -> None:
         """Handle block execution: execute code from a block and send output to agent."""
         block = event.block
         code = block.get_code()
@@ -751,12 +820,17 @@ class ArtificeTerminal(Widget):
         # Focus input immediately so user can continue working
         self.input.query_one("#code-input", InputTextArea).focus()
 
-        state = {"result": ExecutionResult(code=code, status=ExecutionStatus.ERROR), "sent_to_agent": False}
+        state = {
+            "result": ExecutionResult(code=code, status=ExecutionStatus.ERROR),
+            "sent_to_agent": False,
+        }
 
         async def do_execute():
             state["result"] = await self._execute_code(
-                code, language=language,
-                code_input_block=block, in_context=self._auto_send_to_agent,
+                code,
+                language=language,
+                code_input_block=block,
+                in_context=self._auto_send_to_agent,
             )
             block.update_status(state["result"])
             if self._auto_send_to_agent:
@@ -815,7 +889,6 @@ class ArtificeTerminal(Widget):
                 logger.exception("Error processing chunk buffer")
         # Reset scheduling flag to allow next batch
         self._chunk_processing_scheduled = False
-
 
     def on_stream_thinking_chunk(self, event: StreamThinkingChunk) -> None:
         """Handle streaming thinking chunk message - buffer and batch process."""

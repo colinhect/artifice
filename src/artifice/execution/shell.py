@@ -11,6 +11,7 @@ from typing import Callable, Optional
 
 from .common import ExecutionStatus, ExecutionResult
 
+
 class ShellExecutor:
     """Executes shell commands asynchronously with streaming output.
 
@@ -57,7 +58,7 @@ class ShellExecutor:
                 command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                #cwd=self.working_directory,
+                # cwd=self.working_directory,
             )
 
             # Collect output
@@ -70,7 +71,7 @@ class ShellExecutor:
                     line = await stream.readline()
                     if not line:
                         break
-                    text = line.decode('utf-8', errors='replace')
+                    text = line.decode("utf-8", errors="replace")
                     lines_list.append(text)
                     if text and callback:
                         callback(text)
@@ -90,7 +91,9 @@ class ShellExecutor:
 
             result.output = full_output
             result.error = full_error
-            result.status = ExecutionStatus.SUCCESS if returncode == 0 else ExecutionStatus.ERROR
+            result.status = (
+                ExecutionStatus.SUCCESS if returncode == 0 else ExecutionStatus.ERROR
+            )
 
         except asyncio.CancelledError:
             result.status = ExecutionStatus.ERROR
@@ -108,7 +111,9 @@ class ShellExecutor:
         except Exception as e:
             result.status = ExecutionStatus.ERROR
             result.exception = e
-            error_text = f"Failed to execute command: {str(e)}\n{traceback.format_exc()}"
+            error_text = (
+                f"Failed to execute command: {str(e)}\n{traceback.format_exc()}"
+            )
             result.error = error_text
             if on_error:
                 on_error(error_text)
@@ -145,13 +150,15 @@ class ShellExecutor:
 
             # Set TERM environment variable to enable color
             env = os.environ.copy()
-            env['TERM'] = env.get('TERM', 'xterm-256color')
+            env["TERM"] = env.get("TERM", "xterm-256color")
 
             # Prepare the actual command to execute
             if self.init_script and use_shell:
                 # Write a complete script that includes init + command + pwd capture
                 # This is the most reliable way to handle aliases
-                init_file = tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False)
+                init_file = tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".sh", delete=False
+                )
                 init_file.write("#!/bin/bash\n")
                 init_file.write("shopt -s expand_aliases\n")
                 init_file.write(self.init_script)
@@ -168,7 +175,7 @@ class ShellExecutor:
                     wrapped_command = f'cd "{self.working_directory}" && {command} ; echo "###ARTIFICE_PWD###$(pwd)###"'
                 else:
                     wrapped_command = command
-            
+
             if use_shell:
                 # Use shell for commands with shell metacharacters
                 process = await asyncio.create_subprocess_shell(
@@ -210,21 +217,25 @@ class ShellExecutor:
 
             # Read output from master fd
             output_buffer = []
-            
+
             async def read_pty_output():
                 """Read all output from the PTY."""
                 loop = asyncio.get_event_loop()
                 while True:
                     try:
                         # Read from master fd in non-blocking way
-                        data = await loop.run_in_executor(None, os.read, master_fd, 4096)
+                        data = await loop.run_in_executor(
+                            None, os.read, master_fd, 4096
+                        )
                         if not data:
                             break
-                        text = data.decode('utf-8', errors='replace')
+                        text = data.decode("utf-8", errors="replace")
                         output_buffer.append(text)
                         # Filter out the marker from live output
                         if on_output:
-                            filtered_text = re.sub(r'###ARTIFICE_PWD###[^#]+###\r?\n?', '', text)
+                            filtered_text = re.sub(
+                                r"###ARTIFICE_PWD###[^#]+###\r?\n?", "", text
+                            )
                             if filtered_text:
                                 on_output(filtered_text)
                     except OSError:
@@ -264,25 +275,31 @@ class ShellExecutor:
 
             # Collect results
             full_output = "".join(output_buffer)
-            
+
             # Extract and remove the working directory marker
             # The marker format is: ###ARTIFICE_PWD###/path/to/dir###
-            pwd_match = re.search(r'###ARTIFICE_PWD###([^#]+)###', full_output)
+            pwd_match = re.search(r"###ARTIFICE_PWD###([^#]+)###", full_output)
             if pwd_match:
                 new_pwd = pwd_match.group(1).strip()
                 if new_pwd and os.path.isdir(new_pwd):
                     self.working_directory = new_pwd
-            
+
             # Remove the entire marker line from output (including newlines)
-            full_output = re.sub(r'###ARTIFICE_PWD###[^#]+###\r?\n?', '', full_output)
-            
+            full_output = re.sub(r"###ARTIFICE_PWD###[^#]+###\r?\n?", "", full_output)
+
             result.output = full_output
-            result.status = ExecutionStatus.SUCCESS if process.returncode == 0 else ExecutionStatus.ERROR
+            result.status = (
+                ExecutionStatus.SUCCESS
+                if process.returncode == 0
+                else ExecutionStatus.ERROR
+            )
 
         except Exception as e:
             result.status = ExecutionStatus.ERROR
             result.exception = e
-            error_text = f"Failed to execute command: {str(e)}\n{traceback.format_exc()}"
+            error_text = (
+                f"Failed to execute command: {str(e)}\n{traceback.format_exc()}"
+            )
             result.error = error_text
             if on_error:
                 on_error(error_text)

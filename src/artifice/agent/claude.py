@@ -9,6 +9,7 @@ from .common import AgentBase, AgentResponse
 
 logger = logging.getLogger(__name__)
 
+
 class ClaudeAgent(AgentBase):
     """Agent for connecting to Claude via Anthropic API with streaming responses.
 
@@ -49,6 +50,7 @@ class ClaudeAgent(AgentBase):
         if self._client is None:
             try:
                 from anthropic import Anthropic
+
                 self._client = Anthropic(api_key=self.api_key)
                 if self.on_connect:
                     self.on_connect("Claude")
@@ -131,10 +133,14 @@ class ClaudeAgent(AgentBase):
 
             # Log and add assistant's response to conversation history
             if text:
-                logger.info(f"[ClaudeAgent] Received response ({len(text)} chars, stop_reason={stop_reason}): {text}")
+                logger.info(
+                    f"[ClaudeAgent] Received response ({len(text)} chars, stop_reason={stop_reason}): {text}"
+                )
                 # Store structured content for multi-turn thinking compatibility
                 if content_blocks:
-                    self.messages.append({"role": "assistant", "content": content_blocks})
+                    self.messages.append(
+                        {"role": "assistant", "content": content_blocks}
+                    )
                 else:
                     self.messages.append({"role": "assistant", "content": text})
 
@@ -160,7 +166,9 @@ class ClaudeAgent(AgentBase):
             message = stream.get_final_message()
         return "".join(chunks), message.stop_reason, None, None
 
-    def _stream_with_thinking(self, client, api_params, chunks, loop, on_chunk, on_thinking_chunk):
+    def _stream_with_thinking(
+        self, client, api_params, chunks, loop, on_chunk, on_thinking_chunk
+    ):
         """Stream with extended thinking support, capturing both thinking and text deltas."""
         thinking_chunks = []
 
@@ -183,16 +191,20 @@ class ClaudeAgent(AgentBase):
         content_blocks = []
         for block in message.content:
             if block.type == "thinking":
-                content_blocks.append({
-                    "type": "thinking",
-                    "thinking": block.thinking,
-                    "signature": block.signature,
-                })
+                content_blocks.append(
+                    {
+                        "type": "thinking",
+                        "thinking": block.thinking,
+                        "signature": block.signature,
+                    }
+                )
             elif block.type == "text":
-                content_blocks.append({
-                    "type": "text",
-                    "text": block.text,
-                })
+                content_blocks.append(
+                    {
+                        "type": "text",
+                        "text": block.text,
+                    }
+                )
 
         return (
             "".join(chunks),

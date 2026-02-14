@@ -12,8 +12,10 @@ from artifice.terminal import StreamingFenceDetector, _FenceState
 
 # --- Fakes to avoid Textual widget dependencies ---
 
+
 class FakeBlock:
     """Base fake block."""
+
     def __init__(self):
         self._text = ""
         self._full = ""
@@ -27,6 +29,7 @@ class FakeBlock:
 
 class FakeAgentBlock(FakeBlock):
     """Fake AgentOutputBlock that just accumulates text."""
+
     def __init__(self, activity=False):
         super().__init__()
 
@@ -49,6 +52,7 @@ class FakeAgentBlock(FakeBlock):
 
 class FakeCodeBlock(FakeBlock):
     """Fake CodeInputBlock that just stores code."""
+
     def __init__(self, code="", language="python"):
         super().__init__()
         self._code = code
@@ -67,6 +71,7 @@ class FakeCodeBlock(FakeBlock):
 
 class FakeOutput:
     """Fake TerminalOutput."""
+
     def __init__(self):
         self._blocks = []
         self._command_counter = 0
@@ -85,15 +90,19 @@ class FakeOutput:
 @pytest.fixture(autouse=True)
 def _patch_block_types():
     """Patch isinstance targets so the detector recognizes our fakes."""
-    with patch("artifice.terminal.AgentOutputBlock", FakeAgentBlock), \
-         patch("artifice.terminal.CodeInputBlock", FakeCodeBlock):
+    with (
+        patch("artifice.terminal.AgentOutputBlock", FakeAgentBlock),
+        patch("artifice.terminal.CodeInputBlock", FakeCodeBlock),
+    ):
         yield
 
 
 def make_detector(save_callback=None):
     """Create a detector with fake dependencies."""
     output = FakeOutput()
-    detector = StreamingFenceDetector(output, auto_scroll=True, save_callback=save_callback)
+    detector = StreamingFenceDetector(
+        output, auto_scroll=True, save_callback=save_callback
+    )
     detector._make_prose_block = lambda activity: FakeAgentBlock(activity=activity)
     detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
     return detector, output
@@ -141,7 +150,9 @@ class TestBasicFenceDetection:
         d.feed("Before\n```python\ncode\n```\nAfter")
         d.finish()
 
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock) and b._text.strip()]
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAgentBlock) and b._text.strip()
+        ]
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
         assert any("Before" in b._text for b in prose_blocks)
@@ -284,7 +295,7 @@ class TestStringAwareness:
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
-        assert 'print(x)' in code_blocks[0]._code
+        assert "print(x)" in code_blocks[0]._code
 
     def test_backticks_in_single_quoted_string(self):
         d, out = make_detector()
@@ -294,7 +305,7 @@ class TestStringAwareness:
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
-        assert 'print(x)' in code_blocks[0]._code
+        assert "print(x)" in code_blocks[0]._code
 
 
 class TestEmptyBlocks:

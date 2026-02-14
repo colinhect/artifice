@@ -8,6 +8,7 @@ from artifice import ArtificeTerminal
 from artifice.config import load_config, ArtificeConfig
 from artifice.theme import create_artifice_theme
 
+
 class ArtificeHeader(Static):
     """Custom header with gradient fade effect."""
 
@@ -23,9 +24,10 @@ class ArtificeHeader(Static):
             header_content = """┌─┐┬─┐┌┬┐┬┌─┐┬┌─┐┌─┐
 ├─┤├┬┘ │ │├┤ ││  ├┤
 ┴ ┴┴└─ ┴ ┴└  ┴└─┘└─┘\n"""
-        
+
         header_content += "".join(gradient_chars)
         yield Static(header_content, classes="header-bar")
+
 
 class ArtificeApp(App):
     TITLE = "Artifice Terminal"
@@ -64,17 +66,28 @@ class ArtificeApp(App):
 def main():
     """Main entry point for the artifice command."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("model", nargs='?', default=None, help="Model to use")
-    parser.add_argument("--system-prompt", default=None, help="System prompt to use for the agent")
+    parser.add_argument("model", nargs="?", default=None, help="Model to use")
+    parser.add_argument(
+        "--system-prompt", default=None, help="System prompt to use for the agent"
+    )
     parser.add_argument("--prompt-prefix", default=None, help="Prefix to user prompts")
-    parser.add_argument("--thinking-budget", type=int, default=None, help="Extended thinking token budget (>0 enables thinking)")
-    parser.add_argument("--fullscreen", action="store_true", default=None, help="Full screen")
-    parser.add_argument("--logging", action="store_true", default=None, help="Enable logging")
+    parser.add_argument(
+        "--thinking-budget",
+        type=int,
+        default=None,
+        help="Extended thinking token budget (>0 enables thinking)",
+    )
+    parser.add_argument(
+        "--fullscreen", action="store_true", default=None, help="Full screen"
+    )
+    parser.add_argument(
+        "--logging", action="store_true", default=None, help="Enable logging"
+    )
     args = parser.parse_args()
 
     # Load configuration from ~/.config/artifice/init.py
     config, config_error = load_config()
-    
+
     # Command-line arguments override config
     if args.model is not None:
         config.model = args.model
@@ -86,20 +99,25 @@ def main():
         config.thinking_budget = args.thinking_budget
     if args.logging:
         import logging
+
         logging.basicConfig(
-          level=logging.INFO,
-          format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-          filename='artifice_agent.log',
-          filemode='a'  # append mode
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename="artifice_agent.log",
+            filemode="a",  # append mode
         )
-        logging.getLogger('artifice.agent').setLevel(logging.DEBUG)
+        logging.getLogger("artifice.agent").setLevel(logging.DEBUG)
 
     app = ArtificeApp(config)
-    
+
     # Show config error if any (as a notification once app starts)
     if config_error:
-        app.call_later(lambda: app.notify(f"Config error: {config_error}", severity="warning", timeout=10))
-    
+        app.call_later(
+            lambda: app.notify(
+                f"Config error: {config_error}", severity="warning", timeout=10
+            )
+        )
+
     if args.fullscreen:
         app.run()
     else:

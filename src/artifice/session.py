@@ -17,24 +17,24 @@ if TYPE_CHECKING:
 
 class SessionTranscript:
     """Manages saving session transcripts to markdown files."""
-    
+
     def __init__(self, sessions_dir: Path, config: ArtificeConfig):
         """Initialize session transcript manager.
-        
+
         Args:
             sessions_dir: Directory where session files will be saved
         """
         self.sessions_dir = sessions_dir
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
         self.config = config
-        
+
         # Generate session filename with timestamp
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.session_file = self.sessions_dir / f"session_{timestamp}.md"
-        
+
         # Track if we've written the header
         self._header_written = False
-    
+
     def _ensure_header(self) -> None:
         """Write session header if not already written."""
         if self._header_written:
@@ -43,50 +43,53 @@ class SessionTranscript:
         assert self.config.models
         model = self.config.models.get(self.config.model)
         assert model
-        
+
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         header = f"""# Artifice Session
 **Started:** {timestamp}
 **Model:** {self.config.model}
-**Provider:** {model['provider']} ({model['model']})
+**Provider:** {model["provider"]} ({model["model"]})
 **System Prompt:** {self.config.system_prompt}
 
 ---
 
 """
-        with open(self.session_file, 'w') as f:
+        with open(self.session_file, "w") as f:
             f.write(header)
-        
+
         self._header_written = True
-    
+
     def append_block(self, block: BaseBlock) -> None:
         """Append a block to the session transcript.
-        
+
         Args:
             block: The block to append (CodeInputBlock, CodeOutputBlock, etc.)
         """
         self._ensure_header()
-        
+
         # Import here to avoid circular imports
-        
+
         markdown = self._block_to_markdown(block)
         if markdown:
-            with open(self.session_file, 'a') as f:
+            with open(self.session_file, "a") as f:
                 f.write(markdown)
-                f.write('\n\n')
-    
+                f.write("\n\n")
+
     def _block_to_markdown(self, block: BaseBlock) -> str:
         """Convert a block to markdown format.
-        
+
         Args:
             block: The block to convert
-            
+
         Returns:
             Markdown representation of the block
         """
         from .terminal_output import (
-            CodeInputBlock, CodeOutputBlock,
-            AgentInputBlock, AgentOutputBlock, ThinkingOutputBlock
+            CodeInputBlock,
+            CodeOutputBlock,
+            AgentInputBlock,
+            AgentOutputBlock,
+            ThinkingOutputBlock,
         )
 
         if isinstance(block, AgentInputBlock):
@@ -104,12 +107,12 @@ class SessionTranscript:
             if content:
                 return f"## Agent\n\n{content}"
             return ""
-        
+
         elif isinstance(block, CodeInputBlock):
             code = block.get_code().strip()
             language = block._language
             return f"### {block._command_number} Code\n\n```{language}\n{code}\n```"
-        
+
         elif isinstance(block, CodeOutputBlock):
             output = block._full.strip()
             if output:
@@ -119,19 +122,19 @@ class SessionTranscript:
                 else:
                     return f"### Output\n\n```\n{output}\n```"
             return ""
-        
+
         # Unknown block type - skip
         return ""
-    
+
     def finalize(self) -> None:
         """Finalize the session transcript (write footer)."""
         if not self._header_written:
             return
-        
+
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         footer = f"""---
 
 **Ended:** {timestamp}
 """
-        with open(self.session_file, 'a') as f:
+        with open(self.session_file, "a") as f:
             f.write(footer)

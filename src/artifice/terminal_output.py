@@ -16,11 +16,21 @@ from textual.widgets import Static, LoadingIndicator, Markdown
 from .execution import ExecutionResult, ExecutionStatus
 from .terminal_input import InputTextArea
 
+
 class BaseBlock(Static):
     pass
 
+
 class CodeInputBlock(BaseBlock):
-    def __init__(self, code: str, language: str, show_loading: bool = True, in_context=False, command_number: int | None = None, **kwargs) -> None:
+    def __init__(
+        self,
+        code: str,
+        language: str,
+        show_loading: bool = True,
+        in_context=False,
+        command_number: int | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self._loading_indicator = LoadingIndicator(classes="status-indicator")
         if show_loading:
@@ -36,7 +46,9 @@ class CodeInputBlock(BaseBlock):
         self._status_icon.add_class("status-unexecuted")
         self._original_code = code  # Store original code for re-execution
         # Always use syntax highlighting, even during streaming
-        self._code = Static(highlight.highlight(code, language=language), classes="code")
+        self._code = Static(
+            highlight.highlight(code, language=language), classes="code"
+        )
         self._status_container = Horizontal(classes="status-indicator")
         if in_context:
             self.add_class("in-context")
@@ -55,7 +67,7 @@ class CodeInputBlock(BaseBlock):
             with self._status_container:
                 yield self._loading_indicator
                 yield self._status_icon
-                #yield self._prompt_indicator
+                # yield self._prompt_indicator
             yield self._code
 
     def update_status(self, result: ExecutionResult) -> None:
@@ -106,7 +118,9 @@ class CodeInputBlock(BaseBlock):
         self._prompt_indicator.update(self._get_prompt())
 
         # Update syntax highlighting and markdown
-        self._code.update(highlight.highlight(self._original_code.strip(), language=self._language))
+        self._code.update(
+            highlight.highlight(self._original_code.strip(), language=self._language)
+        )
 
 
 class BufferedOutputBlock(BaseBlock):
@@ -155,7 +169,9 @@ class BufferedOutputBlock(BaseBlock):
             if self._markdown:
                 self._markdown.remove()
                 self._markdown = None
-            self._output = Static(self._format_plain_text(), classes=self._STATIC_CSS_CLASS)
+            self._output = Static(
+                self._format_plain_text(), classes=self._STATIC_CSS_CLASS
+            )
             self._contents.mount(self._output)
 
     def _format_plain_text(self) -> str:
@@ -201,6 +217,7 @@ class CodeOutputBlock(BufferedOutputBlock):
                 self._markdown.remove_class("markdown-output")
                 self._markdown.add_class("error-output")
 
+
 class WidgetOutputBlock(BaseBlock):
     """Block that displays an arbitrary Textual widget."""
 
@@ -213,6 +230,7 @@ class WidgetOutputBlock(BaseBlock):
             yield Static("", classes="status-indicator")
             with Vertical(classes="widget-container"):
                 yield self._widget
+
 
 class AgentInputBlock(BaseBlock):
     def __init__(self, prompt: str, in_context=False, **kwargs) -> None:
@@ -237,17 +255,20 @@ class AgentInputBlock(BaseBlock):
         """Get the mode for this block (ai)."""
         return "ai"
 
+
 class AgentOutputBlock(BufferedOutputBlock):
     _STATIC_CSS_CLASS = "text-output"
     _MARKDOWN_CSS_CLASS = "agent-output"
 
-    _FLUSH_INTERVAL = 0.1  # Minimum seconds between Markdown re-renders during streaming
+    _FLUSH_INTERVAL = (
+        0.1  # Minimum seconds between Markdown re-renders during streaming
+    )
 
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__(output=output, render_markdown=render_markdown)
-        #self._loading_indicator = LoadingIndicator(classes="loading-indicator")
+        # self._loading_indicator = LoadingIndicator(classes="loading-indicator")
         self._status_indicator = Static("", classes="status-indicator")
-        #self._status_indicator.styles.display = "none"
+        # self._status_indicator.styles.display = "none"
         self._streaming = activity
         self._last_flush_time: float = 0.0
         self._flush_timer_pending: bool = False
@@ -258,7 +279,7 @@ class AgentOutputBlock(BufferedOutputBlock):
 
     def compose(self) -> ComposeResult:
         with self._contents:
-            #yield self._loading_indicator
+            # yield self._loading_indicator
             yield self._status_indicator
             if self._markdown:
                 yield self._markdown
@@ -310,11 +331,11 @@ class AgentOutputBlock(BufferedOutputBlock):
         self._do_flush()
 
     def mark_success(self) -> None:
-        #self._loading_indicator.styles.display = "none"
+        # self._loading_indicator.styles.display = "none"
         self._status_indicator.styles.display = "block"
 
     def mark_failed(self) -> None:
-        #self._loading_indicator.styles.display = "none"
+        # self._loading_indicator.styles.display = "none"
         self._status_indicator.styles.display = "block"
 
 
@@ -327,12 +348,12 @@ class ThinkingOutputBlock(AgentOutputBlock):
 
     def __init__(self, output="", activity=True) -> None:
         super().__init__(output=output, activity=activity, render_markdown=False)
-        #self._label = Static("Thinking...", classes="thinking-label")
+        # self._label = Static("Thinking...", classes="thinking-label")
 
     def compose(self) -> ComposeResult:
-        #yield self._label
+        # yield self._label
         with self._contents:
-            #yield self._loading_indicator
+            # yield self._loading_indicator
             yield self._status_indicator
             if self._markdown:
                 yield self._markdown
@@ -341,7 +362,7 @@ class ThinkingOutputBlock(AgentOutputBlock):
 
     def mark_success(self) -> None:
         super().mark_success()
-        #self._label.update("Thinking")
+        # self._label.update("Thinking")
 
 
 class HighlightableContainerMixin:
@@ -359,7 +380,9 @@ class HighlightableContainerMixin:
         if self._highlighted_index is None:
             self._highlighted_index = 0
         else:
-            self._highlighted_index = min(self._highlighted_index + 1, len(self._blocks) - 1)
+            self._highlighted_index = min(
+                self._highlighted_index + 1, len(self._blocks) - 1
+            )
         self._update_highlight()
         return original_index != self._highlighted_index
 
@@ -402,12 +425,14 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
 
     class PinRequested(Message):
         """Posted when the user wants to pin the highlighted widget block."""
+
         def __init__(self, block: WidgetOutputBlock) -> None:
             super().__init__()
             self.block = block
 
     class BlockActivated(Message):
         """Posted when the user wants to copy a block to the input."""
+
         def __init__(self, code: str, mode: str) -> None:
             super().__init__()
             self.code = code
@@ -415,6 +440,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
 
     class BlockExecuteRequested(Message):
         """Posted when the user wants to execute a code block."""
+
         def __init__(self, block: CodeInputBlock) -> None:
             super().__init__()
             self.block = block
@@ -426,9 +452,12 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         Binding("ctrl+c", "activate_block", "Copy as Input", show=True),
         Binding("enter", "execute_block", "Execute", show=True),
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown", show=True),
-        #Binding("ctrl+u", "pin_block", "Pin Block", show=True),
+        # Binding("ctrl+u", "pin_block", "Pin Block", show=True),
         Binding("insert", "cycle_language", "Mode", show=True),
-        *[Binding(str(n), f"run_numbered('{n}')", f"Run #{n}", show=False) for n in range(1, 10)],
+        *[
+            Binding(str(n), f"run_numbered('{n}')", f"Run #{n}", show=False)
+            for n in range(1, 10)
+        ],
     ]
 
     def __init__(
@@ -524,7 +553,9 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         # Adjust highlighted index after removal
         if not self._blocks:
             self._highlighted_index = None
-        elif self._highlighted_index is not None and self._highlighted_index >= len(self._blocks):
+        elif self._highlighted_index is not None and self._highlighted_index >= len(
+            self._blocks
+        ):
             self._highlighted_index = len(self._blocks) - 1
         self._update_highlight()
         self.post_message(self.PinRequested(block))
@@ -542,7 +573,11 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         """Move highlight to the previous CodeInputBlock, skipping other block types."""
         if not self._blocks:
             return
-        start = (self._highlighted_index - 1) if self._highlighted_index is not None else len(self._blocks) - 1
+        start = (
+            (self._highlighted_index - 1)
+            if self._highlighted_index is not None
+            else len(self._blocks) - 1
+        )
         for i in range(start, -1, -1):
             if isinstance(self._blocks[i], CodeInputBlock):
                 self._highlighted_index = i
@@ -553,7 +588,9 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         """Move highlight to the next CodeInputBlock, skipping other block types."""
         if not self._blocks:
             return
-        start = (self._highlighted_index + 1) if self._highlighted_index is not None else 0
+        start = (
+            (self._highlighted_index + 1) if self._highlighted_index is not None else 0
+        )
         for i in range(start, len(self._blocks)):
             if isinstance(self._blocks[i], CodeInputBlock):
                 self._highlighted_index = i
@@ -594,6 +631,7 @@ class PinnedOutput(HighlightableContainerMixin, Vertical):
 
     class UnpinRequested(Message):
         """Posted when the user wants to unpin a block."""
+
         def __init__(self, block: WidgetOutputBlock) -> None:
             super().__init__()
             self.block = block

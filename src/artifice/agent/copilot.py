@@ -82,7 +82,7 @@ class CopilotAgent(AgentBase):
                 "streaming": True,
                 "tools": [],
                 "available_tools": [],
-                "infinite_sessions": {"enabled":False}
+                "infinite_sessions": {"enabled": False},
             }
 
             # Add system message if provided
@@ -135,9 +135,13 @@ class CopilotAgent(AgentBase):
             # Register streaming handler for delta events
             unsubscribe = None
             if on_chunk:
+
                 def handle_delta(event):
                     try:
-                        if event.type.value == "assistant.reasoning_delta" and on_thinking_chunk:
+                        if (
+                            event.type.value == "assistant.reasoning_delta"
+                            and on_thinking_chunk
+                        ):
                             delta = event.data.delta_content
                             if delta:
                                 on_thinking_chunk(delta)
@@ -152,9 +156,7 @@ class CopilotAgent(AgentBase):
 
             try:
                 logger.info(f"[CopilotAgent] Sending prompt: {prompt[:100]}...")
-                response = await session.send_and_wait(
-                    {"prompt": prompt}, timeout=60.0
-                )
+                response = await session.send_and_wait({"prompt": prompt}, timeout=60.0)
             finally:
                 if unsubscribe:
                     unsubscribe()
@@ -165,9 +167,7 @@ class CopilotAgent(AgentBase):
                 )
 
             if response.type.value == "session.error":
-                error_msg = getattr(
-                    response.data, "message", str(response.data)
-                )
+                error_msg = getattr(response.data, "message", str(response.data))
                 return AgentResponse(text="", error=error_msg)
 
             if response.type.value == "assistant.message":
@@ -178,9 +178,7 @@ class CopilotAgent(AgentBase):
                 return AgentResponse(text=content, stop_reason="end_turn")
 
             # Unexpected response type
-            logger.warning(
-                f"[CopilotAgent] Unexpected response type: {response.type}"
-            )
+            logger.warning(f"[CopilotAgent] Unexpected response type: {response.type}")
             return AgentResponse(text="", stop_reason="end_turn")
 
         except (ImportError, RuntimeError, PermissionError, FileNotFoundError) as e:

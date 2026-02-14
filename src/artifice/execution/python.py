@@ -11,6 +11,7 @@ from typing import Any, Callable, Optional
 
 from .common import ExecutionStatus, ExecutionResult
 
+
 class StreamCapture(StringIO):
     """StringIO that puts output into a queue."""
 
@@ -42,7 +43,10 @@ class CodeExecutor:
 
     def __init__(self) -> None:
         """Initialize executor with fresh globals/locals context."""
-        self._globals: dict[str, Any] = {"__name__": "__main__", "__builtins__": __builtins__}
+        self._globals: dict[str, Any] = {
+            "__name__": "__main__",
+            "__builtins__": __builtins__,
+        }
         self._locals: dict[str, Any] = {}
         self._exec_lock = threading.Lock()
 
@@ -116,7 +120,11 @@ class CodeExecutor:
             result.result_value = result_value
             result.output = captured_stdout
             result.error = captured_stderr
-            result.status = ExecutionStatus.SUCCESS if not captured_stderr else ExecutionStatus.ERROR
+            result.status = (
+                ExecutionStatus.SUCCESS
+                if not captured_stderr
+                else ExecutionStatus.ERROR
+            )
         except Exception as e:
             result.status = ExecutionStatus.ERROR
             result.exception = e
@@ -127,7 +135,9 @@ class CodeExecutor:
 
         return result
 
-    def _execute_sync(self, code: str, output_queue: Queue, debounce: bool = False) -> tuple[Any, str, str]:
+    def _execute_sync(
+        self, code: str, output_queue: Queue, debounce: bool = False
+    ) -> tuple[Any, str, str]:
         """Execute code synchronously (called in thread pool)."""
         with self._exec_lock:
             old_stdout, old_stderr = sys.stdout, sys.stderr
@@ -158,23 +168,30 @@ class CodeExecutor:
                     debounce_period = 3.0
                     start_time = time.time()
                     last_output_time = start_time
-                    
+
                     while time.time() - last_output_time < debounce_period:
                         # Check if there's been any new output
-                        current_size = len(captured_stdout.getvalue()) + len(captured_stderr.getvalue())
+                        current_size = len(captured_stdout.getvalue()) + len(
+                            captured_stderr.getvalue()
+                        )
                         time.sleep(0.1)  # Brief sleep to avoid busy-waiting
-                        new_size = len(captured_stdout.getvalue()) + len(captured_stderr.getvalue())
-                        
+                        new_size = len(captured_stdout.getvalue()) + len(
+                            captured_stderr.getvalue()
+                        )
+
                         if new_size > current_size:
                             # New output detected, reset the debounce timer
                             last_output_time = time.time()
 
-                return result_value, captured_stdout.getvalue(), captured_stderr.getvalue()
+                return (
+                    result_value,
+                    captured_stdout.getvalue(),
+                    captured_stderr.getvalue(),
+                )
             except Exception as e:
                 # Any error - capture traceback in stderr
                 captured_stderr.write(str(e))
-                #traceback.print_exc(file=captured_stderr)
+                # traceback.print_exc(file=captured_stderr)
                 return None, captured_stdout.getvalue(), captured_stderr.getvalue()
             finally:
                 sys.stdout, sys.stderr = old_stdout, old_stderr
-

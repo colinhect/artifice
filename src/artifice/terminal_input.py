@@ -16,10 +16,13 @@ from textual_autocomplete import AutoComplete, DropdownItem, TargetState
 if TYPE_CHECKING:
     from .history import History
 
+
 class HistoryAutoComplete(AutoComplete):
     """Custom AutoComplete that applies completion to a TextArea."""
 
-    def __init__(self, terminal_input: TerminalInput, search_input: Input, **kwargs) -> None:
+    def __init__(
+        self, terminal_input: TerminalInput, search_input: Input, **kwargs
+    ) -> None:
         self._terminal_input = terminal_input
         self._truncated_to_full: dict[str, str] = {}  # Map truncated text to full text
         super().__init__(search_input, **kwargs)
@@ -44,7 +47,9 @@ class InputTextArea(TextArea):
     def __init__(self, **kwargs) -> None:
         super().__init__(language="python", **kwargs)
         self._focused_placeholder: str = ""
-        self._unfocused_placeholder: str = " [cyan]enter[/] to execute    [cyan]ctrl+i[/] return to prompt"
+        self._unfocused_placeholder: str = (
+            " [cyan]enter[/] to execute    [cyan]ctrl+i[/] return to prompt"
+        )
 
     def action_submit_code(self) -> None:
         """Submit the code."""
@@ -62,24 +67,24 @@ class InputTextArea(TextArea):
     def set_syntax_highlighting(self, language: str) -> None:
         """Enable or disable Python syntax highlighting."""
         self.language = language
-        self.theme="vscode_dark"
+        self.theme = "vscode_dark"
 
     def set_focused_placeholder(self, text: str) -> None:
         """Set the placeholder text to show when focused."""
         self._focused_placeholder = text
         if self.has_focus:
             pass
-            #self.placeholder = str(Text.from_markup(text))
+            # self.placeholder = str(Text.from_markup(text))
 
     def on_focus(self) -> None:
         """Update placeholder when gaining focus."""
         pass
-        #self.placeholder = str(Text.from_markup(self._focused_placeholder))
+        # self.placeholder = str(Text.from_markup(self._focused_placeholder))
 
     def on_blur(self) -> None:
         """Update placeholder when losing focus."""
         pass
-        #self.placeholder = str(Text.from_markup(self._unfocused_placeholder))
+        # self.placeholder = str(Text.from_markup(self._unfocused_placeholder))
 
     async def _on_key(self, event: events.Key) -> None:
         """Intercept key events before TextArea processes them."""
@@ -161,34 +166,45 @@ class TerminalInput(Static):
 
     class SubmitRequested(Message):
         """Internal message from TextArea requesting submission."""
+
         pass
 
     class SetMode(Message):
         """Message requesting a mode switch."""
+
         def __init__(self, mode: str) -> None:
             super().__init__()
             self.mode = mode
 
     class CycleMode(Message):
         """Message requesting to cycle through modes."""
+
         pass
 
     class HistoryPrevious(Message):
         """Message requesting previous history item."""
+
         pass
 
     class HistoryNext(Message):
         """Message requesting next history item."""
+
         pass
 
     class HistorySearchRequested(Message):
         """Message requesting history search interface."""
+
         pass
 
     class Submitted(Message):
         """Message sent when code is submitted."""
 
-        def __init__(self, code: str, is_agent_prompt: bool = False, is_shell_command: bool = False) -> None:
+        def __init__(
+            self,
+            code: str,
+            is_agent_prompt: bool = False,
+            is_shell_command: bool = False,
+        ) -> None:
             self.code = code
             self.is_agent_prompt = is_agent_prompt
             self.is_shell_command = is_shell_command
@@ -301,7 +317,9 @@ class TerminalInput(Static):
             # Submit with current mode
             is_ai = self.mode == "ai"
             is_shell = self.mode == "shell"
-            self.post_message(self.Submitted(code, is_agent_prompt=is_ai, is_shell_command=is_shell))
+            self.post_message(
+                self.Submitted(code, is_agent_prompt=is_ai, is_shell_command=is_shell)
+            )
 
     def action_history_back(self) -> None:
         """Navigate to previous history entry."""
@@ -323,7 +341,9 @@ class TerminalInput(Static):
         if entry is not None:
             self.code = entry
 
-    def on_terminal_input_history_search_requested(self, _: HistorySearchRequested) -> None:
+    def on_terminal_input_history_search_requested(
+        self, _: HistorySearchRequested
+    ) -> None:
         """Handle CTRL+R to enter history search mode."""
         self.action_history_search()
 
@@ -348,7 +368,9 @@ class TerminalInput(Static):
         text_area.display = False
 
         # Create search input
-        self._search_input = Input(placeholder="Search history...", id="history-search-input")
+        self._search_input = Input(
+            placeholder="Search history...", id="history-search-input"
+        )
         horizontal.mount(self._search_input)
 
         # Create autocomplete with history items
@@ -370,9 +392,9 @@ class TerminalInput(Static):
             # Filter and reverse (most recent first)
             def truncate_multiline(item: str) -> str:
                 """Truncate multi-line items to first 3 lines with ... if more exist."""
-                lines = item.split('\n')
+                lines = item.split("\n")
                 if len(lines) > 3:
-                    truncated = '\n'.join(lines[:2] + [lines[2] + '...'])
+                    truncated = "\n".join(lines[:2] + [lines[2] + "..."])
                     # Store mapping from truncated to full
                     if self._autocomplete is not None:
                         self._autocomplete._truncated_to_full[truncated] = item
@@ -391,7 +413,7 @@ class TerminalInput(Static):
         self._autocomplete = HistoryAutoComplete(
             terminal_input=self,
             search_input=self._search_input,
-            candidates=get_history_candidates
+            candidates=get_history_candidates,
         )
         # Mount to screen instead of horizontal container to prevent clipping
         self.screen.mount(self._autocomplete)

@@ -8,19 +8,23 @@ class TestSimulatedAgentPatternMatching:
     @pytest.mark.asyncio
     async def test_pattern_match(self):
         agent = SimulatedAgent(response_delay=0)
-        agent.configure_scenarios([
-            {"pattern": r"hello|hi", "response": "greeting!"},
-            {"pattern": r"math|calc", "response": "calculating!"},
-        ])
+        agent.configure_scenarios(
+            [
+                {"pattern": r"hello|hi", "response": "greeting!"},
+                {"pattern": r"math|calc", "response": "calculating!"},
+            ]
+        )
         resp = await agent.send_prompt("hello there")
         assert resp.text == "greeting!"
 
     @pytest.mark.asyncio
     async def test_case_insensitive_match(self):
         agent = SimulatedAgent(response_delay=0)
-        agent.configure_scenarios([
-            {"pattern": r"hello", "response": "matched!"},
-        ])
+        agent.configure_scenarios(
+            [
+                {"pattern": r"hello", "response": "matched!"},
+            ]
+        )
         resp = await agent.send_prompt("HELLO WORLD")
         assert resp.text == "matched!"
 
@@ -28,19 +32,23 @@ class TestSimulatedAgentPatternMatching:
     async def test_no_match_uses_default(self):
         agent = SimulatedAgent(response_delay=0)
         agent.set_default_response("no match")
-        agent.configure_scenarios([
-            {"pattern": r"specific", "response": "found!"},
-        ])
+        agent.configure_scenarios(
+            [
+                {"pattern": r"specific", "response": "found!"},
+            ]
+        )
         resp = await agent.send_prompt("something else")
         assert resp.text == "no match"
 
     @pytest.mark.asyncio
     async def test_first_matching_pattern_wins(self):
         agent = SimulatedAgent(response_delay=0)
-        agent.configure_scenarios([
-            {"pattern": r"test", "response": "first"},
-            {"pattern": r"test", "response": "second"},
-        ])
+        agent.configure_scenarios(
+            [
+                {"pattern": r"test", "response": "first"},
+                {"pattern": r"test", "response": "second"},
+            ]
+        )
         resp = await agent.send_prompt("test")
         assert resp.text == "first"
 
@@ -50,11 +58,13 @@ class TestSimulatedAgentSequential:
     async def test_sequential_scenarios(self):
         """Scenarios without patterns are used sequentially."""
         agent = SimulatedAgent(response_delay=0)
-        agent.configure_scenarios([
-            {"response": "first"},
-            {"response": "second"},
-            {"response": "third"},
-        ])
+        agent.configure_scenarios(
+            [
+                {"response": "first"},
+                {"response": "second"},
+                {"response": "third"},
+            ]
+        )
         r1 = await agent.send_prompt("anything")
         r2 = await agent.send_prompt("anything")
         r3 = await agent.send_prompt("anything")
@@ -151,20 +161,22 @@ class TestThinkingSimulation:
     async def test_thinking_with_scenario(self):
         """SimulatedAgent streams thinking text before response when configured."""
         agent = SimulatedAgent(response_delay=0)
-        agent.configure_scenarios([
-            {
-                "pattern": r"test",
-                "response": "final answer",
-                "thinking": "let me think..."
-            }
-        ])
+        agent.configure_scenarios(
+            [
+                {
+                    "pattern": r"test",
+                    "response": "final answer",
+                    "thinking": "let me think...",
+                }
+            ]
+        )
 
         thinking_chunks = []
         response_chunks = []
         resp = await agent.send_prompt(
             "test",
             on_chunk=lambda c: response_chunks.append(c),
-            on_thinking_chunk=lambda c: thinking_chunks.append(c)
+            on_thinking_chunk=lambda c: thinking_chunks.append(c),
         )
 
         assert "".join(thinking_chunks) == "let me think..."
@@ -175,9 +187,9 @@ class TestThinkingSimulation:
     async def test_thinking_without_callback_doesnt_error(self):
         """Thinking text configured but no callback provided - should not error."""
         agent = SimulatedAgent(response_delay=0)
-        agent.configure_scenarios([
-            {"pattern": r"test", "response": "ok", "thinking": "thinking..."}
-        ])
+        agent.configure_scenarios(
+            [{"pattern": r"test", "response": "ok", "thinking": "thinking..."}]
+        )
         resp = await agent.send_prompt("test", on_chunk=None, on_thinking_chunk=None)
         assert resp.text == "ok"
 
@@ -190,8 +202,7 @@ class TestThinkingSimulation:
 
         thinking_chunks = []
         resp = await agent.send_prompt(
-            "unknown",
-            on_thinking_chunk=lambda c: thinking_chunks.append(c)
+            "unknown", on_thinking_chunk=lambda c: thinking_chunks.append(c)
         )
 
         assert "".join(thinking_chunks) == "default thinking"
@@ -201,14 +212,11 @@ class TestThinkingSimulation:
     async def test_scenario_without_thinking(self):
         """Scenarios without thinking field don't stream thinking."""
         agent = SimulatedAgent(response_delay=0)
-        agent.configure_scenarios([
-            {"pattern": r"test", "response": "reply only"}
-        ])
+        agent.configure_scenarios([{"pattern": r"test", "response": "reply only"}])
 
         thinking_chunks = []
         resp = await agent.send_prompt(
-            "test",
-            on_thinking_chunk=lambda c: thinking_chunks.append(c)
+            "test", on_thinking_chunk=lambda c: thinking_chunks.append(c)
         )
 
         assert thinking_chunks == []
@@ -220,23 +228,21 @@ class TestThinkingSimulation:
         agent = ScriptedAgent(
             script=[
                 {"response": "step 1", "thinking": "analyzing..."},
-                {"response": "step 2"}
+                {"response": "step 2"},
             ],
-            response_delay=0
+            response_delay=0,
         )
 
         thinking_chunks = []
         r1 = await agent.send_prompt(
-            "anything",
-            on_thinking_chunk=lambda c: thinking_chunks.append(c)
+            "anything", on_thinking_chunk=lambda c: thinking_chunks.append(c)
         )
         assert "".join(thinking_chunks) == "analyzing..."
         assert r1.text == "step 1"
 
         thinking_chunks.clear()
         r2 = await agent.send_prompt(
-            "anything",
-            on_thinking_chunk=lambda c: thinking_chunks.append(c)
+            "anything", on_thinking_chunk=lambda c: thinking_chunks.append(c)
         )
         assert thinking_chunks == []  # No thinking for step 2
         assert r2.text == "step 2"
@@ -249,8 +255,7 @@ class TestThinkingSimulation:
 
         thinking_chunks = []
         resp = await agent.send_prompt(
-            "hi",
-            on_thinking_chunk=lambda c: thinking_chunks.append(c)
+            "hi", on_thinking_chunk=lambda c: thinking_chunks.append(c)
         )
 
         assert "".join(thinking_chunks) == "considering..."
@@ -261,15 +266,12 @@ class TestThinkingSimulation:
         """add_scenario method supports thinking parameter."""
         agent = SimulatedAgent(response_delay=0)
         agent.add_scenario(
-            response="answer",
-            pattern=r"question",
-            thinking="pondering..."
+            response="answer", pattern=r"question", thinking="pondering..."
         )
 
         thinking_chunks = []
         resp = await agent.send_prompt(
-            "question",
-            on_thinking_chunk=lambda c: thinking_chunks.append(c)
+            "question", on_thinking_chunk=lambda c: thinking_chunks.append(c)
         )
 
         assert "".join(thinking_chunks) == "pondering..."

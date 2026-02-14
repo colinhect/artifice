@@ -30,7 +30,11 @@ class History:
         self._python_history_index: int = -1  # -1 means not browsing history
         self._ai_history_index: int = -1
         self._shell_history_index: int = -1
-        self._current_input: dict[str, str] = {"python": "", "ai": "", "shell": ""}  # Store current input per mode when browsing history
+        self._current_input: dict[str, str] = {
+            "python": "",
+            "ai": "",
+            "shell": "",
+        }  # Store current input per mode when browsing history
 
         # History persistence configuration
         if history_file is None:
@@ -174,11 +178,17 @@ class History:
                 with open(self._history_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     if isinstance(data, dict):
-                        self._python_history = data.get("python", [])[-self._max_history_size:]
-                        self._ai_history = data.get("ai", [])[-self._max_history_size:]
-                        self._shell_history = data.get("shell", [])[-self._max_history_size:]
+                        self._python_history = data.get("python", [])[
+                            -self._max_history_size :
+                        ]
+                        self._ai_history = data.get("ai", [])[-self._max_history_size :]
+                        self._shell_history = data.get("shell", [])[
+                            -self._max_history_size :
+                        ]
         except json.JSONDecodeError as e:
-            logger.warning(f"Failed to load history from {self._history_file}: Invalid JSON - {e}")
+            logger.warning(
+                f"Failed to load history from {self._history_file}: Invalid JSON - {e}"
+            )
             self._python_history = []
             self._ai_history = []
             self._shell_history = []
@@ -196,9 +206,9 @@ class History:
 
             # Keep only the most recent entries
             history_to_save = {
-                "python": self._python_history[-self._max_history_size:],
-                "ai": self._ai_history[-self._max_history_size:],
-                "shell": self._shell_history[-self._max_history_size:],
+                "python": self._python_history[-self._max_history_size :],
+                "ai": self._ai_history[-self._max_history_size :],
+                "shell": self._shell_history[-self._max_history_size :],
             }
 
             with open(self._history_file, "w", encoding="utf-8") as f:

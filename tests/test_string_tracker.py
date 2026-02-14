@@ -104,7 +104,7 @@ class TestEdgeCases:
     def test_backticks_dont_affect_state(self):
         """Backticks are not string delimiters in Python."""
         t = StringTracker()
-        feed_string(t, '`hello`')
+        feed_string(t, "`hello`")
         assert not t.in_string
 
     def test_empty_string_literal(self):
@@ -123,7 +123,7 @@ class TestEdgeCases:
     def test_mixed_quote_types(self):
         """Single quotes inside double-quoted strings."""
         t = StringTracker()
-        feed_string(t, "\"it's inside\"")
+        feed_string(t, '"it\'s inside"')
         assert not t.in_string
 
     def test_alternating_strings(self):
