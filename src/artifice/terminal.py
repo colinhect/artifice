@@ -516,7 +516,9 @@ class ArtificeTerminal(Widget):
         if self._config.models:
             model = self._config.models.get(self._config.model)
             if model:
-                self.agent_status.update(f"{model.get('model')} ({model.get('provider')})")
+                self.agent_status.update(
+                    f"{model.get('model')} ({model.get('provider')})"
+                )
 
     def _save_block_to_session(self, block: BaseBlock) -> None:
         """Save a block to the session transcript if enabled."""

@@ -1,9 +1,5 @@
 """Tests for configuration loading."""
 
-import tempfile
-from pathlib import Path
-
-import pytest
 import yaml
 
 from artifice.config import ArtificeConfig, load_config

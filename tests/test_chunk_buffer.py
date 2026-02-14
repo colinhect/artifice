@@ -9,7 +9,9 @@ class TestChunkBuffer:
         scheduled = []
         drained = []
 
-        buf = ChunkBuffer(schedule=lambda fn: scheduled.append(fn), drain=lambda t: drained.append(t))
+        buf = ChunkBuffer(
+            schedule=lambda fn: scheduled.append(fn), drain=lambda t: drained.append(t)
+        )
         buf.append("hello")
 
         assert len(scheduled) == 1
@@ -24,7 +26,9 @@ class TestChunkBuffer:
         scheduled = []
         drained = []
 
-        buf = ChunkBuffer(schedule=lambda fn: scheduled.append(fn), drain=lambda t: drained.append(t))
+        buf = ChunkBuffer(
+            schedule=lambda fn: scheduled.append(fn), drain=lambda t: drained.append(t)
+        )
         buf.append("a")
         buf.append("b")
         buf.append("c")
@@ -40,7 +44,9 @@ class TestChunkBuffer:
         scheduled = []
         drained = []
 
-        buf = ChunkBuffer(schedule=lambda fn: scheduled.append(fn), drain=lambda t: drained.append(t))
+        buf = ChunkBuffer(
+            schedule=lambda fn: scheduled.append(fn), drain=lambda t: drained.append(t)
+        )
         buf.append("first")
         scheduled[0]()
 
@@ -55,7 +61,9 @@ class TestChunkBuffer:
         scheduled = []
         drained = []
 
-        buf = ChunkBuffer(schedule=lambda fn: scheduled.append(fn), drain=lambda t: drained.append(t))
+        buf = ChunkBuffer(
+            schedule=lambda fn: scheduled.append(fn), drain=lambda t: drained.append(t)
+        )
         buf.append("data")
         buf.flush_sync()
 

@@ -371,7 +371,7 @@ class HighlightableContainerMixin:
             if i == self._highlighted_index:
                 block.add_class("highlighted")
                 # Auto-scroll to make the highlighted block visible
-                self.scroll_to_widget(block, animate=True)
+                self.scroll_to_widget(block, animate=True)  # type: ignore
             else:
                 block.remove_class("highlighted")
 
