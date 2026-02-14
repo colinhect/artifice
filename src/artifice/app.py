@@ -91,7 +91,7 @@ def main():
     # Command-line arguments override config
     if args.model is not None:
         config.model = args.model
-    if args.system_prompt:
+    if args.system_prompt is not None:
         config.system_prompt = args.system_prompt
     if args.prompt_prefix:
         config.prompt_prefix = args.prompt_prefix

@@ -455,9 +455,6 @@ class ArtificeTerminal(Widget):
         self._thinking_processing_scheduled: bool = (
             False  # Flag to avoid duplicate batch processing
         )
-        self._loading_block: AgentOutputBlock | None = (
-            None  # Initial loading block before first chunk
-        )
 
         def on_connect(_):
             self.connection_status.add_class("connected")
@@ -648,10 +645,6 @@ class ArtificeTerminal(Widget):
         )
         self._detector_started = False
 
-        # Create initial loading block to show activity while waiting for first chunk
-        self._loading_block = AgentOutputBlock(activity=True)
-        self.output.append_block(self._loading_block)
-
         # Post messages from streaming callback (runs in background thread)
         def on_chunk(text):
             self.post_message(StreamChunk(text))
@@ -688,12 +681,6 @@ class ArtificeTerminal(Widget):
             self._process_chunk_buffer()
         # Ensure detector is started before finishing (handles thinking-only or error cases)
         if not self._detector_started:
-            # Remove loading block if it's still there (no chunks received)
-            if self._loading_block:
-                self._loading_block.remove()
-                if self._loading_block in self.output._blocks:
-                    self.output._blocks.remove(self._loading_block)
-                self._loading_block = None
             self._detector_started = True
             self._current_detector.start()
         self._current_detector.finish()
@@ -854,12 +841,6 @@ class ArtificeTerminal(Widget):
             # Start detector on first text chunk (deferred so thinking block comes first)
             if not self._detector_started:
                 self._detector_started = True
-                # Remove loading block before starting detector (detector creates its own AgentOutputBlock)
-                if self._loading_block:
-                    self._loading_block.remove()
-                    if self._loading_block in self.output._blocks:
-                        self.output._blocks.remove(self._loading_block)
-                    self._loading_block = None
                 self._current_detector.start()
 
             # Add chunk to buffer
@@ -905,12 +886,6 @@ class ArtificeTerminal(Widget):
             try:
                 # Lazily create thinking block on first chunk
                 if self._thinking_block is None:
-                    # Remove loading block before creating thinking block
-                    if self._loading_block:
-                        self._loading_block.remove()
-                        if self._loading_block in self.output._blocks:
-                            self.output._blocks.remove(self._loading_block)
-                        self._loading_block = None
                     self._thinking_block = ThinkingOutputBlock(activity=True)
                     self.output.append_block(self._thinking_block)
                 self._thinking_block.append(text)
