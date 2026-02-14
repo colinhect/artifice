@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import enum
+import re
 
 from .string_tracker import StringTracker
 
@@ -14,6 +15,7 @@ from .terminal_output import (
 )
 
 _LANG_ALIASES = {"py": "python", "shell": "bash", "sh": "bash", "zsh": "bash"}
+_DIVIDER_RE = re.compile(r"^(-{3,}|\*{3,}|_{3,})$")
 
 
 class _FenceState(enum.Enum):
@@ -47,6 +49,9 @@ class StreamingFenceDetector:
         self.all_blocks: list[BaseBlock] = []
         self.first_assistant_block: AssistantOutputBlock | None = None
         self._string_tracker = StringTracker()
+        # Prose line tracking for heading/divider detection
+        self._at_line_start = True
+        self._prose_line_buf = ""
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AssistantOutputBlock(
             activity=activity
@@ -99,7 +104,7 @@ class StreamingFenceDetector:
             self._chunk_buffer = ""
 
     def _feed_prose(self, ch: str) -> None:
-        """Process prose text, looking for opening fence."""
+        """Process prose text, looking for opening fence, headings, and dividers."""
         if ch == "`":
             self._backtick_count += 1
             if self._backtick_count == 3:
@@ -109,10 +114,51 @@ class StreamingFenceDetector:
                 self._backtick_count = 0
                 self._lang_buffer = ""
                 self._state = _FenceState.LANG_LINE
-        else:
-            # Not a fence marker
+            self._at_line_start = False
+        elif ch == "\n":
             self._flush_backticks_to_pending()
             self._pending_buffer += ch
+            # Check if completed line is a markdown divider
+            line = self._prose_line_buf.strip()
+            if line and _DIVIDER_RE.match(line):
+                # Flush everything including this newline to current block, then split
+                self._flush_pending_to_chunk()
+                self._flush_and_update_chunk()
+                self._split_prose_block()
+            self._at_line_start = True
+            self._prose_line_buf = ""
+        elif self._at_line_start and ch == "#":
+            self._flush_backticks_to_pending()
+            # Split before this heading line
+            self._flush_pending_to_chunk()
+            self._flush_and_update_chunk()
+            self._split_prose_block()
+            # Start accumulating the heading into the new block
+            self._pending_buffer = ch
+            self._at_line_start = False
+            self._prose_line_buf = ch
+        else:
+            # Not a fence marker, heading, or newline
+            self._flush_backticks_to_pending()
+            self._pending_buffer += ch
+            self._at_line_start = False
+            self._prose_line_buf += ch
+
+    def _split_prose_block(self) -> None:
+        """End current prose block and start a new one."""
+        if isinstance(self._current_block, AssistantOutputBlock):
+            if not self._current_block._full.strip():
+                # Current block is empty - remove it
+                if self._current_block is self.first_assistant_block:
+                    self.first_assistant_block = None
+                self._remove_block(self._current_block)
+            else:
+                self._current_block.mark_success()
+        self._current_block = self._make_prose_block(activity=True)
+        self._output.append_block(self._current_block)
+        self.all_blocks.append(self._current_block)
+        if self.first_assistant_block is None:
+            self.first_assistant_block = self._current_block
 
     def _feed_lang_line(self, ch: str) -> None:
         """Process language line after opening fence."""
@@ -175,6 +221,8 @@ class StreamingFenceDetector:
                 self._output.append_block(self._current_block)
                 self.all_blocks.append(self._current_block)
 
+                self._at_line_start = False
+                self._prose_line_buf = ""
                 self._state = _FenceState.PROSE
             # Don't add character to pending buffer yet - we're accumulating backticks
         else:

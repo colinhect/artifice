@@ -11,6 +11,72 @@ from .provider import ProviderBase, ProviderResponse
 
 logger = logging.getLogger(__name__)
 
+_TEST_MARKDOWN = """
+Here’s an example of how to organize multiple sections with Markdown, using headers, lists, and formatted text:
+
+---
+
+## Introduction  
+This section introduces the topic. Markdown provides a simple way to structure content using **headers**, *italics*, and other formatting options.  
+- Easy to read  
+- Lightweight syntax  
+- Converts to HTML  
+
+---
+
+## Methodology  
+Here’s how we’ll approach the task:  
+1. Use `##` for section headers  
+2. Add **bold** or _italics_ for emphasis  
+3. Create unordered/ordered lists  
+4. Include code snippets with triple backticks:
+
+### 1 Code
+
+```python
+def example():  
+       return "Hello, Markdown!"
+```
+
+## Assistant
+
+---
+
+## Results  
+Key findings from the experiment:  
+- **Bold text** draws attention  
+- _Italics_ are subtler than bold  
+- [Link to a resource](https://example.com) demonstrates hyperlinks  
+- Tables can also be added:  
+
+| Feature       | Status  |  
+|--------------|---------|  
+| Headers      | ✅ Done |  
+| Lists        | ✅ Done |  
+| Links        | ✅ Done |  
+
+---
+
+## Discussion  
+Markdown is versatile but has limitations. It’s ideal for:  
+- Writing documentation  
+- Formatting README files  
+- Publishing blog posts  
+However, complex layouts (e.g., nested tables) may require HTML/CSS.  
+
+---
+
+## Conclusion  
+Summarize the main points:  
+> "Simplicity is key in writing." – Unknown  
+
+Markdown balances readability and functionality, making it a great choice for structuring text across platforms.  
+
+---
+
+This structure uses headers, lists, code blocks, tables, and inline formatting—key elements of Markdown's utility.
+"""
+
 
 class SimulatedProvider(ProviderBase):
     """Simulated provider for testing without API costs.
@@ -48,6 +114,11 @@ class SimulatedProvider(ProviderBase):
         """Set up default test scenarios."""
         self.scenarios = [
             {
+                "pattern": r"markdown",
+                "response": _TEST_MARKDOWN,
+                "thinking": "Hmmm, this will take a while"
+            },
+            {
                 "pattern": r"hello|hi|hey",
                 "response": "Hello! I'm a **simulated** . How can I help you today?",
                 "thinking": "The user is greeting me. I should respond in a friendly manner and offer to help.",
@@ -66,8 +137,9 @@ class SimulatedProvider(ProviderBase):
                 "pattern": r"goodbye|bye|exit",
                 "response": "Goodbye! Thanks for chatting with me.",
                 "thinking": "The user is saying goodbye. I should acknowledge and thank them for the conversation.",
-            },
+            }
         ]
+
         self.default_response = "I'm not sure how to respond to that. Try asking about math or saying hello!"
         self.default_thinking = "Hmm, I'm not sure how to respond to this. Let me think about what the user might be asking for."
 

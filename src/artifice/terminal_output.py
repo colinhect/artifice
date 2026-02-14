@@ -306,8 +306,8 @@ class AssistantOutputBlock(BufferedOutputBlock):
             if elapsed >= self._FLUSH_INTERVAL:
                 self._markdown.update(self._full.lstrip())
                 self._last_full_update_time = now
-            elif self._chunk:
-                self._markdown.append(self._chunk)
+            #elif self._chunk:
+            #    self._markdown.append(self._chunk)
         elif self._markdown:
             # Not streaming, just do a full update
             self._markdown.update(self._full.strip())

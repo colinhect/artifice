@@ -377,3 +377,213 @@ class TestSaveCallback:
         types = {type(b) for b in saved}
         assert FakeAssistantBlock in types
         assert FakeCodeBlock in types
+
+
+class TestHeadingSplitting:
+    def test_heading_splits_into_new_block(self):
+        """A markdown heading at the start of a line splits into a new prose block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Some intro text.\n## Next Section\nMore text.")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 2
+        assert "Some intro text." in prose_blocks[0]._text
+        assert "## Next Section" in prose_blocks[1]._text
+        assert "More text." in prose_blocks[1]._text
+
+    def test_h1_heading_splits(self):
+        d, out = make_detector()
+        d.start()
+        d.feed("Intro\n# Big Heading\nBody")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 2
+        assert "# Big Heading" in prose_blocks[1]._text
+
+    def test_heading_at_very_start(self):
+        """A heading as the very first content should work (empty initial block removed)."""
+        d, out = make_detector()
+        d.start()
+        d.feed("## Title\nSome content")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 1
+        assert "## Title" in prose_blocks[0]._text
+        assert "Some content" in prose_blocks[0]._text
+
+    def test_multiple_headings_split(self):
+        d, out = make_detector()
+        d.start()
+        d.feed("Intro\n## Section 1\nText 1\n## Section 2\nText 2")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 3
+        assert "Intro" in prose_blocks[0]._text
+        assert "## Section 1" in prose_blocks[1]._text
+        assert "## Section 2" in prose_blocks[2]._text
+
+    def test_heading_after_code_block(self):
+        d, out = make_detector()
+        d.start()
+        d.feed("Intro\n```python\nx = 1\n```\n## Next Part\nDone")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert any("## Next Part" in b._text for b in prose_blocks)
+
+    def test_hash_mid_line_does_not_split(self):
+        """A # character in the middle of a line should not trigger a split."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Use the # symbol for comments.")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 1
+        assert "# symbol" in prose_blocks[0]._text
+
+    def test_heading_streamed_char_by_char(self):
+        d, out = make_detector()
+        d.start()
+        for ch in "Intro\n## Heading\nBody":
+            d.feed(ch)
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 2
+        assert "## Heading" in prose_blocks[1]._text
+
+
+class TestDividerSplitting:
+    def test_dashes_divider_splits(self):
+        """A --- divider line splits into a new prose block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Part one\n---\nPart two")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 2
+        assert "Part one" in prose_blocks[0]._text
+        assert "Part two" in prose_blocks[1]._text
+
+    def test_asterisks_divider_splits(self):
+        d, out = make_detector()
+        d.start()
+        d.feed("Part one\n***\nPart two")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 2
+
+    def test_underscores_divider_splits(self):
+        d, out = make_detector()
+        d.start()
+        d.feed("Part one\n___\nPart two")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 2
+
+    def test_long_divider_splits(self):
+        """More than 3 characters should still work."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Before\n-----\nAfter")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 2
+
+    def test_divider_content_goes_to_previous_block(self):
+        """The divider line itself should be in the block before the split."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Before\n---\nAfter")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        # Divider included in first block
+        assert "---" in prose_blocks[0]._text
+        assert "After" in prose_blocks[1]._text
+
+    def test_dashes_in_text_not_divider(self):
+        """Dashes mixed with other text on a line should not trigger a split."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Use --flag for options.")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 1
+
+    def test_divider_streamed_char_by_char(self):
+        d, out = make_detector()
+        d.start()
+        for ch in "Before\n---\nAfter":
+            d.feed(ch)
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) == 2
+
+    def test_divider_at_start(self):
+        """Divider as the very first content."""
+        d, out = make_detector()
+        d.start()
+        d.feed("---\nContent after")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert len(prose_blocks) >= 1
+        assert any("Content after" in b._text for b in prose_blocks)
+
+    def test_heading_and_divider_combined(self):
+        """Both headings and dividers in the same response."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Intro\n## Section 1\nText\n---\n## Section 2\nMore text")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        # Intro | Section 1 + Text | Section 2 + More text
+        assert len(prose_blocks) == 3
