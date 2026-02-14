@@ -8,8 +8,8 @@ from artifice.config import ArtificeConfig, load_config
 def test_default_config():
     """Test that default config has expected values."""
     config = ArtificeConfig()
-    assert config.model is None
-    assert config.models is None
+    assert config.assistant is None
+    assert config.assistants is None
     assert config.banner is False
     assert config.auto_send_to_assistant is True
     assert config.save_sessions is True
@@ -27,7 +27,7 @@ def test_load_empty_yaml(tmp_path, monkeypatch):
     config, error = load_config()
 
     assert error is None
-    assert config.model is None
+    assert config.assistant is None
     assert config.banner is False
 
 
@@ -38,7 +38,7 @@ def test_load_basic_yaml(tmp_path, monkeypatch):
     init_file = config_dir / "init.yaml"
 
     yaml_content = {
-        "model": "llama",
+        "assistant": "llama",
         "banner": True,
         "system_prompt": "Test prompt",
         "auto_send_to_assistant": False,
@@ -49,21 +49,21 @@ def test_load_basic_yaml(tmp_path, monkeypatch):
     config, error = load_config()
 
     assert error is None
-    assert config.model == "llama"
+    assert config.assistant == "llama"
     assert config.banner is True
     assert config.system_prompt == "Test prompt"
     assert config.auto_send_to_assistant is False
 
 
 def test_load_models_dict(tmp_path, monkeypatch):
-    """Test loading models dictionary configuration."""
+    """Test loading assistants dictionary configuration."""
     config_dir = tmp_path / "artifice"
     config_dir.mkdir()
     init_file = config_dir / "init.yaml"
 
     yaml_content = {
-        "model": "llama",
-        "models": {
+        "assistant": "llama",
+        "assistants": {
             "llama": {"provider": "ollama", "model": "llama3.2:1b"},
             "haiku": {"provider": "anthropic", "model": "claude-haiku-4-5"},
         },
@@ -74,10 +74,10 @@ def test_load_models_dict(tmp_path, monkeypatch):
     config, error = load_config()
 
     assert error is None
-    assert config.models is not None
-    assert "llama" in config.models
-    assert config.models["llama"]["provider"] == "ollama"
-    assert config.models["haiku"]["model"] == "claude-haiku-4-5"
+    assert config.assistants is not None
+    assert "llama" in config.assistants
+    assert config.assistants["llama"]["provider"] == "ollama"
+    assert config.assistants["haiku"]["model"] == "claude-haiku-4-5"
 
 
 def test_load_all_display_settings(tmp_path, monkeypatch):
@@ -149,7 +149,7 @@ def test_load_custom_settings(tmp_path, monkeypatch):
     init_file = config_dir / "init.yaml"
 
     yaml_content = {
-        "model": "llama",
+        "assistant": "llama",
         "custom_key": "custom_value",
         "another_custom": 42,
     }
@@ -189,7 +189,7 @@ def test_load_nonexistent_file(tmp_path, monkeypatch):
     config, error = load_config()
 
     assert error is None
-    assert config.model is None
+    assert config.assistant is None
     assert config.banner is False
 
 

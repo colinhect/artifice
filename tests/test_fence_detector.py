@@ -151,7 +151,9 @@ class TestBasicFenceDetection:
         d.finish()
 
         prose_blocks = [
-            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
+            b
+            for b in d.all_blocks
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()
         ]
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1

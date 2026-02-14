@@ -16,11 +16,11 @@ system_prompt: |
 prompt_prefix: ""
 
 # ============================================================================
-# Model Configuration
+# Assistant Configuration
 # ============================================================================
-model: "llama"
+assistant: "llama"
 
-models:
+assistants:
   llama:
     provider: "ollama"
     model: "llama3.2:1b"

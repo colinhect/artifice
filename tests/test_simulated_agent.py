@@ -1,7 +1,11 @@
 """Tests for simulated assistants - pattern matching, scripted sequences, echo."""
 
 import pytest
-from artifice.assistant.simulated import SimulatedAssistant, ScriptedAssistant, EchoAssistant
+from artifice.assistant.simulated import (
+    SimulatedAssistant,
+    ScriptedAssistant,
+    EchoAssistant,
+)
 
 
 class TestSimulatedAssistantPatternMatching:
@@ -190,7 +194,9 @@ class TestThinkingSimulation:
         assistant.configure_scenarios(
             [{"pattern": r"test", "response": "ok", "thinking": "thinking..."}]
         )
-        resp = await assistant.send_prompt("test", on_chunk=None, on_thinking_chunk=None)
+        resp = await assistant.send_prompt(
+            "test", on_chunk=None, on_thinking_chunk=None
+        )
         assert resp.text == "ok"
 
     @pytest.mark.asyncio

@@ -23,8 +23,8 @@ class ArtificeConfig:
 
     def __init__(self):
         # Assistant settings
-        self.model: Optional[str] = None
-        self.models: Optional[dict] = None
+        self.assistant: Optional[str] = None
+        self.assistants: Optional[dict] = None
         self.system_prompt: Optional[str] = None
         self.prompt_prefix: Optional[str] = None
         self.thinking_budget: Optional[int] = None
@@ -101,10 +101,10 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
 
         # Load configuration values from the YAML data
         # Assistant settings
-        if "model" in data:
-            config.model = data["model"]
-        if "models" in data:
-            config.models = data["models"]
+        if "assistant" in data:
+            config.assistant = data["assistant"]
+        if "assistants" in data:
+            config.assistants = data["assistants"]
         if "system_prompt" in data:
             config.system_prompt = data["system_prompt"]
         if "prompt_prefix" in data:
@@ -142,8 +142,8 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
 
         # Store any additional custom settings
         known_keys = {
-            "model",
-            "models",
+            "assistant",
+            "assistants",
             "system_prompt",
             "prompt_prefix",
             "thinking_budget",

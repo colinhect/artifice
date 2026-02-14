@@ -1,4 +1,4 @@
-""" module with provider/assistant architecture.
+"""module with provider/assistant architecture.
 
 This module exports both the new provider/assistant classes and the
 backward-compatible  classes.
@@ -31,20 +31,19 @@ from .simulated import (
     SimulatedAssistant as SimulatedAssistant,
 )
 
-
 def create_assistant(
     config: ArtificeConfig, on_connect: Callable | None = None
 ) -> AssistantBase | None:
-    if not config.models or not config.model:
-        raise Exception("No model selected in configuration")
+    if not config.assistants or not config.assistant:
+        raise Exception("No assistant selected in configuration")
 
-    model = config.models.get(config.model)
-    if model is None:
-        raise Exception(f"Unknown model: {config.model}")
+    assistant = config.assistants.get(config.assistant)
+    if assistant is None:
+        raise Exception(f"Unknown assistant: {config.assistant}")
 
-    provider = model.get("provider")
-    model_name = model.get("model")
-    thinking_budget = model.get("thinking_budget")
+    provider = assistant.get("provider")
+    model = assistant.get("model")
+    thinking_budget = assistant.get("thinking_budget")
 
     if config.thinking_budget is not None:
         thinking_budget = config.thinking_budget
@@ -54,7 +53,7 @@ def create_assistant(
     if provider.lower() == "ollama":
         return Assistant(
             provider=OllamaProvider(
-                model=model_name,
+                model=model,
                 thinking_budget=thinking_budget,
                 on_connect=on_connect,
             ),
@@ -65,17 +64,17 @@ def create_assistant(
             provider=OpenAICompatibleProvider(
                 base_url="https://router.huggingface.co/v1",
                 api_key=os.environ["HF_TOKEN"],
-                model=model_name,
+                model=model,
                 on_connect=on_connect,
             ),
             system_prompt=config.system_prompt,
-            openai_format=True
+            openai_format=True,
         )
         return assistant
     elif provider.lower() == "anthropic":
         return Assistant(
             provider=AnthropicProvider(
-                model=model_name,
+                model=model,
                 thinking_budget=thinking_budget,
                 on_connect=on_connect,
             ),
@@ -83,7 +82,7 @@ def create_assistant(
         )
     elif provider.lower() == "copilot":
         return CopilotAssistant(
-            model=model_name, system_prompt=config.system_prompt, on_connect=on_connect
+            model=model, system_prompt=config.system_prompt, on_connect=on_connect
         )
     elif provider.lower() == "simulated":
         assistant = SimulatedAssistant(response_delay=0.001, on_connect=on_connect)

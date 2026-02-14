@@ -40,15 +40,15 @@ class SessionTranscript:
         if self._header_written:
             return
 
-        assert self.config.models
-        model = self.config.models.get(self.config.model)
-        assert model
+        assert self.config.assistants
+        assistant = self.config.assistants.get(self.config.assistant)
+        assert assistant
 
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         header = f"""# Artifice Session
 **Started:** {timestamp}
-**Model:** {self.config.model}
-**Provider:** {model["provider"]} ({model["model"]})
+**Assistant:** {self.config.assistant}
+Provider:** {assistant["provider"]} ({assistant["model"]})
 **System Prompt:** {self.config.system_prompt}
 
 ---

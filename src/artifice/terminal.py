@@ -538,11 +538,11 @@ class ArtificeTerminal(Widget):
                 yield self.assistant_status
 
     def on_mount(self) -> None:
-        if self._config.models:
-            model = self._config.models.get(self._config.model)
-            if model:
+        if self._config.assistants:
+            assistant = self._config.assistants.get(self._config.assistant)
+            if assistant:
                 self.assistant_status.update(
-                    f"{model.get('model').lower()} ({model.get('provider').lower()})"
+                    f"{assistant.get('model').lower()} ({assistant.get('provider').lower()})"
                 )
 
     def _save_block_to_session(self, block: BaseBlock) -> None:
