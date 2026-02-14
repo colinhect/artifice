@@ -1,9 +1,32 @@
+"""Agent module with provider/assistant architecture.
+
+This module exports both the new provider/assistant classes and the
+backward-compatible agent classes.
+"""
+
 from typing import Callable
 
 import os
 
 from ..config import ArtificeConfig
+
+# Core interfaces
 from .common import AgentBase as AgentBase
+from .common import AgentResponse as AgentResponse
+from .provider import ProviderBase as ProviderBase
+from .provider import ProviderResponse as ProviderResponse
+
+# Assistant class (universal conversation manager)
+from .assistant import Assistant as Assistant
+
+# Provider implementations
+from .providers.anthropic import AnthropicProvider as AnthropicProvider
+from .providers.ollama import OllamaProvider as OllamaProvider
+from .providers.openai import OpenAICompatibleProvider as OpenAICompatibleProvider
+from .providers.copilot import CopilotProvider as CopilotProvider
+from .providers.simulated import SimulatedProvider as SimulatedProvider
+
+# Backward-compatible agent classes
 from .claude import ClaudeAgent as ClaudeAgent
 from .ollama import OllamaAgent as OllamaAgent
 from .openai import OpenAIAgent as OpenAIAgent

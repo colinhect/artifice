@@ -1,16 +1,22 @@
+"""Agent for Ollama (backward compatibility wrapper).
+
+This module provides the OllamaAgent class which delegates to the new
+provider/assistant architecture while maintaining backward compatibility.
+"""
+
 from __future__ import annotations
 
-import asyncio
-import logging
-from typing import Optional, Callable
+from typing import Callable, Optional
 
+from .assistant import Assistant
 from .common import AgentBase, AgentResponse
-
-logger = logging.getLogger(__name__)
+from .providers.ollama import OllamaProvider
 
 
 class OllamaAgent(AgentBase):
     """Agent for connecting to Ollama locally with streaming responses.
+
+    This is a backward compatibility wrapper that delegates to Assistant + OllamaProvider.
 
     Ollama URL: Defaults to http://localhost:11434 but can be overridden via
     OLLAMA_HOST environment variable.
@@ -30,42 +36,19 @@ class OllamaAgent(AgentBase):
         """Initialize Ollama agent.
 
         Args:
-            model: Model identifier to use. Defaults to llama3.1.
+            model: Model identifier to use. Defaults to llama3.2:1b.
             system_prompt: Optional system prompt to guide the agent's behavior.
             on_connect: Optional callback called when the client first connects.
             host: Optional Ollama host URL. Falls back to OLLAMA_HOST env var.
+            thinking_budget: Optional token budget for thinking mode.
         """
-        import os
-
-        self.host = host or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-        if model:
-            self.model = model
-        else:
-            self.model = "llama3.2:1b"
-        self.system_prompt = system_prompt
-        self.on_connect = on_connect
-        self.thinking_budget = thinking_budget
-        self._client = None
-        self.messages = []  # Persistent conversation history
-
-    def _get_client(self):
-        """Lazy import and create Ollama client."""
-        if self._client is None:
-            try:
-                import ollama
-
-                self._client = ollama.Client(host=self.host)
-                if self.on_connect:
-                    self.on_connect(f"Ollama ({self.model})")
-            except ImportError:
-                raise ImportError(
-                    "ollama package not installed. Install with: pip install ollama"
-                )
-        return self._client
-
-    def clear_conversation(self):
-        """Clear the conversation history."""
-        self.messages = []
+        provider = OllamaProvider(
+            model=model,
+            host=host,
+            thinking_budget=thinking_budget,
+            on_connect=on_connect,
+        )
+        self._assistant = Assistant(provider=provider, system_prompt=system_prompt)
 
     async def send_prompt(
         self,
@@ -78,87 +61,18 @@ class OllamaAgent(AgentBase):
         Args:
             prompt: The prompt text.
             on_chunk: Optional callback for streaming text chunks.
+            on_thinking_chunk: Optional callback for streaming thinking chunks.
 
         Returns:
             AgentResponse with the complete response.
         """
-        try:
-            client = self._get_client()
-            loop = asyncio.get_running_loop()
+        return await self._assistant.send_prompt(prompt, on_chunk, on_thinking_chunk)
 
-            # Add new user message to conversation history (only if non-empty)
-            if prompt.strip():
-                self.messages.append({"role": "user", "content": prompt})
-                logger.info(f"[OllamaAgent] Sending prompt: {prompt}")
+    def clear_conversation(self):
+        """Clear the conversation history."""
+        self._assistant.clear_conversation()
 
-            def sync_stream():
-                """Synchronously stream from Ollama with thinking support."""
-                chunks = []
-                thinking_chunks = []
-
-                # Build message list with system prompt if provided
-                messages = []
-                if self.system_prompt and len(self.messages) == 1:
-                    # Only add system prompt at the start of conversation
-                    messages.append({"role": "system", "content": self.system_prompt})
-                messages.extend(self.messages)
-
-                # Stream response from Ollama
-                stream = client.chat(
-                    model=self.model,
-                    messages=messages,
-                    stream=True,
-                    think=self.thinking_budget is not None and self.thinking_budget > 0,
-                )
-
-                stop_reason = None
-                for chunk in stream:
-                    if "message" in chunk:
-                        # Regular content
-                        content = chunk["message"].get("content", "")
-                        if content:
-                            chunks.append(content)
-                            if on_chunk:
-                                on_chunk(content)
-
-                        # Thinking content (separate field from Ollama API)
-                        thinking = chunk["message"].get("thinking", "")
-                        if thinking:
-                            thinking_chunks.append(thinking)
-                            if on_thinking_chunk:
-                                on_thinking_chunk(thinking)
-
-                    # Check if this is the final chunk
-                    if chunk.get("done", False):
-                        stop_reason = chunk.get("done_reason", "end_turn")
-
-                thinking_text = "".join(thinking_chunks) if thinking_chunks else None
-                return "".join(chunks), stop_reason, thinking_text
-
-            # Execute streaming in thread pool
-            text, stop_reason, thinking_text = await loop.run_in_executor(
-                None, sync_stream
-            )
-
-            # Log and add assistant's response to conversation history
-            if text:
-                logger.info(
-                    f"[OllamaAgent] Received response ({len(text)} chars, stop_reason={stop_reason}): {text}"
-                )
-                if thinking_text:
-                    logger.info(
-                        f"[OllamaAgent] Thinking output ({len(thinking_text)} chars)"
-                    )
-                self.messages.append({"role": "assistant", "content": text})
-
-            return AgentResponse(
-                text=text,
-                stop_reason=stop_reason,
-                thinking=thinking_text,
-            )
-
-        except ImportError as e:
-            return AgentResponse(text="", error=str(e))
-        except Exception as e:
-            error_msg = f"Error communicating with Ollama: {e}"
-            return AgentResponse(text="", error=error_msg)
+    @property
+    def messages(self):
+        """Expose messages for any code that accesses agent.messages."""
+        return self._assistant.messages
