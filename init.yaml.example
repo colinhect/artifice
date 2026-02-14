@@ -33,6 +33,10 @@ models:
     provider: "ollama"
     model: "deepseek-r1:1.5b"
     thinking_budget: 1024
+
+  minimax:
+    provider: "huggingface"
+    model: "MiniMaxAI/MiniMax-M2.5:novita"
   
   haiku:
     provider: "anthropic"

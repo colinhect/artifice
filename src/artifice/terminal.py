@@ -538,7 +538,7 @@ class ArtificeTerminal(Widget):
             model = self._config.models.get(self._config.model)
             if model:
                 self.agent_status.update(
-                    f"{model.get('model')} ({model.get('provider')})"
+                    f"{model.get('model').lower()} ({model.get('provider').lower()})"
                 )
 
     def _save_block_to_session(self, block: BaseBlock) -> None:

@@ -83,28 +83,7 @@ Artifice has three input modes. Switch modes by typing a special character when 
 ```bash
 git clone <repository-url>
 cd artifice/src
-python artifice/app.py
-```
-
-## Configuration
-
-### Claude (Anthropic)
-Set your API key for Claude:
-```bash
-export ANTHROPIC_API_KEY="your-api-key-here"
-```
-
-### Ollama (Local Models)
-Install and run Ollama locally:
-```bash
-# Install Ollama from https://ollama.ai
-ollama pull llama3.1  # or any other model
-ollama serve  # runs on localhost:11434 by default
-```
-
-Optionally set custom Ollama host:
-```bash
-export OLLAMA_HOST="http://localhost:11434"
+python -m artifice.app
 ```
 
 ## Roadmap

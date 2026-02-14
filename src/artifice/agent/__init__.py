@@ -1,9 +1,12 @@
 from typing import Callable
 
+import os
+
 from ..config import ArtificeConfig
 from .common import AgentBase as AgentBase
 from .claude import ClaudeAgent as ClaudeAgent
 from .ollama import OllamaAgent as OllamaAgent
+from .openai import OpenAIAgent as OpenAIAgent
 from .copilot import CopilotAgent as CopilotAgent
 from .simulated import (
     SimulatedAgent as SimulatedAgent,
@@ -31,6 +34,15 @@ def create_agent(
         return None
     if provider.lower() == "ollama":
         return OllamaAgent(
+            model=model_name,
+            system_prompt=config.system_prompt,
+            thinking_budget=thinking_budget,
+            on_connect=on_connect,
+        )
+    elif provider.lower() == "huggingface":
+        return OpenAIAgent(
+            base_url="https://router.huggingface.co/v1",
+            api_key=os.environ["HF_TOKEN"],
             model=model_name,
             system_prompt=config.system_prompt,
             thinking_budget=thinking_budget,
