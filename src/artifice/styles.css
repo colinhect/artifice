@@ -1,0 +1,356 @@
+ArtificeHeader {
+    height: auto;
+    padding: 0;
+    margin: 0;
+    background: $background;
+    content-align: left top;
+}
+
+ArtificeHeader .header-bar {
+    width: 1fr;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    color: $primary;
+}
+
+Screen {
+    layout: vertical;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    border: none;
+    overflow-y: auto;
+}
+
+ArtificeHeader {
+    dock: top;
+}
+
+ArtificeTerminal {
+    height: auto;
+    margin-top: 0;
+    padding-top: 0;
+}
+
+Footer {
+    background: $panel-darken-1;
+    dock: bottom;
+}
+
+ArtificeTerminal {
+    height: auto;
+}
+
+ArtificeTerminal Vertical {
+    height: auto;
+}
+
+ArtificeTerminal TerminalOutput {
+    height: auto;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+ArtificeTerminal TerminalInput {
+    height: auto;
+    padding-left: 1;
+}
+
+ArtificeTerminal TerminalInput.in-context {
+    padding-left: 0;
+}
+
+ArtificeTerminal .highlighted > Horizontal > .status-indicator {
+    background: $surface-lighten-2;
+}
+
+ArtificeTerminal .in-context {
+    border-left: solid $primary;
+}
+
+ArtificeTerminal PinnedOutput {
+    height: auto;
+    max-height: 30vh;
+}
+
+ArtificeTerminal #status-line {
+    height: 1;
+}
+
+ArtificeTerminal LoadingIndicator {
+    width: 1;
+    margin: 0 1 0 0;
+}
+
+ArtificeTerminal LoadingIndicator.agent-inactive {
+    display: none;
+}
+
+ArtificeTerminal LoadingIndicator.agent-active {
+    display: block;
+}
+
+ArtificeTerminal #connection-status.agent-inactive {
+    display: block;
+}
+
+ArtificeTerminal #connection-status.agent-active {
+    display: none;
+}
+
+ArtificeTerminal .connected {
+    color: $primary 100% !important;
+}
+
+ArtificeTerminal #connection-status {
+    width: 1;
+    margin: 0 1 0 0;
+    color: $primary 20%;
+}
+
+ArtificeTerminal #agent-status {
+    height: 1;
+    color: $primary 33%;
+}
+
+TerminalInput {
+    height: auto;
+    max-height: 24;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+TerminalInput Horizontal {
+    height: auto;
+    padding: 0;
+    margin: 0;
+}
+
+TerminalInput .prompt-container {
+    width: 2;
+    height: auto;
+    padding: 0;
+    margin: 0;
+}
+
+TerminalInput .prompt {
+    width: 2;
+    color: $primary;
+    padding: 0;
+    margin: 0;
+}
+
+TerminalInput TextArea {
+    width: 1fr;
+    min-height: 1;
+    height: auto;
+    max-height: 24;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: $background-darken-3;
+}
+
+TerminalInput TextArea:focus {
+    border: none !important;
+}
+
+TerminalInput TextArea:disabled {
+    opacity: 0.6;
+}
+
+TerminalInput Input {
+    width: 1fr;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+TerminalInput #history-search-input {
+    width: 1fr;
+    height: 9;
+}
+
+TerminalInput Input:focus {
+    border: none !important;
+}
+
+/* Show up to 8 items in autocomplete dropdown */
+AutoCompleteList {
+    layer: overlay;
+    height: 9;
+}
+
+BaseBlock {
+    margin: 0 0 1 0;
+    padding: 0;
+    padding-left: 1;
+}
+
+BaseBlock.in-context {
+    padding-left: 0;
+    border-left: solid $primary;
+    margin-bottom: 0;
+    padding-bottom: 1;
+}
+
+BaseBlock Horizontal {
+    height: auto;
+    align: left top;
+}
+
+BaseBlock Vertical {
+    height: auto;
+    width: 1fr;
+}
+
+BaseBlock .status-indicator {
+    width: 2;
+    height: 1;
+    content-align: center top;
+    padding: 0;
+}
+
+BaseBlock .loading-indicator {
+    width: 1;
+    height: 1;
+    content-align: center top;
+    padding: 0;
+}
+
+BaseBlock > Horizontal > .status-indicator {
+    height: 100%;
+}
+
+BaseBlock .status-indicator LoadingIndicator {
+    height: 1;
+}
+
+BaseBlock .status-success {
+    color: $primary;
+}
+
+BaseBlock .status-error {
+    color: $error;
+}
+
+BaseBlock .status-unexecuted {
+}
+
+BaseBlock .status-pending {
+    color: $secondary;
+}
+
+CodeInputBlock .code {
+    padding: 0;
+    border: none;
+}
+
+CodeInputBlock .prompt-indicator {
+    width: 1;
+    height: 1;
+}
+
+CodeInputBlock .code-unused {
+    padding: 0;
+    border: none;
+}
+
+CodeOutputBlock .code-output {
+    background: $surface-darken-1;
+    color: $foreground 66%;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+CodeOutputBlock .error-output {
+    background: $surface-darken-1;
+    color: $error;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+CodeOutputBlock .markdown-output {
+    background: $surface-darken-1;
+    padding-left: 0;
+    padding-right: 0;
+    layout: stream;
+}
+
+BufferedOutputBlock Markdown MarkdownBlock:last-child {
+    margin-bottom: 0;
+}
+
+BufferedOutputBlock Markdown MarkdownFence {
+    margin: 0;
+}
+
+BufferedOutputBlock Markdown MarkdownTable {
+    width: auto;
+}
+
+BufferedOutputBlock Markdown MarkdownH1 {
+    text-align: left;
+}
+
+WidgetOutputBlock .widget-container {
+    height: auto;
+    width: 1fr;
+}
+
+AgentInputBlock .prompt {
+    /*background: $primary-background-darken-2;*/
+    padding: 0;
+    border: none;
+}
+
+AgentOutputBlock .agent-output {
+    padding-left: 0;
+    padding-right: 0;
+    layout: stream;
+}
+
+AgentOutputBlock .loading-indicator {
+    width: 2;
+    height: 1;
+}
+
+AgentOutputBlock .text-output {
+    padding: 0;
+    margin: 0;
+}
+
+ThinkingOutputBlock {
+    color: $foreground 60%;
+    border-left: solid $primary;
+}
+
+/*
+ThinkingOutputBlock .thinking-label {
+    color: $accent;
+    text-style: italic;
+    padding: 0;
+    margin: 0;
+}
+*/
+
+TerminalOutput {
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+PinnedOutput {
+    height: auto;
+    max-height: 30vh;
+    overflow-y: auto;
+    display: none;
+}
+
+PinnedOutput.has-pins {
+    display: block;
+    border-top: solid $accent;
+    padding-top: 1;
+}

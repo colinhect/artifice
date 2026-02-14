@@ -11,24 +11,6 @@ from artifice.config import load_config, ArtificeConfig
 class ArtificeHeader(Static):
     """Custom header with gradient fade effect."""
 
-    DEFAULT_CSS = """
-    ArtificeHeader {
-        height: auto;
-        padding: 0;
-        margin: 0;
-        background: $background;
-        content-align: left top;
-    }
-
-    ArtificeHeader .header-bar {
-        width: 1fr;
-        height: auto;
-        padding: 0;
-        margin: 0;
-        color: $primary;
-    }
-    """
-
     def __init__(self, banner):
         super().__init__()
         self.banner = banner
@@ -83,31 +65,7 @@ def create_artifice_theme() -> Theme:
 
 class ArtificeApp(App):
     TITLE = "Artifice Terminal"
-    CSS = """
-    Screen {
-        layout: vertical;
-        height: auto;
-        padding: 0;
-        margin: 0;
-        border: none;
-        overflow-y: auto;
-    }
-
-    ArtificeHeader {
-        dock: top;
-    }
-
-    ArtificeTerminal {
-        height: auto;
-        margin-top: 0;
-        padding-top: 0;
-    }
-
-    Footer {
-        background: $panel-darken-1;
-        dock: bottom;
-    }
-    """
+    CSS_PATH = "styles.css"
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit"),

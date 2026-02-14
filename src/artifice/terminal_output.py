@@ -17,86 +17,9 @@ from .execution import ExecutionResult, ExecutionStatus
 from .terminal_input import InputTextArea
 
 class BaseBlock(Static):
-    DEFAULT_CSS = """
-    BaseBlock {
-        margin: 0 0 1 0;
-        padding: 0;
-        padding-left: 1;
-    }
-
-    BaseBlock.in-context {
-        padding-left: 0;
-        border-left: solid $primary;
-        margin-bottom: 0;
-        padding-bottom: 1;
-    }
-
-    BaseBlock Horizontal {
-        height: auto;
-        align: left top;
-    }
-
-    BaseBlock Vertical {
-        height: auto;
-        width: 1fr;
-    }
-
-    BaseBlock .status-indicator {
-        width: 2;
-        height: 1;
-        content-align: center top;
-        padding: 0;
-    }
-
-    BaseBlock .loading-indicator {
-        width: 1;
-        height: 1;
-        content-align: center top;
-        padding: 0;
-    }
-
-    BaseBlock > Horizontal > .status-indicator {
-        height: 100%;
-    }
-
-    BaseBlock .status-indicator LoadingIndicator {
-        height: 1;
-    }
-
-    BaseBlock .status-success {
-        color: $primary;
-    }
-
-    BaseBlock .status-error {
-        color: $error;
-    }
-
-    BaseBlock .status-unexecuted {
-    }
-
-    BaseBlock .status-pending {
-        color: $secondary;
-    }
-    """
+    pass
 
 class CodeInputBlock(BaseBlock):
-    DEFAULT_CSS = """
-    CodeInputBlock .code {
-        padding: 0;
-        border: none;
-    }
-
-    CodeInputBlock .prompt-indicator {
-        width: 1;
-        height: 1;
-    }
-
-    CodeInputBlock .code-unused {
-        padding: 0;
-        border: none;
-    }
-    """
-
     def __init__(self, code: str, language: str, show_loading: bool = True, in_context=False, command_number: int | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._loading_indicator = LoadingIndicator(classes="status-indicator")
@@ -193,24 +116,6 @@ class BufferedOutputBlock(BaseBlock):
     which CSS classes are applied to the Static/Markdown child widgets.
     """
 
-    DEFAULT_CSS = """
-    BufferedOutputBlock Markdown MarkdownBlock:last-child {
-        margin-bottom: 0;
-    }
-
-    BufferedOutputBlock Markdown MarkdownFence {
-        margin: 0;
-    }
-
-    BufferedOutputBlock Markdown MarkdownTable {
-        width: auto;
-    }
-
-    BufferedOutputBlock Markdown MarkdownH1 {
-        text-align: left;
-    }
-    """
-
     _STATIC_CSS_CLASS: str = ""
     _MARKDOWN_CSS_CLASS: str = ""
 
@@ -259,29 +164,6 @@ class BufferedOutputBlock(BaseBlock):
 
 
 class CodeOutputBlock(BufferedOutputBlock):
-    DEFAULT_CSS = """
-    CodeOutputBlock .code-output {
-        background: $surface-darken-1;
-        color: $foreground 66%;
-        padding-left: 0;
-        padding-right: 0;
-    }
-
-    CodeOutputBlock .error-output {
-        background: $surface-darken-1;
-        color: $error;
-        padding-left: 0;
-        padding-right: 0;
-    }
-
-    CodeOutputBlock .markdown-output {
-        background: $surface-darken-1;
-        padding-left: 0;
-        padding-right: 0;
-        layout: stream;
-    }
-    """
-
     _STATIC_CSS_CLASS = "code-output"
     _MARKDOWN_CSS_CLASS = "markdown-output"
 
@@ -322,13 +204,6 @@ class CodeOutputBlock(BufferedOutputBlock):
 class WidgetOutputBlock(BaseBlock):
     """Block that displays an arbitrary Textual widget."""
 
-    DEFAULT_CSS = """
-    WidgetOutputBlock .widget-container {
-        height: auto;
-        width: 1fr;
-    }
-    """
-
     def __init__(self, widget: Widget, **kwargs):
         super().__init__(**kwargs)
         self._widget = widget
@@ -340,14 +215,6 @@ class WidgetOutputBlock(BaseBlock):
                 yield self._widget
 
 class AgentInputBlock(BaseBlock):
-    DEFAULT_CSS = """
-    AgentInputBlock .prompt {
-        /*background: $primary-background-darken-2;*/
-        padding: 0;
-        border: none;
-    }
-    """
-
     def __init__(self, prompt: str, in_context=False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._status_indicator = Static(">", classes="status-indicator status-pending")
@@ -371,24 +238,6 @@ class AgentInputBlock(BaseBlock):
         return "ai"
 
 class AgentOutputBlock(BufferedOutputBlock):
-    DEFAULT_CSS = """
-    AgentOutputBlock .agent-output {
-        padding-left: 0;
-        padding-right: 0;
-        layout: stream;
-    }
-
-    AgentOutputBlock .loading-indicator {
-        width: 2;
-        height: 1;
-    }
-
-    AgentOutputBlock .text-output {
-        padding: 0;
-        margin: 0;
-    }
-    """
-
     _STATIC_CSS_CLASS = "text-output"
     _MARKDOWN_CSS_CLASS = "agent-output"
 
@@ -476,22 +325,6 @@ class ThinkingOutputBlock(AgentOutputBlock):
     and a left border accent.
     """
 
-    DEFAULT_CSS = """
-    ThinkingOutputBlock {
-        color: $foreground 60%;
-        border-left: solid $primary;
-    }
-
-    /*
-    ThinkingOutputBlock .thinking-label {
-        color: $accent;
-        text-style: italic;
-        padding: 0;
-        margin: 0;
-    }
-    */
-    """
-
     def __init__(self, output="", activity=True) -> None:
         super().__init__(output=output, activity=activity, render_markdown=False)
         #self._label = Static("Thinking...", classes="thinking-label")
@@ -566,14 +399,6 @@ class HighlightableContainerMixin:
 
 class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     """Container for REPL output blocks."""
-
-    DEFAULT_CSS = """
-    TerminalOutput {
-        border: none;
-        padding: 0;
-        margin: 0;
-    }
-    """
 
     class PinRequested(Message):
         """Posted when the user wants to pin the highlighted widget block."""
@@ -766,21 +591,6 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
 
 class PinnedOutput(HighlightableContainerMixin, Vertical):
     """Container for pinned output blocks, displayed below the input."""
-
-    DEFAULT_CSS = """
-    PinnedOutput {
-        height: auto;
-        max-height: 30vh;
-        overflow-y: auto;
-        display: none;
-    }
-
-    PinnedOutput.has-pins {
-        display: block;
-        border-top: solid $accent;
-        padding-top: 1;
-    }
-    """
 
     class UnpinRequested(Message):
         """Posted when the user wants to unpin a block."""
