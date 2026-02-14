@@ -20,7 +20,7 @@ Screen {
     padding: 0;
     margin: 0;
     border: none;
-    overflow-y: auto;
+    overflow-y: hidden;
 }
 
 ArtificeHeader {
@@ -42,7 +42,7 @@ ArtificeTerminal {
     height: auto;
 }
 
-ArtificeTerminal Vertical {
+ArtificeTerminal > Vertical {
     height: auto;
 }
 
