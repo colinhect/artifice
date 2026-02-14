@@ -112,7 +112,7 @@ class SimulatedProvider(ProviderBase):
             {
                 "pattern": r"markdown",
                 "response": _TEST_MARKDOWN,
-                "thinking": "Hmmm, this will take a while"
+                "thinking": "Hmmm, this will take a while",
             },
             {
                 "pattern": r"hello|hi|hey",
@@ -133,7 +133,7 @@ class SimulatedProvider(ProviderBase):
                 "pattern": r"goodbye|bye|exit",
                 "response": "Goodbye! Thanks for chatting with me.",
                 "thinking": "The user is saying goodbye. I should acknowledge and thank them for the conversation.",
-            }
+            },
         ]
 
         self.default_response = "I'm not sure how to respond to that. Try asking about math or saying hello!"

@@ -47,6 +47,9 @@ class StreamingFenceDetector:
         self.all_blocks: list[BaseBlock] = []
         self.first_assistant_block: AssistantOutputBlock | None = None
         self._string_tracker = StringTracker()
+        self._current_line_buffer = (
+            ""  # Tracks current line in PROSE for blank line detection
+        )
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AssistantOutputBlock(
             activity=activity
@@ -108,11 +111,37 @@ class StreamingFenceDetector:
                 self._flush_pending_to_chunk()
                 self._backtick_count = 0
                 self._lang_buffer = ""
+                self._current_line_buffer = ""  # Reset line tracking
                 self._state = _FenceState.LANG_LINE
         else:
             # Not a fence marker
             self._flush_backticks_to_pending()
-            self._pending_buffer += ch
+
+            # Check for empty lines to split blocks
+            if ch == "\n":
+                # Add newline to pending buffer
+                self._pending_buffer += ch
+
+                # Check if the line we just completed was empty/whitespace-only
+                if self._current_line_buffer.strip() == "":
+                    # Empty line detected - split to new block
+                    self._flush_pending_to_chunk()
+                    self._flush_and_update_chunk()
+
+                    # Mark current prose block as complete
+                    if isinstance(self._current_block, AssistantOutputBlock):
+                        self._current_block.mark_success()
+
+                    # Create new prose block
+                    self._current_block = self._make_prose_block(activity=True)
+                    self._output.append_block(self._current_block)
+                    self.all_blocks.append(self._current_block)
+
+                # Reset line buffer for next line
+                self._current_line_buffer = ""
+            else:
+                self._pending_buffer += ch
+                self._current_line_buffer += ch
 
     def _feed_lang_line(self, ch: str) -> None:
         """Process language line after opening fence."""
@@ -175,6 +204,9 @@ class StreamingFenceDetector:
                 self._output.append_block(self._current_block)
                 self.all_blocks.append(self._current_block)
 
+                self._current_line_buffer = (
+                    ""  # Reset line tracking for new prose block
+                )
                 self._state = _FenceState.PROSE
             # Don't add character to pending buffer yet - we're accumulating backticks
         else:
