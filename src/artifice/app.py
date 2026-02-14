@@ -142,10 +142,10 @@ class ArtificeApp(App):
 def main():
     """Main entry point for the artifice command."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default=None, help="Model to use (defined in config)")
-    parser.add_argument("--system-prompt", default=None, help="System prompt to use for the agent (overrides config)")
-    parser.add_argument("--prompt-prefix", default=None, help="Prefix to user prompts (overrides config)")
-    parser.add_argument("--thinking-budget", type=int, default=None, help="Extended thinking token budget (enables thinking, overrides config)")
+    parser.add_argument("model", nargs='?', default=None, help="Model to use")
+    parser.add_argument("--system-prompt", default=None, help="System prompt to use for the agent")
+    parser.add_argument("--prompt-prefix", default=None, help="Prefix to user prompts")
+    parser.add_argument("--thinking-budget", type=int, default=None, help="Extended thinking token budget (>0 enables thinking)")
     parser.add_argument("--fullscreen", action="store_true", default=None, help="Full screen")
     parser.add_argument("--logging", action="store_true", default=None, help="Enable logging")
     args = parser.parse_args()
