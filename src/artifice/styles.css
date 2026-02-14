@@ -48,7 +48,7 @@ ArtificeTerminal > Vertical {
 
 ArtificeTerminal TerminalOutput {
     height: auto;
-    max-height: 90vh;
+    max-height: 94vh;
     overflow-y: auto;
 }
 
