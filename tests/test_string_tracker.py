@@ -1,6 +1,6 @@
 """Tests for StringTracker - the streaming string literal detector."""
 
-from artifice.terminal import StringTracker
+from artifice.fence_detector import StringTracker
 
 
 def feed_string(tracker, text):

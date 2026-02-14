@@ -7,7 +7,7 @@ targets in the terminal module so the detector recognizes our fakes.
 
 from unittest.mock import patch
 import pytest
-from artifice.terminal import StreamingFenceDetector, _FenceState
+from artifice.fence_detector import StreamingFenceDetector, _FenceState
 
 
 # --- Fakes to avoid Textual widget dependencies ---
@@ -91,8 +91,8 @@ class FakeOutput:
 def _patch_block_types():
     """Patch isinstance targets so the detector recognizes our fakes."""
     with (
-        patch("artifice.terminal.AssistantOutputBlock", FakeAssistantBlock),
-        patch("artifice.terminal.CodeInputBlock", FakeCodeBlock),
+        patch("artifice.fence_detector.AssistantOutputBlock", FakeAssistantBlock),
+        patch("artifice.fence_detector.CodeInputBlock", FakeCodeBlock),
     ):
         yield
 

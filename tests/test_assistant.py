@@ -2,7 +2,8 @@
 
 import pytest
 
-from artifice.assistant import Assistant, SimulatedProvider
+from artifice.assistant.assistant import Assistant
+from artifice.providers.simulated import SimulatedProvider
 
 
 @pytest.mark.asyncio

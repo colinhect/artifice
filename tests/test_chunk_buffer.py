@@ -1,6 +1,6 @@
 """Tests for the ChunkBuffer helper class."""
 
-from artifice.terminal import ChunkBuffer
+from artifice.chunk_buffer import ChunkBuffer
 
 
 class TestChunkBuffer:
