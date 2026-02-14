@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class OpenAIAgent(AgentBase):
-
     def __init__(
         self,
         base_url: str,
@@ -63,7 +62,9 @@ class OpenAIAgent(AgentBase):
             # Add new user message to conversation history (only if non-empty)
             if prompt.strip():
                 self.messages.append({"role": "user", "content": prompt})
-                logger.info(f"[OpenAIAgent] Sending prompt to {self.model}: {prompt[:100]}...")
+                logger.info(
+                    f"[OpenAIAgent] Sending prompt to {self.model}: {prompt[:100]}..."
+                )
 
             logger.info(f"[OpenAIAgent] Messages history length: {len(self.messages)}")
 
@@ -86,10 +87,15 @@ class OpenAIAgent(AgentBase):
                         delta = chunk.choices[0].delta
 
                         # Handle reasoning/thinking content (o1, o3 models)
-                        if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                        if (
+                            hasattr(delta, "reasoning_content")
+                            and delta.reasoning_content
+                        ):
                             thinking_text += delta.reasoning_content
                             if on_thinking_chunk:
-                                loop.call_soon_threadsafe(on_thinking_chunk, delta.reasoning_content)
+                                loop.call_soon_threadsafe(
+                                    on_thinking_chunk, delta.reasoning_content
+                                )
 
                         # Handle regular content
                         if delta.content:
@@ -100,11 +106,17 @@ class OpenAIAgent(AgentBase):
 
                 return text, thinking_text, chunk_count
 
-            text, thinking_text, chunk_count = await loop.run_in_executor(None, sync_stream)
+            text, thinking_text, chunk_count = await loop.run_in_executor(
+                None, sync_stream
+            )
 
             if thinking_text:
-                logger.info(f"[OpenAIAgent] Received thinking content, length: {len(thinking_text)}")
-            logger.info(f"[OpenAIAgent] Received {chunk_count} chunks, total length: {len(text)}")
+                logger.info(
+                    f"[OpenAIAgent] Received thinking content, length: {len(thinking_text)}"
+                )
+            logger.info(
+                f"[OpenAIAgent] Received {chunk_count} chunks, total length: {len(text)}"
+            )
 
             # Add assistant's response to conversation history
             if text:
@@ -116,8 +128,9 @@ class OpenAIAgent(AgentBase):
                 text=text,
             )
 
-        except Exception as e:
+        except Exception:
             import traceback
+
             error_msg = f"Error communicating with model: {traceback.format_exc()}"
             logger.error(f"[OpenAIAgent] {error_msg}")
             return AgentResponse(text="", error=error_msg)

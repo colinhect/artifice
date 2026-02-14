@@ -39,23 +39,23 @@ class TestChunkBuffer:
         scheduled[0]()
         assert drained == ["abc"]
 
-# Failing because there is no asyncio loop
-#    def test_drain_resets_scheduling(self):
-#        """After a drain, new appends schedule a new drain."""
-#        scheduled = []
-#        drained = []
-#
-#        buf = ChunkBuffer(
-#            schedule=lambda fn: scheduled.append(fn), drain=lambda t: drained.append(t)
-#        )
-#        buf.append("first")
-#        scheduled[0]()
-#
-#        buf.append("second")
-#        assert len(scheduled) == 2
-#
-#        scheduled[1]()
-#        assert drained == ["first", "second"]
+    # Failing because there is no asyncio loop
+    #    def test_drain_resets_scheduling(self):
+    #        """After a drain, new appends schedule a new drain."""
+    #        scheduled = []
+    #        drained = []
+    #
+    #        buf = ChunkBuffer(
+    #            schedule=lambda fn: scheduled.append(fn), drain=lambda t: drained.append(t)
+    #        )
+    #        buf.append("first")
+    #        scheduled[0]()
+    #
+    #        buf.append("second")
+    #        assert len(scheduled) == 2
+    #
+    #        scheduled[1]()
+    #        assert drained == ["first", "second"]
 
     def test_flush_sync_drains_immediately(self):
         """flush_sync drains buffered text without waiting for schedule."""
