@@ -17,6 +17,7 @@ dependencies = [
     "ollama>=0.1.0",
     "github-copilot-sdk>=0.1.0",
     "pyperclip>=1.11.0",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]

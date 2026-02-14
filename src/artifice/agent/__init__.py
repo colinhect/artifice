@@ -18,7 +18,7 @@ def create_agent(
 
     model = config.models.get(config.model)
     if model is None:
-        raise Exception(f"Unknown model: {model}")
+        raise Exception(f"Unknown model: {config.model}")
 
     provider = model.get("provider")
     model_name = model.get("model")

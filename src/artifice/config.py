@@ -1,7 +1,7 @@
 """Configuration management for Artifice.
 
-This module handles loading user configuration from ~/.config/artifice/init.py
-and provides a sandboxed execution environment for user settings.
+This module handles loading user configuration from ~/.config/artifice/init.yaml
+and provides YAML-based configuration.
 """
 
 from __future__ import annotations
@@ -11,11 +11,13 @@ import traceback
 from pathlib import Path
 from typing import Any, Optional
 
+import yaml
+
 
 class ArtificeConfig:
     """Configuration container for Artifice settings.
 
-    This class stores configuration values that can be set by the user's init.py file.
+    This class stores configuration values that can be set by the user's init.yaml file.
     All settings have sensible defaults.
     """
 
@@ -67,15 +69,15 @@ def get_config_path() -> Path:
 
 
 def get_init_script_path() -> Path:
-    """Get the path to the user's init.py script."""
-    return get_config_path() / "init.py"
+    """Get the path to the user's init.yaml script."""
+    return get_config_path() / "init.yaml"
 
 
 def load_config() -> tuple[ArtificeConfig, Optional[str]]:
-    """Load configuration from ~/.config/artifice/init.py.
+    """Load configuration from ~/.config/artifice/init.yaml.
 
-    The init.py file is executed in a sandboxed environment where it can set
-    configuration values on a 'config' object.
+    The init.yaml file is parsed as YAML and configuration values are loaded
+    from the resulting dictionary.
 
     Returns:
         A tuple of (config, error_message). If loading fails, error_message
@@ -84,48 +86,87 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
     config = ArtificeConfig()
     init_path = get_init_script_path()
 
-    # If no init.py exists, return default config
+    # If no init.yaml exists, return default config
     if not init_path.exists():
         return config, None
 
-    # Create a sandboxed namespace for executing the init script
-    sandbox = {
-        "__builtins__": {
-            # Allow basic builtins
-            "True": True,
-            "False": False,
-            "None": None,
-            "str": str,
-            "int": int,
-            "float": float,
-            "bool": bool,
-            "list": list,
-            "dict": dict,
-            "tuple": tuple,
-            "set": set,
-            "len": len,
-            "range": range,
-            "enumerate": enumerate,
-            "zip": zip,
-            "print": print,  # Allow print for debugging config
-            # Explicitly deny dangerous operations
-            "__import__": None,
-            "open": None,
-            "exec": None,
-            "eval": None,
-            "compile": None,
-        },
-        "config": config,
-    }
-
     try:
-        # Read and execute the init script
+        # Read and parse the YAML file
         with open(init_path, "r") as f:
-            code = f.read()
+            data = yaml.safe_load(f)
 
-        exec(code, sandbox)
+        # If the file is empty or invalid YAML, return default config
+        if data is None:
+            return config, None
+
+        # Load configuration values from the YAML data
+        # Agent settings
+        if "model" in data:
+            config.model = data["model"]
+        if "models" in data:
+            config.models = data["models"]
+            print(config.models)
+        if "system_prompt" in data:
+            config.system_prompt = data["system_prompt"]
+        if "prompt_prefix" in data:
+            config.prompt_prefix = data["prompt_prefix"]
+        if "thinking_budget" in data:
+            config.thinking_budget = data["thinking_budget"]
+
+        # Provider-specific settings
+        if "ollama_host" in data:
+            config.ollama_host = data["ollama_host"]
+
+        # Display settings
+        if "banner" in data:
+            config.banner = data["banner"]
+        if "python_markdown" in data:
+            config.python_markdown = data["python_markdown"]
+        if "agent_markdown" in data:
+            config.agent_markdown = data["agent_markdown"]
+        if "shell_markdown" in data:
+            config.shell_markdown = data["shell_markdown"]
+
+        # Auto-send settings
+        if "auto_send_to_agent" in data:
+            config.auto_send_to_agent = data["auto_send_to_agent"]
+
+        # Shell init script
+        if "shell_init_script" in data:
+            config.shell_init_script = data["shell_init_script"]
+
+        # Session settings
+        if "save_sessions" in data:
+            config.save_sessions = data["save_sessions"]
+        if "sessions_dir" in data:
+            config.sessions_dir = data["sessions_dir"]
+
+        # Store any additional custom settings
+        known_keys = {
+            "model",
+            "models",
+            "system_prompt",
+            "prompt_prefix",
+            "thinking_budget",
+            "ollama_host",
+            "banner",
+            "python_markdown",
+            "agent_markdown",
+            "shell_markdown",
+            "auto_send_to_agent",
+            "shell_init_script",
+            "save_sessions",
+            "sessions_dir",
+        }
+        for key, value in data.items():
+            if key not in known_keys:
+                config.set(key, value)
+
         return config, None
 
+    except yaml.YAMLError as e:
+        error_msg = f"Error parsing YAML from {init_path}:\n{e}"
+        return config, error_msg
     except Exception:
         error_msg = f"Error loading config from {init_path}:\n{traceback.format_exc()}"
         return config, error_msg

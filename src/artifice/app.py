@@ -85,7 +85,7 @@ def main():
     )
     args = parser.parse_args()
 
-    # Load configuration from ~/.config/artifice/init.py
+    # Load configuration from ~/.config/artifice/init.yaml
     config, config_error = load_config()
 
     # Command-line arguments override config
