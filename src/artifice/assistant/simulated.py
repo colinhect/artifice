@@ -1,4 +1,4 @@
-"""Simulated AI agent for testing and development (backward compatibility wrapper)."""
+"""Simulated AI  for testing and development (backward compatibility wrapper)."""
 
 from __future__ import annotations
 
@@ -7,19 +7,19 @@ import logging
 from typing import Any, Callable
 
 from .assistant import Assistant
-from .common import AgentBase, AgentResponse
+from .common import AssistantBase, AssistantResponse
 from .providers.simulated import SimulatedProvider
 
 logger = logging.getLogger(__name__)
 
 
-class SimulatedAgent(AgentBase):
-    """A simulated AI agent that can be configured with predefined responses.
+class SimulatedAssistant(AssistantBase):
+    """A simulated AI  that can be configured with predefined responses.
 
     This is a backward compatibility wrapper that delegates to Assistant + SimulatedProvider.
 
-    This agent is useful for:
-    - Testing the agent interaction flow without API costs
+    This  is useful for:
+    - Testing the  interaction flow without API costs
     - Development and debugging
     - Creating reproducible test scenarios
     """
@@ -30,10 +30,10 @@ class SimulatedAgent(AgentBase):
         on_connect: Callable | None = None,
         response_delay: float = 0.05,
     ):
-        """Initialize the simulated agent.
+        """Initialize the simulated .
 
         Args:
-            system_prompt: System prompt (not used by simulated agent but kept for API compatibility)
+            system_prompt: System prompt (not used by simulated  but kept for API compatibility)
             on_connect: Optional callback called on initialization
             response_delay: Delay between streaming chunks (seconds) to simulate typing
         """
@@ -44,18 +44,20 @@ class SimulatedAgent(AgentBase):
         # Don't set up default scenarios by default (backward compatibility)
         self._provider.scenarios = []
         self._provider.default_response = (
-            "I'm a simulated AI agent. I can be configured with custom responses."
+            "I'm a simulated AI . I can be configured with custom responses."
         )
         self._provider.default_thinking = None
 
-        self._assistant = Assistant(provider=self._provider, system_prompt=system_prompt)
+        self._assistant = Assistant(
+            provider=self._provider, system_prompt=system_prompt
+        )
 
     def default_scenarios_and_response(self):
         """Configure default test scenarios."""
         self._provider._setup_default_scenarios()
 
     def configure_scenarios(self, scenarios: list[dict[str, Any]]) -> None:
-        """Configure the agent with predefined scenarios.
+        """Configure the  with predefined scenarios.
 
         Each scenario is a dict with:
         - 'response': str - The text response to stream
@@ -92,8 +94,8 @@ class SimulatedAgent(AgentBase):
         prompt: str,
         on_chunk: Callable[[str], None] | None = None,
         on_thinking_chunk: Callable[[str], None] | None = None,
-    ) -> AgentResponse:
-        """Send a prompt to the simulated agent.
+    ) -> AssistantResponse:
+        """Send a prompt to the simulated .
 
         Args:
             prompt: The user's prompt
@@ -101,12 +103,12 @@ class SimulatedAgent(AgentBase):
             on_thinking_chunk: Optional callback for streaming thinking chunks
 
         Returns:
-            AgentResponse with the simulated response
+            AssistantResponse with the simulated response
         """
         return await self._assistant.send_prompt(prompt, on_chunk, on_thinking_chunk)
 
     def reset(self) -> None:
-        """Reset the agent's conversation history and scenario index."""
+        """Reset the 's conversation history and scenario index."""
         self._assistant.clear_conversation()
         self._provider.current_scenario_index = 0
 
@@ -120,7 +122,7 @@ class SimulatedAgent(AgentBase):
 
     @property
     def messages(self):
-        """Expose messages for any code that accesses agent.messages."""
+        """Expose messages for any code that accesses .messages."""
         return self._assistant.messages
 
     @property
@@ -139,8 +141,8 @@ class SimulatedAgent(AgentBase):
         return self._provider.scenarios
 
 
-class ScriptedAgent(SimulatedAgent):
-    """A simulated agent that follows a predefined script of interactions.
+class ScriptedAssistant(SimulatedAssistant):
+    """A simulated  that follows a predefined script of interactions.
 
     This is useful for creating demos or tutorials where you want to show
     a specific sequence of interactions.
@@ -152,7 +154,7 @@ class ScriptedAgent(SimulatedAgent):
         system_prompt: str | None = None,
         response_delay: float = 0.05,
     ):
-        """Initialize the scripted agent.
+        """Initialize the scripted .
 
         Args:
             script: List of script entries, each with 'response'
@@ -167,7 +169,7 @@ class ScriptedAgent(SimulatedAgent):
         prompt: str,
         on_chunk: Callable[[str], None] | None = None,
         on_thinking_chunk: Callable[[str], None] | None = None,
-    ) -> AgentResponse:
+    ) -> AssistantResponse:
         """Send a prompt and return the next scripted response."""
         if self._provider.current_scenario_index < len(self._provider.scenarios):
             scenario = self._provider.scenarios[self._provider.current_scenario_index]
@@ -191,15 +193,13 @@ class ScriptedAgent(SimulatedAgent):
                 await asyncio.sleep(self._provider.response_delay)
 
         self._assistant.messages.append({"role": "user", "content": prompt})
-        self._assistant.messages.append(
-            {"role": "assistant", "content": response_text}
-        )
+        self._assistant.messages.append({"role": "assistant", "content": response_text})
 
-        return AgentResponse(text=response_text, stop_reason="end_turn")
+        return AssistantResponse(text=response_text, stop_reason="end_turn")
 
 
-class EchoAgent(SimulatedAgent):
-    """A simple agent that echoes back the user's input with optional formatting."""
+class EchoAssistant(SimulatedAssistant):
+    """A simple  that echoes back the user's input with optional formatting."""
 
     def __init__(
         self,
@@ -207,7 +207,7 @@ class EchoAgent(SimulatedAgent):
         system_prompt: str | None = None,
         thinking_text: str | None = None,
     ):
-        """Initialize the echo agent.
+        """Initialize the echo .
 
         Args:
             prefix: Prefix to add before echoing the input
@@ -223,9 +223,9 @@ class EchoAgent(SimulatedAgent):
         prompt: str,
         on_chunk: Callable[[str], None] | None = None,
         on_thinking_chunk: Callable[[str], None] | None = None,
-    ) -> AgentResponse:
+    ) -> AssistantResponse:
         """Echo the prompt back with the configured prefix."""
-        logger.info(f"[EchoAgent] Sending prompt: {prompt}")
+        logger.info(f"[EchoAssistant] Sending prompt: {prompt}")
         response_text = f"{self.prefix}{prompt}"
 
         # Stream thinking text if configured
@@ -241,6 +241,6 @@ class EchoAgent(SimulatedAgent):
                 await asyncio.sleep(self._provider.response_delay)
 
         logger.info(
-            f"[EchoAgent] Received response ({len(response_text)} chars): {response_text}"
+            f"[EchoAssistant] Received response ({len(response_text)} chars): {response_text}"
         )
-        return AgentResponse(text=response_text, stop_reason="end_turn")
+        return AssistantResponse(text=response_text, stop_reason="end_turn")

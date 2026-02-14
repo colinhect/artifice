@@ -27,8 +27,8 @@ class FakeBlock:
         self._removed = True
 
 
-class FakeAgentBlock(FakeBlock):
-    """Fake AgentOutputBlock that just accumulates text."""
+class FakeAssistantBlock(FakeBlock):
+    """Fake AssistantOutputBlock that just accumulates text."""
 
     def __init__(self, activity=False):
         super().__init__()
@@ -91,7 +91,7 @@ class FakeOutput:
 def _patch_block_types():
     """Patch isinstance targets so the detector recognizes our fakes."""
     with (
-        patch("artifice.terminal.AgentOutputBlock", FakeAgentBlock),
+        patch("artifice.terminal.AssistantOutputBlock", FakeAssistantBlock),
         patch("artifice.terminal.CodeInputBlock", FakeCodeBlock),
     ):
         yield
@@ -103,7 +103,7 @@ def make_detector(save_callback=None):
     detector = StreamingFenceDetector(
         output, auto_scroll=True, save_callback=save_callback
     )
-    detector._make_prose_block = lambda activity: FakeAgentBlock(activity=activity)
+    detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
     detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
     return detector, output
 
@@ -116,7 +116,7 @@ class TestBasicFenceDetection:
         d.feed("Hello world, no code here.")
         d.finish()
         assert len(d.all_blocks) == 1
-        assert isinstance(d.all_blocks[0], FakeAgentBlock)
+        assert isinstance(d.all_blocks[0], FakeAssistantBlock)
         assert "Hello world" in d.all_blocks[0]._text
 
     def test_single_code_block(self):
@@ -151,7 +151,7 @@ class TestBasicFenceDetection:
         d.finish()
 
         prose_blocks = [
-            b for b in d.all_blocks if isinstance(b, FakeAgentBlock) and b._text.strip()
+            b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()
         ]
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
@@ -317,7 +317,7 @@ class TestEmptyBlocks:
         d.finish()
 
         # Initial empty prose should have been removed from all_blocks
-        assert d.first_agent_block is None  # Was removed since it was empty
+        assert d.first_assistant_block is None  # Was removed since it was empty
 
     def test_empty_trailing_prose_removed(self):
         """Empty prose block after last code fence should be removed."""
@@ -327,9 +327,9 @@ class TestEmptyBlocks:
         d.finish()
 
         non_removed = [b for b in d.all_blocks if not b._removed]
-        # All remaining agent blocks should have content
+        # All remaining assistant blocks should have content
         for b in non_removed:
-            if isinstance(b, FakeAgentBlock):
+            if isinstance(b, FakeAssistantBlock):
                 assert b._text.strip()
 
 
@@ -373,5 +373,5 @@ class TestSaveCallback:
         d.feed("Prose\n```python\ncode\n```\nMore prose")
         d.finish()
         types = {type(b) for b in saved}
-        assert FakeAgentBlock in types
+        assert FakeAssistantBlock in types
         assert FakeCodeBlock in types

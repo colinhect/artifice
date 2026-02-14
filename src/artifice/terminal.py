@@ -16,14 +16,14 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import LoadingIndicator, Static
 
-from .agent import AgentBase, create_agent
+from .assistant import AssistantBase, create_assistant
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
 from .terminal_output import (
     TerminalOutput,
-    AgentInputBlock,
-    AgentOutputBlock,
+    AssistantInputBlock,
+    AssistantOutputBlock,
     ThinkingOutputBlock,
     CodeInputBlock,
     CodeOutputBlock,
@@ -166,10 +166,12 @@ class StreamingFenceDetector:
             None  # The block we're currently appending to
         )
         self.all_blocks: list[BaseBlock] = []
-        self.first_agent_block: AgentOutputBlock | None = None
+        self.first_assistant_block: AssistantOutputBlock | None = None
         self._string_tracker = StringTracker()
         # Factory methods for block creation (can be overridden for testing)
-        self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
+        self._make_prose_block = lambda activity: AssistantOutputBlock(
+            activity=activity
+        )
         self._make_code_block = lambda code, lang: CodeInputBlock(
             code,
             language=lang,
@@ -179,11 +181,11 @@ class StreamingFenceDetector:
         )
 
     def start(self) -> None:
-        """Create the initial AgentOutputBlock for streaming prose."""
+        """Create the initial AssistantOutputBlock for streaming prose."""
         self._current_block = self._make_prose_block(activity=True)
         self._output.append_block(self._current_block)
         self.all_blocks.append(self._current_block)
-        self.first_agent_block = self._current_block
+        self.first_assistant_block = self._current_block
 
     def feed(self, text: str) -> None:
         """Process a chunk of streaming text, creating blocks as needed."""
@@ -247,15 +249,15 @@ class StreamingFenceDetector:
 
             # Remove empty prose block, or mark it complete
             current_is_empty = (
-                isinstance(self._current_block, AgentOutputBlock)
+                isinstance(self._current_block, AssistantOutputBlock)
                 and not self._current_block._full.strip()
             )
             if current_is_empty:
-                if self._current_block is self.first_agent_block:
-                    self.first_agent_block = None
+                if self._current_block is self.first_assistant_block:
+                    self.first_assistant_block = None
                 if self._current_block is not None:
                     self._remove_block(self._current_block)
-            elif isinstance(self._current_block, AgentOutputBlock):
+            elif isinstance(self._current_block, AssistantOutputBlock):
                 self._current_block.mark_success()
 
             # Create new code block
@@ -313,7 +315,7 @@ class StreamingFenceDetector:
             if isinstance(self._current_block, CodeInputBlock):
                 existing = self._current_block.get_code()
                 self._current_block.update_code(existing + self._chunk_buffer)
-            elif isinstance(self._current_block, AgentOutputBlock):
+            elif isinstance(self._current_block, AssistantOutputBlock):
                 self._current_block.append(self._chunk_buffer)
                 self._current_block.flush()
 
@@ -346,7 +348,7 @@ class StreamingFenceDetector:
                 self._chunk_buffer = ""  # Clear to avoid double-processing
 
         # Mark the last block as complete
-        if isinstance(self._current_block, AgentOutputBlock):
+        if isinstance(self._current_block, AssistantOutputBlock):
             self._current_block.flush()  # Ensure final content is rendered
             self._current_block.mark_success()
 
@@ -354,16 +356,16 @@ class StreamingFenceDetector:
         for block in self.all_blocks:
             if isinstance(block, CodeInputBlock):
                 block.finish_streaming()
-            elif isinstance(block, AgentOutputBlock):
+            elif isinstance(block, AssistantOutputBlock):
                 block.flush()  # Ensure all content is rendered before finalizing
                 block.finalize_streaming()
 
-        # Remove empty AgentOutputBlocks (keep first_agent_block for status indicator)
+        # Remove empty AssistantOutputBlocks (keep first_assistant_block for status indicator)
         for block in [
             b
             for b in self.all_blocks
-            if isinstance(b, AgentOutputBlock)
-            and b is not self.first_agent_block
+            if isinstance(b, AssistantOutputBlock)
+            and b is not self.first_assistant_block
             and not b._full.strip()
         ]:
             self._remove_block(block)
@@ -448,14 +450,16 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+l", "clear", "Clear", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
-        Binding("ctrl+g", "toggle_auto_send_to_agent", "Toggle Agent", show=True),
-        Binding("ctrl+n", "clear_agent_context", "Clear Context", show=True),
+        Binding(
+            "ctrl+g", "toggle_auto_send_to_assistant", "Toggle Assistant", show=True
+        ),
+        Binding("ctrl+n", "clear_assistant_context", "Clear Context", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
     ]
 
     _MARKDOWN_SETTINGS = {
-        "ai": ("_agent_markdown_enabled", "AI agent output"),
+        "ai": ("_assistant_markdown_enabled", "AI assistant output"),
         "shell": ("_shell_markdown_enabled", "shell command output"),
         "python": ("_python_markdown_enabled", "Python code output"),
     }
@@ -486,9 +490,9 @@ class ArtificeTerminal(Widget):
         )
 
         self._python_markdown_enabled = self._config.python_markdown
-        self._agent_markdown_enabled = self._config.agent_markdown
+        self._assistant_markdown_enabled = self._config.assistant_markdown
         self._shell_markdown_enabled = self._config.shell_markdown
-        self._auto_send_to_agent: bool = self._config.auto_send_to_agent
+        self._auto_send_to_assistant: bool = self._config.auto_send_to_assistant
 
         # Initialize session transcript if enabled
         self._session_transcript: SessionTranscript | None = None
@@ -502,12 +506,12 @@ class ArtificeTerminal(Widget):
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
-        self.agent_loading = LoadingIndicator()
+        self.assistant_loading = LoadingIndicator()
         self.connection_status = Static("◉", id="connection-status")
-        self.agent_status = Static("", id="agent-status")
+        self.assistant_status = Static("", id="assistant-status")
         # self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
-        self._context_blocks: list[BaseBlock] = []  # Blocks in agent context
+        self._context_blocks: list[BaseBlock] = []  # Blocks in assistant context
         self._current_detector: StreamingFenceDetector | None = (
             None  # Active streaming detector
         )
@@ -518,10 +522,10 @@ class ArtificeTerminal(Widget):
         def on_connect(_):
             self.connection_status.add_class("connected")
 
-        # Create agent
-        self._agent: AgentBase | None = None
-        self._agent = create_agent(self._config, on_connect=on_connect)
-        self._set_agent_inactive()
+        # Create assistant
+        self._assistant: AssistantBase | None = None
+        self._assistant = create_assistant(self._config, on_connect=on_connect)
+        self._set_assistant_inactive()
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -529,15 +533,15 @@ class ArtificeTerminal(Widget):
             yield self.input
             # yield self.pinned_output
             with Horizontal(id="status-line"):
-                yield self.agent_loading
+                yield self.assistant_loading
                 yield self.connection_status
-                yield self.agent_status
+                yield self.assistant_status
 
     def on_mount(self) -> None:
         if self._config.models:
             model = self._config.models.get(self._config.model)
             if model:
-                self.agent_status.update(
+                self.assistant_status.update(
                     f"{model.get('model').lower()} ({model.get('provider').lower()})"
                 )
 
@@ -575,20 +579,20 @@ class ArtificeTerminal(Widget):
         self.input.clear()
 
         async def do_execute():
-            if event.is_agent_prompt:
-                await self._handle_agent_prompt(code)
+            if event.is_assistant_prompt:
+                await self._handle_assistant_prompt(code)
             elif event.is_shell_command:
                 result = await self._execute_code(
-                    code, language="bash", in_context=self._auto_send_to_agent
+                    code, language="bash", in_context=self._auto_send_to_assistant
                 )
-                if self._auto_send_to_agent:
-                    await self._send_execution_result_to_agent(code, result)
+                if self._auto_send_to_assistant:
+                    await self._send_execution_result_to_assistant(code, result)
             else:
                 result = await self._execute_code(
-                    code, language="python", in_context=self._auto_send_to_agent
+                    code, language="python", in_context=self._auto_send_to_assistant
                 )
-                if self._auto_send_to_agent:
-                    await self._send_execution_result_to_agent(code, result)
+                if self._auto_send_to_assistant:
+                    await self._send_execution_result_to_assistant(code, result)
 
         self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
 
@@ -650,7 +654,7 @@ class ArtificeTerminal(Widget):
             code: The code/command to execute.
             language: "python" or "bash".
             code_input_block: Existing block to update status on. If None, one is created.
-            in_context: Whether the output should be marked as in agent context.
+            in_context: Whether the output should be marked as in assistant context.
         """
         if code_input_block is None:
             code_input_block = CodeInputBlock(
@@ -681,7 +685,7 @@ class ArtificeTerminal(Widget):
         return result
 
     def _mark_block_in_context(self, block: BaseBlock) -> None:
-        """Mark a block as being in the agent's context."""
+        """Mark a block as being in the assistant's context."""
         if block not in self._context_blocks:
             self._context_blocks.append(block)
             block.add_class("in-context")
@@ -692,17 +696,17 @@ class ArtificeTerminal(Widget):
             block.remove_class("in-context")
         self._context_blocks.clear()
 
-    def _set_agent_active(self) -> None:
-        """Update status indicators to show agent is processing."""
-        self.agent_loading.classes = "agent-active"
-        self.connection_status.remove_class("agent-inactive")
-        self.connection_status.add_class("agent-active")
+    def _set_assistant_active(self) -> None:
+        """Update status indicators to show assistant is processing."""
+        self.assistant_loading.classes = "assistant-active"
+        self.connection_status.remove_class("assistant-inactive")
+        self.connection_status.add_class("assistant-active")
 
-    def _set_agent_inactive(self) -> None:
-        """Update status indicators to show agent is idle."""
-        self.connection_status.add_class("agent-inactive")
-        self.connection_status.remove_class("agent-active")
-        self.agent_loading.classes = "agent-inactive"
+    def _set_assistant_inactive(self) -> None:
+        """Update status indicators to show assistant is idle."""
+        self.connection_status.add_class("assistant-inactive")
+        self.connection_status.remove_class("assistant-active")
+        self.assistant_loading.classes = "assistant-inactive"
 
     def _finalize_stream(self) -> None:
         """Flush buffers and finalize thinking block and detector after streaming ends."""
@@ -721,22 +725,24 @@ class ArtificeTerminal(Widget):
             self._current_detector.start()
         self._current_detector.finish()
 
-    def _apply_agent_response(self, detector: StreamingFenceDetector, response) -> None:
+    def _apply_assistant_response(
+        self, detector: StreamingFenceDetector, response
+    ) -> None:
         """Mark context, handle errors, and auto-highlight the first code block."""
         with self.app.batch_update():
             for block in detector.all_blocks:
                 self._mark_block_in_context(block)
 
-            if detector.first_agent_block:
+            if detector.first_assistant_block:
                 if response.error:
-                    detector.first_agent_block.append(
+                    detector.first_assistant_block.append(
                         f"\n**Error:** {response.error}\n"
                     )
-                    detector.first_agent_block.flush()
-                    detector.first_agent_block.mark_failed()
+                    detector.first_assistant_block.flush()
+                    detector.first_assistant_block.mark_failed()
                 else:
-                    detector.first_agent_block.flush()
-                    detector.first_agent_block.mark_success()
+                    detector.first_assistant_block.flush()
+                    detector.first_assistant_block.mark_success()
 
         # Auto-highlight the first CodeInputBlock (command #1) from this response
         last_code_block = None
@@ -754,12 +760,12 @@ class ArtificeTerminal(Widget):
             except ValueError:
                 pass
 
-    async def _stream_agent_response(
-        self, agent: AgentBase, prompt: str
+    async def _stream_assistant_response(
+        self, assistant: AssistantBase, prompt: str
     ) -> tuple[StreamingFenceDetector, object]:
-        """Stream an agent response, splitting into prose and code blocks.
+        """Stream an assistant response, splitting into prose and code blocks.
 
-        Returns the detector (with all_blocks, first_agent_block) and the AgentResponse.
+        Returns the detector (with all_blocks, first_assistant_block) and the AssistantResponse.
         """
         self.output.clear_command_numbers()
 
@@ -779,48 +785,48 @@ class ArtificeTerminal(Widget):
         if self._config.prompt_prefix:
             prompt = self._config.prompt_prefix + " " + prompt
 
-        self._set_agent_active()
-        response = await agent.send_prompt(
+        self._set_assistant_active()
+        response = await assistant.send_prompt(
             prompt, on_chunk=on_chunk, on_thinking_chunk=on_thinking_chunk
         )
-        self._set_agent_inactive()
+        self._set_assistant_inactive()
 
         self._finalize_stream()
-        self._apply_agent_response(self._current_detector, response)
+        self._apply_assistant_response(self._current_detector, response)
 
         detector = self._current_detector
         self._current_detector = None
         return detector, response
 
-    async def _handle_agent_prompt(self, prompt: str) -> None:
-        """Handle AI agent prompt with code block detection."""
+    async def _handle_assistant_prompt(self, prompt: str) -> None:
+        """Handle AI assistant prompt with code block detection."""
         # Create a block showing the prompt
-        agent_input_block = AgentInputBlock(prompt)
-        self.output.append_block(agent_input_block)
-        self._save_block_to_session(agent_input_block)
+        assistant_input_block = AssistantInputBlock(prompt)
+        self.output.append_block(assistant_input_block)
+        self._save_block_to_session(assistant_input_block)
 
         # Mark the prompt as in context
-        self._mark_block_in_context(agent_input_block)
+        self._mark_block_in_context(assistant_input_block)
 
-        if self._agent is None:
-            # No agent configured, show error
-            agent_output_block = AgentOutputBlock("No AI agent configured.")
-            self.output.append_block(agent_output_block)
-            agent_output_block.mark_failed()
+        if self._assistant is None:
+            # No assistant configured, show error
+            assistant_output_block = AssistantOutputBlock("No AI assistant configured.")
+            self.output.append_block(assistant_output_block)
+            assistant_output_block.mark_failed()
             return
 
-        await self._stream_agent_response(self._agent, prompt)
+        await self._stream_assistant_response(self._assistant, prompt)
 
-        # After sending a prompt to the agent, enable auto-send mode
-        if not self._auto_send_to_agent:
-            self._auto_send_to_agent = True
+        # After sending a prompt to the assistant, enable auto-send mode
+        if not self._auto_send_to_assistant:
+            self._auto_send_to_assistant = True
             self.input.add_class("in-context")
 
-    async def _send_execution_result_to_agent(
+    async def _send_execution_result_to_assistant(
         self, code: str, result: ExecutionResult
     ) -> None:
-        """Send execution results back to the agent and split the response."""
-        if self._agent is not None:
+        """Send execution results back to the assistant and split the response."""
+        if self._assistant is not None:
             prompt = (
                 "Executed:\n```\n"
                 + code
@@ -829,7 +835,7 @@ class ArtificeTerminal(Widget):
                 + result.error
                 + "\n"
             )
-            await self._stream_agent_response(self._agent, prompt)
+            await self._stream_assistant_response(self._assistant, prompt)
 
     async def on_terminal_output_pin_requested(
         self, event: TerminalOutput.PinRequested
@@ -861,7 +867,7 @@ class ArtificeTerminal(Widget):
     async def on_terminal_output_block_execute_requested(
         self, event: TerminalOutput.BlockExecuteRequested
     ) -> None:
-        """Handle block execution: execute code from a block and send output to agent."""
+        """Handle block execution: execute code from a block and send output to assistant."""
         block = event.block
         code = block.get_code()
         mode = block.get_mode()
@@ -875,7 +881,7 @@ class ArtificeTerminal(Widget):
 
         state = {
             "result": ExecutionResult(code=code, status=ExecutionStatus.ERROR),
-            "sent_to_agent": False,
+            "sent_to_assistant": False,
         }
 
         async def do_execute():
@@ -883,18 +889,18 @@ class ArtificeTerminal(Widget):
                 code,
                 language=language,
                 code_input_block=block,
-                in_context=self._auto_send_to_agent,
+                in_context=self._auto_send_to_assistant,
             )
             block.update_status(state["result"])
-            if self._auto_send_to_agent:
-                state["sent_to_agent"] = True
-                await self._send_execution_result_to_agent(code, state["result"])
+            if self._auto_send_to_assistant:
+                state["sent_to_assistant"] = True
+                await self._send_execution_result_to_assistant(code, state["result"])
 
         def cleanup():
             if state["result"]:
                 block.update_status(state["result"])
             block.finish_streaming()
-            if not state["sent_to_agent"]:
+            if not state["sent_to_assistant"]:
                 self.input.focus_input()
 
         self._current_task = asyncio.create_task(
@@ -993,20 +999,20 @@ class ArtificeTerminal(Widget):
                 self.input.query_one("#code-input", InputTextArea).focus()
         # If input has focus, do nothing (already at the bottom)
 
-    def action_toggle_auto_send_to_agent(self) -> None:
-        """Toggle auto-send mode - when enabled, all code execution results are sent to agent."""
-        self._auto_send_to_agent = not self._auto_send_to_agent
+    def action_toggle_auto_send_to_assistant(self) -> None:
+        """Toggle auto-send mode - when enabled, all code execution results are sent to assistant."""
+        self._auto_send_to_assistant = not self._auto_send_to_assistant
 
         # Update visual indicator on input
-        if self._auto_send_to_agent:
+        if self._auto_send_to_assistant:
             self.input.add_class("in-context")
         else:
             self.input.remove_class("in-context")
 
-    def action_clear_agent_context(self) -> None:
-        """Clear the agent's conversation context and unhighlight all in-context blocks."""
-        if self._agent and hasattr(self._agent, "clear_conversation"):
-            self._agent.clear_conversation()
+    def action_clear_assistant_context(self) -> None:
+        """Clear the assistant's conversation context and unhighlight all in-context blocks."""
+        if self._assistant and hasattr(self._assistant, "clear_conversation"):
+            self._assistant.clear_conversation()
 
         # Remove highlighting from all context blocks
         self._clear_all_context_highlights()

@@ -1,7 +1,7 @@
-"""Agent module with provider/assistant architecture.
+""" module with provider/assistant architecture.
 
 This module exports both the new provider/assistant classes and the
-backward-compatible agent classes.
+backward-compatible  classes.
 """
 
 from typing import Callable
@@ -11,8 +11,8 @@ import os
 from ..config import ArtificeConfig
 
 # Core interfaces
-from .common import AgentBase as AgentBase
-from .common import AgentResponse as AgentResponse
+from .common import AssistantBase as AssistantBase
+from .common import AssistantResponse as AssistantResponse
 from .provider import ProviderBase as ProviderBase
 from .provider import ProviderResponse as ProviderResponse
 
@@ -26,19 +26,15 @@ from .providers.openai import OpenAICompatibleProvider as OpenAICompatibleProvid
 from .providers.copilot import CopilotProvider as CopilotProvider
 from .providers.simulated import SimulatedProvider as SimulatedProvider
 
-# Backward-compatible agent classes
-from .claude import ClaudeAgent as ClaudeAgent
-from .ollama import OllamaAgent as OllamaAgent
-from .openai import OpenAIAgent as OpenAIAgent
-from .copilot import CopilotAgent as CopilotAgent
+from .copilot import CopilotAssistant as CopilotAssistant
 from .simulated import (
-    SimulatedAgent as SimulatedAgent,
+    SimulatedAssistant as SimulatedAssistant,
 )
 
 
-def create_agent(
+def create_assistant(
     config: ArtificeConfig, on_connect: Callable | None = None
-) -> AgentBase | None:
+) -> AssistantBase | None:
     if not config.models or not config.model:
         raise Exception("No model selected in configuration")
 
@@ -56,35 +52,42 @@ def create_agent(
     if provider is None:
         return None
     if provider.lower() == "ollama":
-        return OllamaAgent(
-            model=model_name,
+        return Assistant(
+            provider=OllamaProvider(
+                model=model_name,
+                thinking_budget=thinking_budget,
+                on_connect=on_connect,
+            ),
             system_prompt=config.system_prompt,
-            thinking_budget=thinking_budget,
-            on_connect=on_connect,
         )
     elif provider.lower() == "huggingface":
-        return OpenAIAgent(
-            base_url="https://router.huggingface.co/v1",
-            api_key=os.environ["HF_TOKEN"],
-            model=model_name,
+        assistant = Assistant(
+            provider=OpenAICompatibleProvider(
+                base_url="https://router.huggingface.co/v1",
+                api_key=os.environ["HF_TOKEN"],
+                model=model_name,
+                on_connect=on_connect,
+            ),
             system_prompt=config.system_prompt,
-            thinking_budget=thinking_budget,
-            on_connect=on_connect,
+            openai_format=True
         )
+        return assistant
     elif provider.lower() == "anthropic":
-        return ClaudeAgent(
-            model=model_name,
+        return Assistant(
+            provider=AnthropicProvider(
+                model=model_name,
+                thinking_budget=thinking_budget,
+                on_connect=on_connect,
+            ),
             system_prompt=config.system_prompt,
-            thinking_budget=thinking_budget,
-            on_connect=on_connect,
         )
     elif provider.lower() == "copilot":
-        return CopilotAgent(
+        return CopilotAssistant(
             model=model_name, system_prompt=config.system_prompt, on_connect=on_connect
         )
     elif provider.lower() == "simulated":
-        agent = SimulatedAgent(response_delay=0.001, on_connect=on_connect)
-        agent.default_scenarios_and_response()
-        return agent
+        assistant = SimulatedAssistant(response_delay=0.001, on_connect=on_connect)
+        assistant.default_scenarios_and_response()
+        return assistant
     else:
-        raise Exception(f"Unsupported agent provider {provider}")
+        raise Exception(f"Unsupported provider {provider}")

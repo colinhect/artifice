@@ -60,7 +60,7 @@ models:
 banner: false
 
 # Enable/disable markdown rendering for different output types
-agent_markdown: true    # AI agent responses
+assistant_markdown: true    # AI assistant responses
 python_markdown: false  # Python code output
 shell_markdown: false   # Shell command output
 
@@ -68,9 +68,9 @@ shell_markdown: false   # Shell command output
 # Behavior Settings
 # ============================================================================
 
-# Auto-send execution results to the agent
-# When True, code execution results are automatically sent to the AI agent
-auto_send_to_agent: true
+# Auto-send execution results to the assistant
+# When True, code execution results are automatically sent to the AI assistant
+auto_send_to_assistant: true
 
 # ============================================================================
 # Session Settings

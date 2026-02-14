@@ -174,11 +174,11 @@ class TerminalInput(Static):
         def __init__(
             self,
             code: str,
-            is_agent_prompt: bool = False,
+            is_assistant_prompt: bool = False,
             is_shell_command: bool = False,
         ) -> None:
             self.code = code
-            self.is_agent_prompt = is_agent_prompt
+            self.is_assistant_prompt = is_assistant_prompt
             self.is_shell_command = is_shell_command
             super().__init__()
 
@@ -288,7 +288,9 @@ class TerminalInput(Static):
             is_ai = self.mode == "ai"
             is_shell = self.mode == "shell"
             self.post_message(
-                self.Submitted(code, is_agent_prompt=is_ai, is_shell_command=is_shell)
+                self.Submitted(
+                    code, is_assistant_prompt=is_ai, is_shell_command=is_shell
+                )
             )
 
     def action_history_back(self) -> None:

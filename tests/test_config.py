@@ -11,9 +11,9 @@ def test_default_config():
     assert config.model is None
     assert config.models is None
     assert config.banner is False
-    assert config.auto_send_to_agent is True
+    assert config.auto_send_to_assistant is True
     assert config.save_sessions is True
-    assert config.agent_markdown is True
+    assert config.assistant_markdown is True
 
 
 def test_load_empty_yaml(tmp_path, monkeypatch):
@@ -41,7 +41,7 @@ def test_load_basic_yaml(tmp_path, monkeypatch):
         "model": "llama",
         "banner": True,
         "system_prompt": "Test prompt",
-        "auto_send_to_agent": False,
+        "auto_send_to_assistant": False,
     }
     init_file.write_text(yaml.dump(yaml_content))
 
@@ -52,7 +52,7 @@ def test_load_basic_yaml(tmp_path, monkeypatch):
     assert config.model == "llama"
     assert config.banner is True
     assert config.system_prompt == "Test prompt"
-    assert config.auto_send_to_agent is False
+    assert config.auto_send_to_assistant is False
 
 
 def test_load_models_dict(tmp_path, monkeypatch):
@@ -89,7 +89,7 @@ def test_load_all_display_settings(tmp_path, monkeypatch):
     yaml_content = {
         "banner": True,
         "python_markdown": True,
-        "agent_markdown": False,
+        "assistant_markdown": False,
         "shell_markdown": True,
     }
     init_file.write_text(yaml.dump(yaml_content))
@@ -100,7 +100,7 @@ def test_load_all_display_settings(tmp_path, monkeypatch):
     assert error is None
     assert config.banner is True
     assert config.python_markdown is True
-    assert config.agent_markdown is False
+    assert config.assistant_markdown is False
     assert config.shell_markdown is True
 
 

@@ -1,4 +1,4 @@
-"""Interface for AI agent interaction."""
+"""Interface for AI assistant interaction."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from typing import Callable, Optional
 
 
 @dataclass
-class AgentResponse:
-    """Response from an AI agent."""
+class AssistantResponse:
+    """Response from an AI assistant."""
 
     text: str
     stop_reason: str | None = None
@@ -18,8 +18,8 @@ class AgentResponse:
     thinking: str | None = None
 
 
-class AgentBase(ABC):
-    """Base class for AI agents."""
+class AssistantBase(ABC):
+    """Base class for AI s."""
 
     @abstractmethod
     async def send_prompt(
@@ -27,8 +27,8 @@ class AgentBase(ABC):
         prompt: str,
         on_chunk: Optional[Callable] = None,
         on_thinking_chunk: Optional[Callable] = None,
-    ) -> AgentResponse:
-        """Send a prompt to the agent.
+    ) -> AssistantResponse:
+        """Send a prompt to the assistant.
 
         Args:
             prompt: The prompt text to send.
@@ -36,7 +36,7 @@ class AgentBase(ABC):
             on_thinking_chunk: Optional callback for streaming thinking/reasoning chunks.
 
         Returns:
-            AgentResponse with the complete response.
+            AssistantResponse with the complete response.
         """
         pass
 

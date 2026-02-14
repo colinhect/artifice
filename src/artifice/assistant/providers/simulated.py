@@ -37,7 +37,7 @@ class SimulatedProvider(ProviderBase):
         self.scenarios: list[dict[str, Any]] = []
         self.current_scenario_index = 0
         self.default_response = (
-            "I'm a simulated AI agent. I can be configured with custom responses."
+            "I'm a simulated AI . I can be configured with custom responses."
         )
         self.default_thinking: str | None = None
 
@@ -49,7 +49,7 @@ class SimulatedProvider(ProviderBase):
         self.scenarios = [
             {
                 "pattern": r"hello|hi|hey",
-                "response": "Hello! I'm a **simulated** agent. How can I help you today?",
+                "response": "Hello! I'm a **simulated** . How can I help you today?",
                 "thinking": "The user is greeting me. I should respond in a friendly manner and offer to help.",
             },
             {
@@ -68,12 +68,8 @@ class SimulatedProvider(ProviderBase):
                 "thinking": "The user is saying goodbye. I should acknowledge and thank them for the conversation.",
             },
         ]
-        self.default_response = (
-            "I'm not sure how to respond to that. Try asking about math or saying hello!"
-        )
-        self.default_thinking = (
-            "Hmm, I'm not sure how to respond to this. Let me think about what the user might be asking for."
-        )
+        self.default_response = "I'm not sure how to respond to that. Try asking about math or saying hello!"
+        self.default_thinking = "Hmm, I'm not sure how to respond to this. Let me think about what the user might be asking for."
 
     def configure_scenarios(self, scenarios: list[dict[str, Any]]) -> None:
         """Configure the provider with predefined scenarios.

@@ -225,7 +225,7 @@ class WidgetOutputBlock(BaseBlock):
                 yield self._widget
 
 
-class AgentInputBlock(BaseBlock):
+class AssistantInputBlock(BaseBlock):
     def __init__(self, prompt: str, in_context=False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._status_indicator = Static(">", classes="status-indicator status-pending")
@@ -249,9 +249,9 @@ class AgentInputBlock(BaseBlock):
         return "ai"
 
 
-class AgentOutputBlock(BufferedOutputBlock):
+class AssistantOutputBlock(BufferedOutputBlock):
     _STATIC_CSS_CLASS = "text-output"
-    _MARKDOWN_CSS_CLASS = "agent-output"
+    _MARKDOWN_CSS_CLASS = "assistant-output"
 
     _FLUSH_INTERVAL = (
         0.1  # Minimum seconds between full Markdown re-renders during streaming
@@ -330,7 +330,7 @@ class AgentOutputBlock(BufferedOutputBlock):
         self._status_indicator.styles.display = "block"
 
 
-class ThinkingOutputBlock(AgentOutputBlock):
+class ThinkingOutputBlock(AssistantOutputBlock):
     """Block for AI thinking content. Styled distinctly via CSS."""
 
     def __init__(self, output="", activity=True) -> None:
@@ -488,7 +488,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
             pyperclip.copy(code)
             mode = block.get_mode()
             self.post_message(self.BlockActivated(code, mode))
-        elif isinstance(block, AgentInputBlock):
+        elif isinstance(block, AssistantInputBlock):
             code = block.get_prompt()
             pyperclip.copy(code)
             mode = block.get_mode()
@@ -507,7 +507,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     async def action_toggle_block_markdown(self) -> None:
         """Toggle markdown rendering for the currently highlighted block."""
         block = self.get_highlighted_block()
-        if block and isinstance(block, (CodeOutputBlock, AgentOutputBlock)):
+        if block and isinstance(block, (CodeOutputBlock, AssistantOutputBlock)):
             block.toggle_markdown()
 
     def action_cycle_language(self) -> None:

@@ -5,27 +5,28 @@ from __future__ import annotations
 import logging
 from typing import Callable, Optional
 
-from .common import AgentBase, AgentResponse
+from .common import AssistantBase, AssistantResponse
 from .provider import ProviderBase
 
 logger = logging.getLogger(__name__)
 
 
-class Assistant(AgentBase):
+class Assistant(AssistantBase):
     """Universal assistant managing conversation with any provider.
 
     The assistant maintains conversation history and delegates API calls
     to the underlying provider. Multiple assistants can share the same
     provider instance (though current usage only needs one).
 
-    This class implements the AgentBase interface, so it can be used as
-    a drop-in replacement for existing agent classes.
+    This class implements the AssistantBase interface, so it can be used as
+    a drop-in replacement for existing  classes.
     """
 
     def __init__(
         self,
         provider: ProviderBase,
         system_prompt: str | None = None,
+        openai_format: bool = False,
     ):
         """Initialize the assistant.
 
@@ -35,14 +36,18 @@ class Assistant(AgentBase):
         """
         self.provider = provider
         self.system_prompt = system_prompt
+        self.openai_format = openai_format
         self.messages: list[dict] = []  # Conversation history
+
+        if openai_format and system_prompt:
+            self.messages = [{"role": "system", "content": system_prompt}]
 
     async def send_prompt(
         self,
         prompt: str,
         on_chunk: Optional[Callable] = None,
         on_thinking_chunk: Optional[Callable] = None,
-    ) -> AgentResponse:
+    ) -> AssistantResponse:
         """Send prompt and maintain conversation history.
 
         Args:
@@ -51,7 +56,7 @@ class Assistant(AgentBase):
             on_thinking_chunk: Optional callback for streaming thinking chunks
 
         Returns:
-            AgentResponse with the complete response
+            AssistantResponse with the complete response
         """
         # Add user message to history (only if non-empty)
         if prompt.strip():
@@ -69,20 +74,22 @@ class Assistant(AgentBase):
         # Handle errors
         if response.error:
             logger.error(f"[Assistant] Provider error: {response.error}")
-            return AgentResponse(text="", error=response.error)
+            return AssistantResponse(text="", error=response.error)
 
         # Add assistant response to history
         if response.text:
             if response.content_blocks:
                 # Claude's structured content (for multi-turn thinking)
-                self.messages.append({"role": "assistant", "content": response.content_blocks})
+                self.messages.append(
+                    {"role": "assistant", "content": response.content_blocks}
+                )
             else:
                 self.messages.append({"role": "assistant", "content": response.text})
             logger.info(
                 f"[Assistant] Received response ({len(response.text)} chars, stop_reason={response.stop_reason})"
             )
 
-        return AgentResponse(
+        return AssistantResponse(
             text=response.text,
             stop_reason=response.stop_reason,
             thinking=response.thinking,
@@ -91,4 +98,6 @@ class Assistant(AgentBase):
     def clear_conversation(self):
         """Clear conversation history."""
         self.messages = []
+        if self.openai_format and self.system_prompt:
+            self.messages = [{"role": "system", "content": self.system_prompt}]
         logger.info("[Assistant] Conversation history cleared")

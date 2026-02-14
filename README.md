@@ -19,7 +19,7 @@ A minimal Python-based terminal user interface and harness for interacting with 
 - **Edit Blocks** - Modify and re-execute previous inputs
 - **Save/Restore** - Persist important blocks across sessions
 
-### AI Agent Integration
+### AI Assistant Integration
 - **Code/command Execution** - AI can propose Python code or shell commands
 - **Human Approval** - Review/edit actions before execution
 - **Selective Context** - Mark which blocks should be given as context to AI
@@ -71,9 +71,9 @@ Artifice has three input modes. Switch modes by typing a special character when 
 - **Ctrl+L** - Clear output
 - **F2** - Toggle help footer
 
-## AI Agent Integration
+## AI Assistant Integration
 
-### Supported Agents
+### Supported Assistants
 
 - **Claude** (via Anthropic API) - Streaming support with tool calling
 - **Ollama** (local models) - Run models locally with streaming support
@@ -94,7 +94,7 @@ Planned features and improvements:
 - [ ] Additional AI provider support (OpenAI, Gemini)
     - [ ] GitHub Copilot integration
 - [ ] Session export/import
-- [ ] LSP integration with agent
+- [ ] LSP integration with assistant
 - [ ] Other programming languages
 - [ ] Export commands to shell history
 - [ ] Tab-completion in Python and shell mode

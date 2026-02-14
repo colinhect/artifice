@@ -22,7 +22,7 @@ class ArtificeConfig:
     """
 
     def __init__(self):
-        # Agent settings
+        # Assistant settings
         self.model: Optional[str] = None
         self.models: Optional[dict] = None
         self.system_prompt: Optional[str] = None
@@ -35,11 +35,11 @@ class ArtificeConfig:
         # Display settings
         self.banner: bool = False
         self.python_markdown: bool = False
-        self.agent_markdown: bool = True
+        self.assistant_markdown: bool = True
         self.shell_markdown: bool = False
 
         # Auto-send settings
-        self.auto_send_to_agent: bool = True
+        self.auto_send_to_assistant: bool = True
 
         # Shell init script (for bash)
         self.shell_init_script: Optional[str] = None
@@ -100,7 +100,7 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
             return config, None
 
         # Load configuration values from the YAML data
-        # Agent settings
+        # Assistant settings
         if "model" in data:
             config.model = data["model"]
         if "models" in data:
@@ -121,14 +121,14 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
             config.banner = data["banner"]
         if "python_markdown" in data:
             config.python_markdown = data["python_markdown"]
-        if "agent_markdown" in data:
-            config.agent_markdown = data["agent_markdown"]
+        if "assistant_markdown" in data:
+            config.assistant_markdown = data["assistant_markdown"]
         if "shell_markdown" in data:
             config.shell_markdown = data["shell_markdown"]
 
         # Auto-send settings
-        if "auto_send_to_agent" in data:
-            config.auto_send_to_agent = data["auto_send_to_agent"]
+        if "auto_send_to_assistant" in data:
+            config.auto_send_to_assistant = data["auto_send_to_assistant"]
 
         # Shell init script
         if "shell_init_script" in data:
@@ -150,9 +150,9 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
             "ollama_host",
             "banner",
             "python_markdown",
-            "agent_markdown",
+            "assistant_markdown",
             "shell_markdown",
-            "auto_send_to_agent",
+            "auto_send_to_assistant",
             "shell_init_script",
             "save_sessions",
             "sessions_dir",

@@ -1,6 +1,6 @@
-"""Agent for GitHub Copilot (backward compatibility wrapper).
+"""Assistant for GitHub Copilot (backward compatibility wrapper).
 
-This module provides the CopilotAgent class which delegates to the new
+This module provides the CopilotAssistant class which delegates to the new
 provider/assistant architecture while maintaining backward compatibility.
 """
 
@@ -10,12 +10,12 @@ import asyncio
 from typing import Callable, Optional
 
 from .assistant import Assistant
-from .common import AgentBase, AgentResponse
+from .common import AssistantBase, AssistantResponse
 from .providers.copilot import CopilotProvider
 
 
-class CopilotAgent(AgentBase):
-    """Agent for connecting to GitHub Copilot CLI with streaming responses.
+class CopilotAssistant(AssistantBase):
+    """Assistant for connecting to GitHub Copilot CLI with streaming responses.
 
     This is a backward compatibility wrapper that delegates to Assistant + CopilotProvider.
 
@@ -33,25 +33,27 @@ class CopilotAgent(AgentBase):
         system_prompt: str | None = None,
         on_connect: Callable | None = None,
     ):
-        """Initialize Copilot agent.
+        """Initialize Copilot .
 
         Args:
             model: Model identifier to use. Defaults to claude-haiku-4.5.
-            system_prompt: Optional system prompt to guide the agent's behavior.
+            system_prompt: Optional system prompt to guide the 's behavior.
             on_connect: Optional callback called when the client first connects.
         """
         self._provider = CopilotProvider(
             model=model,
             on_connect=on_connect,
         )
-        self._assistant = Assistant(provider=self._provider, system_prompt=system_prompt)
+        self._assistant = Assistant(
+            provider=self._provider, system_prompt=system_prompt
+        )
 
     async def send_prompt(
         self,
         prompt: str,
         on_chunk: Optional[Callable] = None,
         on_thinking_chunk: Optional[Callable] = None,
-    ) -> AgentResponse:
+    ) -> AssistantResponse:
         """Send a prompt to Copilot and stream the response.
 
         Args:
@@ -60,7 +62,7 @@ class CopilotAgent(AgentBase):
             on_thinking_chunk: Optional callback for streaming thinking chunks
 
         Returns:
-            AgentResponse with the complete response
+            AssistantResponse with the complete response
         """
         return await self._assistant.send_prompt(prompt, on_chunk, on_thinking_chunk)
 
@@ -70,13 +72,12 @@ class CopilotAgent(AgentBase):
         self._assistant.clear_conversation()
         # Reset the provider's session
         if self._provider._session is not None:
-            session = self._provider._session
             self._provider._session = None
             asyncio.create_task(self._provider.reset_session())
 
     @property
     def messages(self):
-        """Expose messages for any code that accesses agent.messages.
+        """Expose messages for any code that accesses .messages.
 
         Note: For Copilot, the assistant messages may not reflect the actual
         session history since Copilot manages conversation internally.

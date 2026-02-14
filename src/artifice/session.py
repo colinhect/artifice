@@ -87,12 +87,12 @@ class SessionTranscript:
         from .terminal_output import (
             CodeInputBlock,
             CodeOutputBlock,
-            AgentInputBlock,
-            AgentOutputBlock,
+            AssistantInputBlock,
+            AssistantOutputBlock,
             ThinkingOutputBlock,
         )
 
-        if isinstance(block, AgentInputBlock):
+        if isinstance(block, AssistantInputBlock):
             prompt = block.get_prompt()
             return f"## User\n\n{prompt}"
 
@@ -102,10 +102,10 @@ class SessionTranscript:
                 return f"## Thinking\n\n<details>\n<summary>Thinking</summary>\n\n{content}\n\n</details>"
             return ""
 
-        elif isinstance(block, AgentOutputBlock):
+        elif isinstance(block, AssistantOutputBlock):
             content = block._full.strip()
             if content:
-                return f"## Agent\n\n{content}"
+                return f"## Assistant\n\n{content}"
             return ""
 
         elif isinstance(block, CodeInputBlock):

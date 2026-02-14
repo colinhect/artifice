@@ -1,7 +1,7 @@
 # Claude Instructions for Artifice
 
 ## Project Overview
-Artifice is an interactive Python REPL and coding environment with AI agent integration. It's a TUI application built with Textual that allows human-in-the-loop code execution.
+Artifice is an interactive Python REPL and coding environment with AI assistant integration. It's a TUI application built with Textual that allows human-in-the-loop code execution.
 
 ## Important Constraints
 

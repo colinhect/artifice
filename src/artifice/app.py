@@ -68,7 +68,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("model", nargs="?", default=None, help="Model to use")
     parser.add_argument(
-        "--system-prompt", default=None, help="System prompt to use for the agent"
+        "--system-prompt", default=None, help="System prompt to use for the assistant"
     )
     parser.add_argument("--prompt-prefix", default=None, help="Prefix to user prompts")
     parser.add_argument(
@@ -103,10 +103,10 @@ def main():
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            filename="artifice_agent.log",
+            filename="artifice_assistant.log",
             filemode="a",  # append mode
         )
-        logging.getLogger("artifice.agent").setLevel(logging.DEBUG)
+        logging.getLogger("artifice.assistant").setLevel(logging.DEBUG)
 
     app = ArtificeApp(config)
 
