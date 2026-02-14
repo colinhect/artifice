@@ -117,7 +117,6 @@ class ArtificeApp(App):
     def __init__(self, config: ArtificeConfig):
         self.config = config
         # Use config values, with command-line args taking precedence
-        self.provider = config.provider or ""
         self.banner = config.banner
         self.footer_visible = False
         super().__init__()
@@ -143,18 +142,11 @@ class ArtificeApp(App):
 def main():
     """Main entry point for the artifice command."""
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--provider",
-        choices=["anthropic", "copilot", "ollama", "simulated"],
-        default=None,
-        help="Type of agent to use (anthropic, copilot, ollama, or simulated). Overrides config."
-    )
-    parser.add_argument("--model", default=None, help="Model to use (overrides config)")
-    parser.add_argument("--system-prompt", default=None, help="System prompt to use for the agent")
-    parser.add_argument("--prompt-prefix", default=None, help="Prefix to user prompts")
-    parser.add_argument("--banner", action="store_true", default=None, help="Show the banner")
+    parser.add_argument("--model", default=None, help="Model to use (defined in config)")
+    parser.add_argument("--system-prompt", default=None, help="System prompt to use for the agent (overrides config)")
+    parser.add_argument("--prompt-prefix", default=None, help="Prefix to user prompts (overrides config)")
+    parser.add_argument("--thinking-budget", type=int, default=None, help="Extended thinking token budget (enables thinking, overrides config)")
     parser.add_argument("--fullscreen", action="store_true", default=None, help="Full screen")
-    parser.add_argument("--thinking-budget", type=int, default=None, help="Extended thinking token budget (enables thinking)")
     parser.add_argument("--logging", action="store_true", default=None, help="Enable logging")
     args = parser.parse_args()
 
@@ -162,10 +154,6 @@ def main():
     config, config_error = load_config()
     
     # Command-line arguments override config
-    if args.provider is not None:
-        config.provider = args.provider
-    if args.banner is not None:
-        config.banner = args.banner
     if args.model is not None:
         config.model = args.model
     if args.system_prompt:

@@ -401,7 +401,7 @@ class ArtificeTerminal(Widget):
 
     ArtificeTerminal LoadingIndicator {
         width: 1;
-        margin: 0 1 0 1;
+        margin: 0 1 0 0;
     }
 
     ArtificeTerminal LoadingIndicator.agent-inactive {
@@ -421,13 +421,13 @@ class ArtificeTerminal(Widget):
     }
 
     ArtificeTerminal .connected {
-        color: $success 100% !important;
+        color: $primary 100% !important;
     }
 
     ArtificeTerminal #connection-status {
         width: 1;
-        margin: 0 1 0 1;
-        color: $success 33%;
+        margin: 0 1 0 0;
+        color: $primary 20%;
     }
 
     ArtificeTerminal #agent-status {
@@ -495,7 +495,7 @@ class ArtificeTerminal(Widget):
         self.input = TerminalInput(history=self._history, id="input")
         self.agent_loading = LoadingIndicator()
         self.connection_status = Static(f"◉", id="connection-status")
-        self.agent_status = Static(f"{self._config.provider} | {self._config.model}", id="agent-status")
+        self.agent_status = Static(f"{self._config.model}", id="agent-status")
         self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
         self._context_blocks: list[BaseBlock] = []  # Blocks in agent context

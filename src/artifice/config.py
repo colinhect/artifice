@@ -21,14 +21,14 @@ class ArtificeConfig:
     
     def __init__(self):
         # Agent settings
-        self.provider: Optional[str] = None  # claude, copilot, ollama, simulated
-        self.model: Optional[str] = None  # claude-sonnet-4-5, gpt-4, llama3.2:1b, etc
+        self.model: Optional[str] = None
+        self.models: Optional[dict] = None
         self.system_prompt: Optional[str] = None
         self.prompt_prefix: Optional[str] = None
+        self.thinking_budget: Optional[int] = None
 
         # Provider-specific settings
         self.ollama_host: Optional[str] = None  # e.g., http://localhost:11434
-        self.thinking_budget: Optional[int] = None  # Extended thinking token budget
         
         # Display settings
         self.banner: bool = False
