@@ -68,15 +68,18 @@ class InputTextArea(TextArea):
         """Set the placeholder text to show when focused."""
         self._focused_placeholder = text
         if self.has_focus:
-            self.placeholder = str(Text.from_markup(text))
+            pass
+            #self.placeholder = str(Text.from_markup(text))
 
     def on_focus(self) -> None:
         """Update placeholder when gaining focus."""
-        self.placeholder = str(Text.from_markup(self._focused_placeholder))
+        pass
+        #self.placeholder = str(Text.from_markup(self._focused_placeholder))
 
     def on_blur(self) -> None:
         """Update placeholder when losing focus."""
-        self.placeholder = str(Text.from_markup(self._unfocused_placeholder))
+        pass
+        #self.placeholder = str(Text.from_markup(self._unfocused_placeholder))
 
     async def _on_key(self, event: events.Key) -> None:
         """Intercept key events before TextArea processes them."""
@@ -494,25 +497,6 @@ class TerminalInput(Static):
             self._exit_search_mode()
             event.prevent_default()
             event.stop()
-
-    def set_activity(self, active: bool) -> None:
-        """Show or hide the activity indicator and update input state."""
-        if self._activity_mode == active:
-            return
-
-        self._activity_mode = active
-        loading_indicator = self.query_one("#activity-indicator", LoadingIndicator)
-        prompt_display = self.query_one("#prompt-display", Static)
-
-        if active:
-            loading_indicator.styles.display = "block"
-            prompt_display.styles.display = "none"
-            text_area = self.query_one("#code-input", InputTextArea)
-            text_area.placeholder = str(Text.from_markup(" [cyan]ctrl+c[/] to cancel"))
-        else:
-            loading_indicator.styles.display = "none"
-            prompt_display.styles.display = "block"
-            self._update_prompt()
 
     def focus_input(self) -> None:
         """Focus the input text area."""

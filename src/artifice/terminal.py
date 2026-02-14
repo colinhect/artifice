@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import Static
+from textual.widgets import LoadingIndicator, Static
 
 from .agent import AgentBase, create_agent
 from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
@@ -395,9 +395,44 @@ class ArtificeTerminal(Widget):
         max-height: 30vh;
     }
 
-    ArtificeTerminal #flash {
-        height: 0;
+    ArtificeTerminal #status-line {
+        height: 1;
+    }
+
+    ArtificeTerminal LoadingIndicator {
+        width: 1;
+        margin: 0 1 0 1;
+    }
+
+    ArtificeTerminal LoadingIndicator.agent-inactive {
         display: none;
+    }
+
+    ArtificeTerminal LoadingIndicator.agent-active {
+        display: block;
+    }
+
+    ArtificeTerminal #connection-status.agent-inactive {
+        display: block;
+    }
+
+    ArtificeTerminal #connection-status.agent-active {
+        display: none;
+    }
+
+    ArtificeTerminal .connected {
+        color: $success 100% !important;
+    }
+
+    ArtificeTerminal #connection-status {
+        width: 1;
+        margin: 0 1 0 1;
+        color: $success 33%;
+    }
+
+    ArtificeTerminal #agent-status {
+        height: 1;
+        color: $primary 33%;
     }
     """
 
@@ -455,12 +490,12 @@ class ArtificeTerminal(Widget):
             except Exception as e:
                 logger.error(f"Failed to initialize session transcript: {e}")
 
-        # Create agent
-        self._agent: AgentBase | None = None
-        self._agent = create_agent(self._config)
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
+        self.agent_loading = LoadingIndicator()
+        self.connection_status = Static(f"◉", id="connection-status")
+        self.agent_status = Static(f"{self._config.provider} | {self._config.model}", id="agent-status")
         self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
         self._context_blocks: list[BaseBlock] = []  # Blocks in agent context
@@ -472,12 +507,24 @@ class ArtificeTerminal(Widget):
         self._thinking_processing_scheduled: bool = False  # Flag to avoid duplicate batch processing
         self._loading_block: AgentOutputBlock | None = None  # Initial loading block before first chunk
 
+        def on_connect(_):
+            self.connection_status.add_class("connected")
+
+        # Create agent
+        self._agent: AgentBase | None = None
+        self._agent = create_agent(self._config, on_connect=on_connect)
+        self.connection_status.add_class("agent-inactive")
+        self.agent_loading.classes = "agent-inactive"
+
     def compose(self) -> ComposeResult:
         with Vertical():
             yield self.output
-            yield Static(id="flash")
             yield self.input
             yield self.pinned_output
+            with Horizontal(id="status-line"):
+                yield self.agent_loading
+                yield self.connection_status
+                yield self.agent_status
 
     def _save_block_to_session(self, block: BaseBlock) -> None:
         """Save a block to the session transcript if enabled."""
@@ -645,7 +692,13 @@ class ArtificeTerminal(Widget):
         if self._config.prompt_prefix:
             prompt = self._config.prompt_prefix + " " + prompt
 
+        self.agent_loading.classes = "agent-active"
+        self.connection_status.remove_class("agent-inactive")
+        self.connection_status.add_class("agent-active")
         response = await agent.send_prompt(prompt, on_chunk=on_chunk, on_thinking_chunk=on_thinking_chunk)
+        self.connection_status.add_class("agent-inactive")
+        self.connection_status.remove_class("agent-active")
+        self.agent_loading.classes = "agent-inactive"
 
         # Flush any remaining buffered thinking chunks
         if self._thinking_buffer:

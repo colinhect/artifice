@@ -34,6 +34,7 @@ class SimulatedAgent(AgentBase):
             response_delay: Delay between streaming chunks (seconds) to simulate typing
         """
         self.system_prompt = system_prompt
+        self.on_connect = on_connect
         self.response_delay = response_delay
         self.conversation_history: list[dict[str, Any]] = []
 
@@ -42,9 +43,6 @@ class SimulatedAgent(AgentBase):
         self.current_scenario_index = 0
         self.default_response = "I'm a simulated AI agent. I can be configured with custom responses."
         self.default_thinking: str | None = None
-
-        if on_connect:
-            on_connect("Artifice")
 
     def default_scenarios_and_response(self):
         self.configure_scenarios([
@@ -157,6 +155,9 @@ class SimulatedAgent(AgentBase):
         Returns:
             AgentResponse with the simulated response
         """
+        if self.on_connect:
+            self.on_connect("Artifice")
+            self.on_connect = None
         #await asyncio.sleep(2)
         # Add prompt to conversation history
         self.conversation_history.append({

@@ -394,9 +394,9 @@ class AgentOutputBlock(BufferedOutputBlock):
 
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__(output=output, render_markdown=render_markdown)
-        self._loading_indicator = LoadingIndicator(classes="loading-indicator")
+        #self._loading_indicator = LoadingIndicator(classes="loading-indicator")
         self._status_indicator = Static("", classes="status-indicator")
-        self._status_indicator.styles.display = "none"
+        #self._status_indicator.styles.display = "none"
         self._streaming = activity
         self._last_flush_time: float = 0.0
         self._flush_timer_pending: bool = False
@@ -407,7 +407,7 @@ class AgentOutputBlock(BufferedOutputBlock):
 
     def compose(self) -> ComposeResult:
         with self._contents:
-            yield self._loading_indicator
+            #yield self._loading_indicator
             yield self._status_indicator
             if self._markdown:
                 yield self._markdown
@@ -459,11 +459,11 @@ class AgentOutputBlock(BufferedOutputBlock):
         self._do_flush()
 
     def mark_success(self) -> None:
-        self._loading_indicator.styles.display = "none"
+        #self._loading_indicator.styles.display = "none"
         self._status_indicator.styles.display = "block"
 
     def mark_failed(self) -> None:
-        self._loading_indicator.styles.display = "none"
+        #self._loading_indicator.styles.display = "none"
         self._status_indicator.styles.display = "block"
 
 
@@ -497,7 +497,7 @@ class ThinkingOutputBlock(AgentOutputBlock):
     def compose(self) -> ComposeResult:
         #yield self._label
         with self._contents:
-            yield self._loading_indicator
+            #yield self._loading_indicator
             yield self._status_indicator
             if self._markdown:
                 yield self._markdown
