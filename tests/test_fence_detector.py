@@ -69,6 +69,29 @@ class FakeCodeBlock(FakeBlock):
         self._finished = True
 
 
+class FakeThinkingBlock(FakeBlock):
+    """Fake ThinkingOutputBlock that accumulates thinking text."""
+
+    def __init__(self, activity=False):
+        super().__init__()
+
+    def append(self, text):
+        self._text += text
+        self._full += text
+
+    def flush(self):
+        pass
+
+    def mark_success(self):
+        self._success = True
+
+    def mark_failed(self):
+        pass
+
+    def finalize_streaming(self):
+        self._finished = True
+
+
 class FakeOutput:
     """Fake TerminalOutput."""
 
@@ -93,6 +116,7 @@ def _patch_block_types():
     with (
         patch("artifice.fence_detector.AssistantOutputBlock", FakeAssistantBlock),
         patch("artifice.fence_detector.CodeInputBlock", FakeCodeBlock),
+        patch("artifice.fence_detector.ThinkingOutputBlock", FakeThinkingBlock),
     ):
         yield
 
@@ -105,6 +129,7 @@ def make_detector(save_callback=None):
     )
     detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
     detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
+    detector._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
     return detector, output
 
 
@@ -377,3 +402,121 @@ class TestSaveCallback:
         types = {type(b) for b in saved}
         assert FakeAssistantBlock in types
         assert FakeCodeBlock in types
+
+
+class TestThinkTagDetection:
+    def test_simple_think_tag(self):
+        """Basic <think>...</think> detection creates a thinking block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Before<think>thinking content</think>After")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 1
+        assert "thinking content" in thinking_blocks[0]._text
+
+    def test_think_tag_with_newlines(self):
+        """Think tags can span multiple lines."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Before\n<think>\nline 1\nline 2\n</think>\nAfter")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 1
+        assert "line 1" in thinking_blocks[0]._text
+        assert "line 2" in thinking_blocks[0]._text
+
+    def test_multiple_think_blocks(self):
+        """Multiple think tags create separate thinking blocks."""
+        d, out = make_detector()
+        d.start()
+        d.feed("<think>first</think>prose<think>second</think>")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 2
+        assert "first" in thinking_blocks[0]._text
+        assert "second" in thinking_blocks[1]._text
+
+    def test_think_tag_split_across_chunks(self):
+        """Think tags split across feed() calls should still be detected."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Text<th")
+        d.feed("ink>thinking")
+        d.feed("</th")
+        d.feed("ink>")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 1
+        assert "thinking" in thinking_blocks[0]._text
+
+    def test_unclosed_think_tag(self):
+        """Unclosed think tag keeps content in thinking block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Before<think>thinking without close")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 1
+        assert "thinking without close" in thinking_blocks[0]._text
+
+    def test_think_and_code_blocks_together(self):
+        """Think tags and code fences can coexist."""
+        d, out = make_detector()
+        d.start()
+        d.feed("<think>planning</think>\n```python\ncode\n```\nDone")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(thinking_blocks) == 1
+        assert len(code_blocks) == 1
+        assert "planning" in thinking_blocks[0]._text
+        assert "code" in code_blocks[0]._code
+
+    def test_think_tag_with_prose_before_and_after(self):
+        """Think tags create separate blocks from surrounding prose."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Before text<think>thinking</think>After text")
+        d.finish()
+
+        prose_blocks = [
+            b
+            for b in d.all_blocks
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+
+        assert len(thinking_blocks) == 1
+        assert any("Before" in b._text for b in prose_blocks)
+        assert any("After" in b._text for b in prose_blocks)
+
+    def test_state_transitions_with_think(self):
+        """State machine transitions correctly with think tags."""
+        d, _ = make_detector()
+        d.start()
+        assert d._state == _FenceState.PROSE
+
+        d.feed("<think>")
+        assert d._state == _FenceState.THINKING
+
+        d.feed("content</think>")
+        assert d._state == _FenceState.PROSE
+
+    def test_incomplete_think_tag(self):
+        """Incomplete <think at end should be treated as prose."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Hello <thi")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 0
+        # Should be in prose block
+        assert "<thi" in d.all_blocks[0]._text
