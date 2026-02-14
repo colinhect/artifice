@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from .assistant import Assistant
 from .common import AssistantBase, AssistantResponse
-from .providers.simulated import SimulatedProvider
+from ..providers.simulated import SimulatedProvider
 
 logger = logging.getLogger(__name__)
 

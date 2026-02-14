@@ -8,7 +8,7 @@ from typing import Callable, Optional
 
 from openai import OpenAI
 
-from ..provider import ProviderBase, ProviderResponse
+from .provider import ProviderBase, ProviderResponse
 
 logger = logging.getLogger(__name__)
 

@@ -91,7 +91,7 @@ async def test_assistant_error_handling():
 
     # Create a provider that returns an error
     async def error_send(*args, **kwargs):
-        from artifice.assistant import ProviderResponse
+        from artifice.providers.provider import ProviderResponse
 
         return ProviderResponse(text="", error="Test error")
 

@@ -6,7 +6,7 @@ import logging
 from typing import Callable, Optional
 
 from .common import AssistantBase, AssistantResponse
-from .provider import ProviderBase
+from ..providers.provider import ProviderBase
 
 logger = logging.getLogger(__name__)
 

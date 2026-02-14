@@ -11,7 +11,7 @@ from typing import Callable, Optional
 
 from .assistant import Assistant
 from .common import AssistantBase, AssistantResponse
-from .providers.copilot import CopilotProvider
+from ..providers.copilot import CopilotProvider
 
 
 class CopilotAssistant(AssistantBase):

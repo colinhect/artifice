@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Callable, Optional
 
-from ..provider import ProviderBase, ProviderResponse
+from .provider import ProviderBase, ProviderResponse
 
 logger = logging.getLogger(__name__)
 

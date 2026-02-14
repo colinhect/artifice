@@ -1,8 +1,4 @@
-"""module with provider/assistant architecture.
-
-This module exports both the new provider/assistant classes and the
-backward-compatible  classes.
-"""
+"""Module with provider/assistant architecture."""
 
 from typing import Callable
 
@@ -12,24 +8,20 @@ from ..config import ArtificeConfig
 
 # Core interfaces
 from .common import AssistantBase as AssistantBase
-from .common import AssistantResponse as AssistantResponse
-from .provider import ProviderBase as ProviderBase
-from .provider import ProviderResponse as ProviderResponse
 
 # Assistant class (universal conversation manager)
 from .assistant import Assistant as Assistant
 
 # Provider implementations
-from .providers.anthropic import AnthropicProvider as AnthropicProvider
-from .providers.ollama import OllamaProvider as OllamaProvider
-from .providers.openai import OpenAICompatibleProvider as OpenAICompatibleProvider
-from .providers.copilot import CopilotProvider as CopilotProvider
-from .providers.simulated import SimulatedProvider as SimulatedProvider
+from ..providers.anthropic import AnthropicProvider as AnthropicProvider
+from ..providers.ollama import OllamaProvider as OllamaProvider
+from ..providers.openai import OpenAICompatibleProvider as OpenAICompatibleProvider
 
 from .copilot import CopilotAssistant as CopilotAssistant
 from .simulated import (
     SimulatedAssistant as SimulatedAssistant,
 )
+
 
 def create_assistant(
     config: ArtificeConfig, on_connect: Callable | None = None

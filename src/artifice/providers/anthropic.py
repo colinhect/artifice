@@ -7,7 +7,7 @@ import logging
 import os
 from typing import Callable, Optional
 
-from ..provider import ProviderBase, ProviderResponse
+from .provider import ProviderBase, ProviderResponse
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class AnthropicProvider(ProviderBase):
             on_connect: Optional callback called when the client first connects.
         """
         self.api_key = os.environ.get("ANTHROPIC_API_KEY")
-        self.model = model if model else "claude-haiku-4-5"
+        self.model = model
         self.thinking_budget = thinking_budget
         self.on_connect = on_connect
         self._client = None
