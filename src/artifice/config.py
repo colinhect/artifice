@@ -105,7 +105,6 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
             config.model = data["model"]
         if "models" in data:
             config.models = data["models"]
-            print(config.models)
         if "system_prompt" in data:
             config.system_prompt = data["system_prompt"]
         if "prompt_prefix" in data:
