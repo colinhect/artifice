@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -184,7 +185,7 @@ class StreamingFenceDetector:
         self.all_blocks.append(self._current_block)
         self.first_agent_block = self._current_block
 
-    def feed(self, text: str, auto_scroll: bool = True) -> None:
+    def feed(self, text: str) -> None:
         """Process a chunk of streaming text, creating blocks as needed."""
         self._chunk_buffer = ""  # Reset for this chunk
         for ch in text:
@@ -195,9 +196,6 @@ class StreamingFenceDetector:
         if self._chunk_buffer and self._current_block:
             self._update_current_block_with_chunk()
             self._chunk_buffer = ""  # Clear after updating to avoid reprocessing
-        # Optionally scroll to bottom after updating content
-        if auto_scroll:
-            self._output.scroll_end(animate=False)
 
     def _feed_char(self, ch: str) -> None:
         if self._state == _FenceState.PROSE:
@@ -378,31 +376,52 @@ class StreamingFenceDetector:
 
 class ChunkBuffer:
     """Accumulates text chunks and drains them in a single batch via call_later.
+    
+    Enforces a maximum frame rate (default 30 FPS) to prevent excessive UI updates
+    during rapid streaming.
 
     Args:
         schedule: Callable that defers ``drain`` to the next event-loop tick
                   (e.g. ``widget.call_later``).
         drain: Callable(text) invoked with the accumulated text when flushed.
+        min_interval: Minimum seconds between drain operations (default: 1/30 for 30 FPS).
     """
 
-    def __init__(self, schedule, drain) -> None:
+    def __init__(self, schedule, drain, min_interval: float = 1.0 / 30.0) -> None:
         self._schedule = schedule
         self._drain = drain
         self._buffer: str = ""
         self._scheduled: bool = False
+        self._min_interval = min_interval
+        self._last_drain_time: float = 0.0
 
     def append(self, text: str) -> None:
         """Add *text* to the buffer and schedule a drain if needed."""
         self._buffer += text
         if not self._scheduled:
             self._scheduled = True
-            self._schedule(self._flush)
+            # Check if we need to throttle based on last drain time
+            now = time.monotonic()
+            elapsed = now - self._last_drain_time
+            if elapsed >= self._min_interval:
+                # Enough time has passed, schedule immediately
+                self._schedule(self._flush)
+            else:
+                # Throttle: schedule for later to maintain frame rate limit
+                delay = self._min_interval - elapsed
+                self._schedule(lambda: self._schedule_delayed_flush(delay))
+
+    def _schedule_delayed_flush(self, delay: float) -> None:
+        """Schedule a flush after the specified delay."""
+        import asyncio
+        asyncio.get_event_loop().call_later(delay, self._flush)
 
     def _flush(self) -> None:
         self._scheduled = False
         if self._buffer:
             text = self._buffer
             self._buffer = ""
+            self._last_drain_time = time.monotonic()
             self._drain(text)
 
     def flush_sync(self) -> None:
@@ -411,6 +430,7 @@ class ChunkBuffer:
         if self._buffer:
             text = self._buffer
             self._buffer = ""
+            self._last_drain_time = time.monotonic()
             self._drain(text)
 
     @property
@@ -484,7 +504,7 @@ class ArtificeTerminal(Widget):
         self.agent_loading = LoadingIndicator()
         self.connection_status = Static("◉", id="connection-status")
         self.agent_status = Static("", id="agent-status")
-        self.pinned_output = PinnedOutput(id="pinned")
+        #self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
         self._context_blocks: list[BaseBlock] = []  # Blocks in agent context
         self._current_detector: StreamingFenceDetector | None = (
@@ -506,7 +526,7 @@ class ArtificeTerminal(Widget):
         with Vertical():
             yield self.output
             yield self.input
-            yield self.pinned_output
+            #yield self.pinned_output
             with Horizontal(id="status-line"):
                 yield self.agent_loading
                 yield self.connection_status
@@ -816,13 +836,14 @@ class ArtificeTerminal(Widget):
         """Handle pin request: move widget block from output to pinned area."""
         block = event.block
         await block.remove()
-        await self.pinned_output.add_pinned_block(block)
+        #await self.pinned_output.add_pinned_block(block)
 
     async def on_pinned_output_unpin_requested(
         self, event: PinnedOutput.UnpinRequested
     ) -> None:
         """Handle unpin request: remove block from pinned area."""
-        await self.pinned_output.remove_pinned_block(event.block)
+        pass
+        #await self.pinned_output.remove_pinned_block(event.block)
 
     async def on_terminal_output_block_activated(
         self, event: TerminalOutput.BlockActivated
@@ -898,7 +919,7 @@ class ArtificeTerminal(Widget):
             self._current_detector.start()
         try:
             with self.app.batch_update():
-                self._current_detector.feed(text, auto_scroll=False)
+                self._current_detector.feed(text)
             # Schedule scroll after layout refresh so Markdown widget height is recalculated
             self.call_after_refresh(lambda: self.output.scroll_end(animate=False))
         except Exception:

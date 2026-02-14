@@ -254,15 +254,15 @@ class AgentOutputBlock(BufferedOutputBlock):
     _MARKDOWN_CSS_CLASS = "agent-output"
 
     _FLUSH_INTERVAL = (
-        0.1  # Minimum seconds between Markdown re-renders during streaming
+        0.1  # Minimum seconds between full Markdown re-renders during streaming
     )
 
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__(output=output, render_markdown=render_markdown)
         self._status_indicator = Static("", classes="status-indicator")
         self._streaming = activity
-        self._last_flush_time: float = 0.0
-        self._flush_timer_pending: bool = False
+        self._last_full_update_time: float = 0.0
+        self._chunk: str = ""
         self.add_class("in-context")
 
         if not activity:
@@ -278,47 +278,50 @@ class AgentOutputBlock(BufferedOutputBlock):
 
     def append(self, response) -> None:
         self._full += response
+        self._chunk += response
         self._dirty = True
 
     def flush(self) -> None:
-        """Push accumulated text to the widget, throttled for Markdown during streaming."""
+        """Push accumulated text to the widget.
+        
+        Uses markdown.append() for incremental updates most of the time,
+        but performs a full update() every _FLUSH_INTERVAL to re-render everything.
+        """
         if not self._dirty:
             return
 
-        # Throttle Markdown re-renders during streaming
+        self._dirty = False
+        
+        # For non-markdown output, always do a simple update
+        if self._output:
+            self._output.update(self._full.strip())
+            return
+        
+        # For markdown output during streaming, decide between append and full update
         if self._markdown and self._streaming:
             now = time.monotonic()
-            elapsed = now - self._last_flush_time
-            if elapsed < self._FLUSH_INTERVAL:
-                # Too soon — schedule a deferred flush if not already pending
-                if not self._flush_timer_pending:
-                    self._flush_timer_pending = True
-                    self.set_timer(self._FLUSH_INTERVAL - elapsed, self._deferred_flush)
-                return
-
-        self._do_flush()
-
-    def _do_flush(self) -> None:
-        """Actually push content to the widget."""
-        if not self._dirty:
-            return
-        self._dirty = False
-        self._last_flush_time = time.monotonic()
-        self._flush_timer_pending = False
-        if self._markdown:
+            elapsed = now - self._last_full_update_time
+            
+            # Do a full update every _FLUSH_INTERVAL
+            if elapsed >= self._FLUSH_INTERVAL:
+                self._markdown.update(self._full.lstrip())
+                self._last_full_update_time = now
+            elif self._chunk:
+                self._markdown.append(self._chunk)
+        elif self._markdown:
+            # Not streaming, just do a full update
             self._markdown.update(self._full.strip())
-        elif self._output:
-            self._output.update(self._full.strip())
 
-    def _deferred_flush(self) -> None:
-        """Timer callback for deferred flush."""
-        self._flush_timer_pending = False
-        self._do_flush()
+        self._chunk = ""
 
     def finalize_streaming(self) -> None:
         """End streaming mode — force final flush to ensure content is current."""
         self._streaming = False
-        self._do_flush()
+        if self._dirty:
+            self.flush()
+        # Ensure final content is fully rendered
+        if self._markdown:
+            self._markdown.update(self._full.strip())
 
     def mark_success(self) -> None:
         self._status_indicator.styles.display = "block"
