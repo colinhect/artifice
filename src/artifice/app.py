@@ -3,10 +3,10 @@ import argparse
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Static
-from textual.theme import Theme
 
 from artifice import ArtificeTerminal
 from artifice.config import load_config, ArtificeConfig
+from artifice.theme import create_artifice_theme
 
 class ArtificeHeader(Static):
     """Custom header with gradient fade effect."""
@@ -26,42 +26,6 @@ class ArtificeHeader(Static):
         
         header_content += "".join(gradient_chars)
         yield Static(header_content, classes="header-bar")
-
-def create_artifice_theme() -> Theme:
-    #black = "#07080A" 
-    dark_gray = "#3B4252" 
-    gray = "#434C5E" 
-    #light_gray = "#4C566A" 
-    #light_gray_bright = "#616E88" 
-    #darkest_white = "#D8DEE9" 
-    #darker_white = "#E5E9F0" 
-    white = "#ECEFF4" 
-    teal = "#8FBCBB" 
-    #off_blue = "#88C0D0" 
-    glacier = "#81A1C1" 
-    blue = "#5E81AC" 
-    red = "#BF616A" 
-    #orange = "#D08770" 
-    #yellow = "#EBCB8B" 
-    green = "#A3BE8C" 
-    #purple = "#B48EAD" 
-    #none = "NONE"
-
-    return Theme(
-        name="artifice",
-        primary=blue,
-        secondary=green,
-        accent=teal,
-        foreground=white,
-        #background=black,
-        success=green,
-        warning=glacier,
-        error=red,
-        surface=dark_gray,
-        panel=gray,
-        dark=True,
-    )
-
 
 class ArtificeApp(App):
     TITLE = "Artifice Terminal"
