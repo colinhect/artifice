@@ -79,20 +79,31 @@ class OpenAIAgent(AgentBase):
                 )
 
                 text = ""
+                thinking_text = ""
                 chunk_count = 0
                 for chunk in stream:
                     if chunk.choices and len(chunk.choices) > 0:
-                        delta = chunk.choices[0].delta.content
-                        if delta:
+                        delta = chunk.choices[0].delta
+
+                        # Handle reasoning/thinking content (o1, o3 models)
+                        if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                            thinking_text += delta.reasoning_content
+                            if on_thinking_chunk:
+                                loop.call_soon_threadsafe(on_thinking_chunk, delta.reasoning_content)
+
+                        # Handle regular content
+                        if delta.content:
                             chunk_count += 1
-                            text += delta
+                            text += delta.content
                             if on_chunk:
-                                loop.call_soon_threadsafe(on_chunk, delta)
+                                loop.call_soon_threadsafe(on_chunk, delta.content)
 
-                return text, chunk_count
+                return text, thinking_text, chunk_count
 
-            text, chunk_count = await loop.run_in_executor(None, sync_stream)
+            text, thinking_text, chunk_count = await loop.run_in_executor(None, sync_stream)
 
+            if thinking_text:
+                logger.info(f"[OpenAIAgent] Received thinking content, length: {len(thinking_text)}")
             logger.info(f"[OpenAIAgent] Received {chunk_count} chunks, total length: {len(text)}")
 
             # Add assistant's response to conversation history
