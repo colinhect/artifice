@@ -283,7 +283,7 @@ class AgentOutputBlock(BufferedOutputBlock):
 
     def flush(self) -> None:
         """Push accumulated text to the widget.
-        
+
         Uses markdown.append() for incremental updates most of the time,
         but performs a full update() every _FLUSH_INTERVAL to re-render everything.
         """
@@ -291,17 +291,17 @@ class AgentOutputBlock(BufferedOutputBlock):
             return
 
         self._dirty = False
-        
+
         # For non-markdown output, always do a simple update
         if self._output:
             self._output.update(self._full.strip())
             return
-        
+
         # For markdown output during streaming, decide between append and full update
         if self._markdown and self._streaming:
             now = time.monotonic()
             elapsed = now - self._last_full_update_time
-            
+
             # Do a full update every _FLUSH_INTERVAL
             if elapsed >= self._FLUSH_INTERVAL:
                 self._markdown.update(self._full.lstrip())

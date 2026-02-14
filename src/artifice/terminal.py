@@ -376,7 +376,7 @@ class StreamingFenceDetector:
 
 class ChunkBuffer:
     """Accumulates text chunks and drains them in a single batch via call_later.
-    
+
     Enforces a maximum frame rate (default 30 FPS) to prevent excessive UI updates
     during rapid streaming.
 
@@ -414,6 +414,7 @@ class ChunkBuffer:
     def _schedule_delayed_flush(self, delay: float) -> None:
         """Schedule a flush after the specified delay."""
         import asyncio
+
         asyncio.get_event_loop().call_later(delay, self._flush)
 
     def _flush(self) -> None:
@@ -504,7 +505,7 @@ class ArtificeTerminal(Widget):
         self.agent_loading = LoadingIndicator()
         self.connection_status = Static("◉", id="connection-status")
         self.agent_status = Static("", id="agent-status")
-        #self.pinned_output = PinnedOutput(id="pinned")
+        # self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
         self._context_blocks: list[BaseBlock] = []  # Blocks in agent context
         self._current_detector: StreamingFenceDetector | None = (
@@ -526,7 +527,7 @@ class ArtificeTerminal(Widget):
         with Vertical():
             yield self.output
             yield self.input
-            #yield self.pinned_output
+            # yield self.pinned_output
             with Horizontal(id="status-line"):
                 yield self.agent_loading
                 yield self.connection_status
@@ -836,14 +837,14 @@ class ArtificeTerminal(Widget):
         """Handle pin request: move widget block from output to pinned area."""
         block = event.block
         await block.remove()
-        #await self.pinned_output.add_pinned_block(block)
+        # await self.pinned_output.add_pinned_block(block)
 
     async def on_pinned_output_unpin_requested(
         self, event: PinnedOutput.UnpinRequested
     ) -> None:
         """Handle unpin request: remove block from pinned area."""
         pass
-        #await self.pinned_output.remove_pinned_block(event.block)
+        # await self.pinned_output.remove_pinned_block(event.block)
 
     async def on_terminal_output_block_activated(
         self, event: TerminalOutput.BlockActivated
