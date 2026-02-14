@@ -376,6 +376,49 @@ class StreamingFenceDetector:
                 self._save_callback(block)
 
 
+class ChunkBuffer:
+    """Accumulates text chunks and drains them in a single batch via call_later.
+
+    Args:
+        schedule: Callable that defers ``drain`` to the next event-loop tick
+                  (e.g. ``widget.call_later``).
+        drain: Callable(text) invoked with the accumulated text when flushed.
+    """
+
+    def __init__(self, schedule, drain) -> None:
+        self._schedule = schedule
+        self._drain = drain
+        self._buffer: str = ""
+        self._scheduled: bool = False
+
+    def append(self, text: str) -> None:
+        """Add *text* to the buffer and schedule a drain if needed."""
+        self._buffer += text
+        if not self._scheduled:
+            self._scheduled = True
+            self._schedule(self._flush)
+
+    def _flush(self) -> None:
+        self._scheduled = False
+        if self._buffer:
+            text = self._buffer
+            self._buffer = ""
+            self._drain(text)
+
+    def flush_sync(self) -> None:
+        """Drain any remaining buffered text immediately."""
+        self._scheduled = False
+        if self._buffer:
+            text = self._buffer
+            self._buffer = ""
+            self._drain(text)
+
+    @property
+    def pending(self) -> bool:
+        """True if the buffer has un-drained text."""
+        return bool(self._buffer)
+
+
 class ArtificeTerminal(Widget):
     """Primary widget for interacting with Artifice."""
 
@@ -446,15 +489,9 @@ class ArtificeTerminal(Widget):
         self._current_detector: StreamingFenceDetector | None = (
             None  # Active streaming detector
         )
-        self._chunk_buffer: str = ""  # Buffer for batching StreamChunk messages
-        self._chunk_processing_scheduled: bool = (
-            False  # Flag to avoid duplicate batch processing
-        )
         self._thinking_block: ThinkingOutputBlock | None = None  # Active thinking block
-        self._thinking_buffer: str = ""  # Buffer for batching thinking chunks
-        self._thinking_processing_scheduled: bool = (
-            False  # Flag to avoid duplicate batch processing
-        )
+        self._chunk_buf = ChunkBuffer(self.call_later, self._drain_chunks)
+        self._thinking_buf = ChunkBuffer(self.call_later, self._drain_thinking)
 
         def on_connect(_):
             self.connection_status.add_class("connected")
@@ -626,6 +663,68 @@ class ArtificeTerminal(Widget):
             block.remove_class("in-context")
         self._context_blocks.clear()
 
+    def _set_agent_active(self) -> None:
+        """Update status indicators to show agent is processing."""
+        self.agent_loading.classes = "agent-active"
+        self.connection_status.remove_class("agent-inactive")
+        self.connection_status.add_class("agent-active")
+
+    def _set_agent_inactive(self) -> None:
+        """Update status indicators to show agent is idle."""
+        self.connection_status.add_class("agent-inactive")
+        self.connection_status.remove_class("agent-active")
+        self.agent_loading.classes = "agent-inactive"
+
+    def _finalize_stream(self) -> None:
+        """Flush buffers and finalize thinking block and detector after streaming ends."""
+        # Flush any remaining buffered thinking chunks
+        self._thinking_buf.flush_sync()
+        if self._thinking_block:
+            self._thinking_block.finalize_streaming()
+            self._thinking_block.mark_success()
+            self._save_block_to_session(self._thinking_block)
+            self._thinking_block = None
+
+        # Flush any remaining buffered chunks and finalize detector
+        self._chunk_buf.flush_sync()
+        if not self._detector_started:
+            self._detector_started = True
+            self._current_detector.start()
+        self._current_detector.finish()
+
+    def _apply_agent_response(self, detector: StreamingFenceDetector, response) -> None:
+        """Mark context, handle errors, and auto-highlight the first code block."""
+        with self.app.batch_update():
+            for block in detector.all_blocks:
+                self._mark_block_in_context(block)
+
+            if detector.first_agent_block:
+                if response.error:
+                    detector.first_agent_block.append(
+                        f"\n**Error:** {response.error}\n"
+                    )
+                    detector.first_agent_block.flush()
+                    detector.first_agent_block.mark_failed()
+                else:
+                    detector.first_agent_block.flush()
+                    detector.first_agent_block.mark_success()
+
+        # Auto-highlight the first CodeInputBlock (command #1) from this response
+        last_code_block = None
+        for block in reversed(detector.all_blocks):
+            if isinstance(block, CodeInputBlock) and block._command_number == 1:
+                last_code_block = block
+                break
+
+        if last_code_block is not None:
+            try:
+                idx = self.output._blocks.index(last_code_block)
+                self.output._highlighted_index = idx
+                self.output._update_highlight()
+                self.output.focus()
+            except ValueError:
+                pass
+
     async def _stream_agent_response(
         self, agent: AgentBase, prompt: str
     ) -> tuple[StreamingFenceDetector, object]:
@@ -633,11 +732,8 @@ class ArtificeTerminal(Widget):
 
         Returns the detector (with all_blocks, first_agent_block) and the AgentResponse.
         """
-        # Clear old command numbers so the new response starts from 1
         self.output.clear_command_numbers()
 
-        # Create detector but don't start yet — defer until first text chunk
-        # so that ThinkingOutputBlock (if any) gets mounted first
         self._current_detector = StreamingFenceDetector(
             self.output,
             self.output.auto_scroll,
@@ -645,7 +741,6 @@ class ArtificeTerminal(Widget):
         )
         self._detector_started = False
 
-        # Post messages from streaming callback (runs in background thread)
         def on_chunk(text):
             self.post_message(StreamChunk(text))
 
@@ -655,73 +750,14 @@ class ArtificeTerminal(Widget):
         if self._config.prompt_prefix:
             prompt = self._config.prompt_prefix + " " + prompt
 
-        self.agent_loading.classes = "agent-active"
-        self.connection_status.remove_class("agent-inactive")
-        self.connection_status.add_class("agent-active")
+        self._set_agent_active()
         response = await agent.send_prompt(
             prompt, on_chunk=on_chunk, on_thinking_chunk=on_thinking_chunk
         )
-        self.connection_status.add_class("agent-inactive")
-        self.connection_status.remove_class("agent-active")
-        self.agent_loading.classes = "agent-inactive"
+        self._set_agent_inactive()
 
-        # Flush any remaining buffered thinking chunks
-        if self._thinking_buffer:
-            self._process_thinking_buffer()
-        # Finalize thinking block
-        if self._thinking_block:
-            self._thinking_block.finalize_streaming()
-            self._thinking_block.mark_success()
-            self._save_block_to_session(self._thinking_block)
-            self._thinking_block = None
-
-        # Flush any remaining buffered chunks and finalize directly
-        # (no message-based race — send_prompt has returned, no more chunks coming)
-        if self._chunk_buffer:
-            self._process_chunk_buffer()
-        # Ensure detector is started before finishing (handles thinking-only or error cases)
-        if not self._detector_started:
-            self._detector_started = True
-            self._current_detector.start()
-        self._current_detector.finish()
-
-        with self.app.batch_update():
-            # Mark all blocks as in context
-            for block in self._current_detector.all_blocks:
-                self._mark_block_in_context(block)
-
-            # Mark the first agent output block with success/failure
-            if self._current_detector.first_agent_block:
-                if response.error:
-                    # Show the error message in the block
-                    self._current_detector.first_agent_block.append(
-                        f"\n**Error:** {response.error}\n"
-                    )
-                    self._current_detector.first_agent_block.flush()
-                    self._current_detector.first_agent_block.mark_failed()
-                else:
-                    self._current_detector.first_agent_block.flush()
-                    self._current_detector.first_agent_block.mark_success()
-
-        # Auto-highlight the last CodeInputBlock from this agent response
-        # Search backward through the blocks created in this response
-        last_code_block = None
-        for block in reversed(self._current_detector.all_blocks):
-            if isinstance(block, CodeInputBlock) and block._command_number == 1:
-                last_code_block = block
-                break
-
-        if last_code_block is not None:
-            # Find its index in the output blocks
-            try:
-                last_code_block_index = self.output._blocks.index(last_code_block)
-                # Set the index BEFORE focusing to avoid on_focus overwriting it
-                self.output._highlighted_index = last_code_block_index
-                self.output._update_highlight()
-                self.output.focus()
-            except ValueError:
-                # Block not found in output (shouldn't happen, but be safe)
-                pass
+        self._finalize_stream()
+        self._apply_agent_response(self._current_detector, response)
 
         detector = self._current_detector
         self._current_detector = None
@@ -842,58 +878,40 @@ class ArtificeTerminal(Widget):
             if not self._detector_started:
                 self._detector_started = True
                 self._current_detector.start()
+            self._chunk_buf.append(event.text)
 
-            # Add chunk to buffer
-            self._chunk_buffer += event.text
-
-            # Schedule batch processing if not already scheduled
-            if not self._chunk_processing_scheduled:
-                self._chunk_processing_scheduled = True
-                # Schedule on next tick to allow chunks to accumulate
-                self.call_later(self._process_chunk_buffer)
-
-    def _process_chunk_buffer(self) -> None:
+    def _drain_chunks(self, text: str) -> None:
         """Process all accumulated chunks in the buffer at once."""
-        if self._current_detector and self._chunk_buffer:
-            # Ensure detector is started before feeding text
-            if not self._detector_started:
-                self._detector_started = True
-                self._current_detector.start()
-            text = self._chunk_buffer
-            self._chunk_buffer = ""
-            try:
-                with self.app.batch_update():
-                    self._current_detector.feed(text, auto_scroll=False)
-                # Schedule scroll after layout refresh so Markdown widget height is recalculated
-                self.call_after_refresh(lambda: self.output.scroll_end(animate=False))
-            except Exception:
-                logger.exception("Error processing chunk buffer")
-        # Reset scheduling flag to allow next batch
-        self._chunk_processing_scheduled = False
+        if not self._current_detector:
+            return
+        # Ensure detector is started before feeding text
+        if not self._detector_started:
+            self._detector_started = True
+            self._current_detector.start()
+        try:
+            with self.app.batch_update():
+                self._current_detector.feed(text, auto_scroll=False)
+            # Schedule scroll after layout refresh so Markdown widget height is recalculated
+            self.call_after_refresh(lambda: self.output.scroll_end(animate=False))
+        except Exception:
+            logger.exception("Error processing chunk buffer")
 
     def on_stream_thinking_chunk(self, event: StreamThinkingChunk) -> None:
         """Handle streaming thinking chunk message - buffer and batch process."""
-        self._thinking_buffer += event.text
-        if not self._thinking_processing_scheduled:
-            self._thinking_processing_scheduled = True
-            self.call_later(self._process_thinking_buffer)
+        self._thinking_buf.append(event.text)
 
-    def _process_thinking_buffer(self) -> None:
+    def _drain_thinking(self, text: str) -> None:
         """Process all accumulated thinking chunks in the buffer at once."""
-        if self._thinking_buffer:
-            text = self._thinking_buffer
-            self._thinking_buffer = ""
-            try:
-                # Lazily create thinking block on first chunk
-                if self._thinking_block is None:
-                    self._thinking_block = ThinkingOutputBlock(activity=True)
-                    self.output.append_block(self._thinking_block)
-                self._thinking_block.append(text)
-                self._thinking_block.flush()
-                self.output.scroll_end(animate=False)
-            except Exception:
-                logger.exception("Error processing thinking buffer")
-        self._thinking_processing_scheduled = False
+        try:
+            # Lazily create thinking block on first chunk
+            if self._thinking_block is None:
+                self._thinking_block = ThinkingOutputBlock(activity=True)
+                self.output.append_block(self._thinking_block)
+            self._thinking_block.append(text)
+            self._thinking_block.flush()
+            self.output.scroll_end(animate=False)
+        except Exception:
+            logger.exception("Error processing thinking buffer")
 
     def action_clear(self) -> None:
         """Clear the output."""

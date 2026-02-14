@@ -40,7 +40,6 @@ class CodeInputBlock(BaseBlock):
         self._streaming = show_loading
         self._language = language
         self._command_number = command_number
-        self._prompt_indicator = Static(self._get_prompt(), classes="prompt-indicator")
         # Status icon appears before the prompt (✔, ✖, or loading indicator)
         self._status_icon = Static(self._status_text(), classes="status-indicator")
         self._status_icon.add_class("status-unexecuted")
@@ -59,15 +58,11 @@ class CodeInputBlock(BaseBlock):
             return str(self._command_number)
         return ""
 
-    def _get_prompt(self) -> str:
-        return "]" if self._language == "python" else "$"
-
     def compose(self) -> ComposeResult:
         with Horizontal():
             with self._status_container:
                 yield self._loading_indicator
                 yield self._status_icon
-                # yield self._prompt_indicator
             yield self._code
 
     def update_status(self, result: ExecutionResult) -> None:
@@ -115,9 +110,7 @@ class CodeInputBlock(BaseBlock):
         else:
             self._language = "python"
 
-        self._prompt_indicator.update(self._get_prompt())
-
-        # Update syntax highlighting and markdown
+        # Update syntax highlighting
         self._code.update(
             highlight.highlight(self._original_code.strip(), language=self._language)
         )
@@ -266,9 +259,7 @@ class AgentOutputBlock(BufferedOutputBlock):
 
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__(output=output, render_markdown=render_markdown)
-        # self._loading_indicator = LoadingIndicator(classes="loading-indicator")
         self._status_indicator = Static("", classes="status-indicator")
-        # self._status_indicator.styles.display = "none"
         self._streaming = activity
         self._last_flush_time: float = 0.0
         self._flush_timer_pending: bool = False
@@ -279,7 +270,6 @@ class AgentOutputBlock(BufferedOutputBlock):
 
     def compose(self) -> ComposeResult:
         with self._contents:
-            # yield self._loading_indicator
             yield self._status_indicator
             if self._markdown:
                 yield self._markdown
@@ -331,38 +321,17 @@ class AgentOutputBlock(BufferedOutputBlock):
         self._do_flush()
 
     def mark_success(self) -> None:
-        # self._loading_indicator.styles.display = "none"
         self._status_indicator.styles.display = "block"
 
     def mark_failed(self) -> None:
-        # self._loading_indicator.styles.display = "none"
         self._status_indicator.styles.display = "block"
 
 
 class ThinkingOutputBlock(AgentOutputBlock):
-    """Block for displaying AI agent thinking/reasoning content.
-
-    Visually distinct from regular agent output with dimmed styling
-    and a left border accent.
-    """
+    """Block for AI thinking content. Styled distinctly via CSS."""
 
     def __init__(self, output="", activity=True) -> None:
         super().__init__(output=output, activity=activity, render_markdown=False)
-        # self._label = Static("Thinking...", classes="thinking-label")
-
-    def compose(self) -> ComposeResult:
-        # yield self._label
-        with self._contents:
-            # yield self._loading_indicator
-            yield self._status_indicator
-            if self._markdown:
-                yield self._markdown
-            elif self._output is not None:
-                yield self._output
-
-    def mark_success(self) -> None:
-        super().mark_success()
-        # self._label.update("Thinking")
 
 
 class HighlightableContainerMixin:

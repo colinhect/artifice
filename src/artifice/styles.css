@@ -327,15 +327,6 @@ ThinkingOutputBlock {
     border-left: solid $primary;
 }
 
-/*
-ThinkingOutputBlock .thinking-label {
-    color: $accent;
-    text-style: italic;
-    padding: 0;
-    margin: 0;
-}
-*/
-
 TerminalOutput {
     border: none;
     padding: 0;

@@ -45,10 +45,6 @@ class InputTextArea(TextArea):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(language="python", **kwargs)
-        self._focused_placeholder: str = ""
-        self._unfocused_placeholder: str = (
-            " [cyan]enter[/] to execute    [cyan]ctrl+i[/] return to prompt"
-        )
 
     def action_submit_code(self) -> None:
         """Submit the code."""
@@ -67,23 +63,6 @@ class InputTextArea(TextArea):
         """Enable or disable Python syntax highlighting."""
         self.language = language
         self.theme = "vscode_dark"
-
-    def set_focused_placeholder(self, text: str) -> None:
-        """Set the placeholder text to show when focused."""
-        self._focused_placeholder = text
-        if self.has_focus:
-            pass
-            # self.placeholder = str(Text.from_markup(text))
-
-    def on_focus(self) -> None:
-        """Update placeholder when gaining focus."""
-        pass
-        # self.placeholder = str(Text.from_markup(self._focused_placeholder))
-
-    def on_blur(self) -> None:
-        """Update placeholder when losing focus."""
-        pass
-        # self.placeholder = str(Text.from_markup(self._unfocused_placeholder))
 
     async def _on_key(self, event: events.Key) -> None:
         """Intercept key events before TextArea processes them."""
@@ -135,23 +114,17 @@ class InputTextArea(TextArea):
                 event.stop()
                 self.post_message(TerminalInput.HistoryNext())
                 return
-        # If input is empty
-        if not self.text.strip():
-            if event.key == "greater_than_sign":
-                event.prevent_default()
-                event.stop()
-                self.post_message(TerminalInput.SetMode("ai"))
-                return
-            if event.key == "dollar_sign":
-                event.prevent_default()
-                event.stop()
-                self.post_message(TerminalInput.SetMode("shell"))
-                return
-            if event.key == "right_square_bracket":
-                event.prevent_default()
-                event.stop()
-                self.post_message(TerminalInput.SetMode("python"))
-                return
+        # If input is empty, switch mode on shortcut key
+        _EMPTY_INPUT_SHORTCUTS = {
+            "greater_than_sign": "ai",
+            "dollar_sign": "shell",
+            "right_square_bracket": "python",
+        }
+        if not self.text.strip() and event.key in _EMPTY_INPUT_SHORTCUTS:
+            event.prevent_default()
+            event.stop()
+            self.post_message(TerminalInput.SetMode(_EMPTY_INPUT_SHORTCUTS[event.key]))
+            return
         # Let parent handle other keys
         await super()._on_key(event)
 
@@ -210,9 +183,9 @@ class TerminalInput(Static):
             super().__init__()
 
     _MODE_CONFIG = {
-        "ai": (">", "ai prompt...       [red]][/] python  [cyan]$[/] shell", None),
-        "shell": ("$", "shell command...   [cyan]>[/] ai  [cyan]][/] python", "bash"),
-        "python": ("]", "python code...     [cyan]>[/] ai  [cyan]$[/] shell", "python"),
+        "ai": (">", None),
+        "shell": ("$", "bash"),
+        "python": ("]", "python"),
     }
 
     def __init__(
@@ -229,7 +202,6 @@ class TerminalInput(Static):
         self._search_mode = False
         self._search_input: Input | None = None
         self._autocomplete: HistoryAutoComplete | None = None
-        self._activity_mode = False  # Whether activity indicator is shown
         self.add_class("in-context")
 
     def compose(self) -> ComposeResult:
@@ -281,13 +253,12 @@ class TerminalInput(Static):
 
     def _update_prompt(self) -> None:
         """Update the prompt display based on current mode."""
-        prompt_char, placeholder, lang = self._MODE_CONFIG[self.mode]
+        prompt_char, lang = self._MODE_CONFIG[self.mode]
         prompt_widget = self.query_one("#prompt-display", Static)
         text_area = self.query_one("#code-input", InputTextArea)
 
         with self.app.batch_update():
             prompt_widget.update(prompt_char)
-            text_area.set_focused_placeholder(placeholder)
             text_area.set_syntax_highlighting(lang)
 
     @property
