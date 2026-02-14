@@ -520,3 +520,21 @@ class TestThinkTagDetection:
         assert len(thinking_blocks) == 0
         # Should be in prose block
         assert "<thi" in d.all_blocks[0]._text
+
+    def test_thinking_split_on_empty_lines(self):
+        """Empty lines within <think> tags should split into multiple thinking blocks."""
+        d, out = make_detector()
+        d.start()
+        d.feed("<think>\nFirst paragraph\n\nSecond paragraph\n\nThird paragraph\n</think>")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 3, f"Expected 3 thinking blocks, got {len(thinking_blocks)}"
+
+        # Check content of each thinking block
+        assert "First paragraph" in thinking_blocks[0]._text
+        assert "Second paragraph" in thinking_blocks[1]._text
+        assert "Third paragraph" in thinking_blocks[2]._text
+
+        # Verify all are marked as successful
+        assert all(b._success for b in thinking_blocks)

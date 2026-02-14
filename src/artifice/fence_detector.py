@@ -295,9 +295,41 @@ class StreamingFenceDetector:
 
                     self._current_line_buffer = ""
                     self._state = _FenceState.PROSE
-        else:
-            # Regular thinking content
+            return
+
+        # Check for empty lines to split thinking blocks
+        if ch == "\n":
+            # Add newline to pending buffer
             self._pending_buffer += ch
+
+            # Check if the line we just completed was empty/whitespace-only
+            # Only split if the current block has accumulated some content
+            if self._current_line_buffer.strip() == "":
+                # Check if current thinking block has content (including pending)
+                current_has_content = (
+                    isinstance(self._current_block, ThinkingOutputBlock)
+                    and (self._current_block._full.strip() or self._pending_buffer.strip())
+                )
+
+                if current_has_content:
+                    # Empty line detected - split to new thinking block
+                    self._flush_pending_to_chunk()
+                    self._flush_and_update_chunk()
+
+                    # Mark current thinking block as complete
+                    if isinstance(self._current_block, ThinkingOutputBlock):
+                        self._current_block.mark_success()
+
+                    # Create new thinking block
+                    self._current_block = self._make_thinking_block()
+                    self._output.append_block(self._current_block)
+                    self.all_blocks.append(self._current_block)
+
+            # Reset line buffer for next line
+            self._current_line_buffer = ""
+        else:
+            self._pending_buffer += ch
+            self._current_line_buffer += ch
 
     def _flush_pending_to_chunk(self) -> None:
         """Move pending buffer to chunk buffer."""
