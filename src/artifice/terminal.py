@@ -438,7 +438,7 @@ class ArtificeTerminal(Widget):
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
         self.agent_loading = LoadingIndicator()
-        self.connection_status = Static(f"◉", id="connection-status")
+        self.connection_status = Static("◉", id="connection-status")
         self.agent_status = Static(f"{self._config.model}", id="agent-status")
         self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
