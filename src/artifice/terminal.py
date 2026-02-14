@@ -500,8 +500,7 @@ class ArtificeTerminal(Widget):
         # Create agent
         self._agent: AgentBase | None = None
         self._agent = create_agent(self._config, on_connect=on_connect)
-        self.connection_status.add_class("agent-inactive")
-        self.agent_loading.classes = "agent-inactive"
+        self._set_agent_inactive()
 
     def compose(self) -> ComposeResult:
         with Vertical():
