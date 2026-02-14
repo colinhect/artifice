@@ -157,7 +157,7 @@ class StreamingFenceDetector:
         self._string_tracker = StringTracker()
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
-        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=True, in_context=True, command_number=self._output.next_command_number())
+        self._make_code_block = lambda code, lang: CodeInputBlock(code, language=lang, show_loading=False, in_context=True, command_number=self._output.next_command_number())
 
     def start(self) -> None:
         """Create the initial AgentOutputBlock for streaming prose."""

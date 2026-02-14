@@ -102,6 +102,8 @@ class CodeInputBlock(BaseBlock):
         self._loading_indicator = LoadingIndicator(classes="status-indicator")
         if show_loading:
             self._loading_indicator.styles.display = "block"
+        else:
+            self._loading_indicator.styles.display = "none"
         self._streaming = show_loading
         self._language = language
         self._command_number = command_number
