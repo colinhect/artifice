@@ -451,6 +451,7 @@ class ArtificeTerminal(Widget):
         super().__init__(name=name, id=id, classes=classes)
 
         self._config = app.config
+
         self._executor = CodeExecutor()
         self._shell_executor = ShellExecutor()
 
@@ -482,7 +483,7 @@ class ArtificeTerminal(Widget):
         self.input = TerminalInput(history=self._history, id="input")
         self.agent_loading = LoadingIndicator()
         self.connection_status = Static("◉", id="connection-status")
-        self.agent_status = Static(f"{self._config.model}", id="agent-status")
+        self.agent_status = Static("", id="agent-status")
         self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
         self._context_blocks: list[BaseBlock] = []  # Blocks in agent context
@@ -511,6 +512,12 @@ class ArtificeTerminal(Widget):
                 yield self.agent_loading
                 yield self.connection_status
                 yield self.agent_status
+
+    def on_mount(self) -> None:
+        if self._config.models:
+            model = self._config.models.get(self._config.model)
+            if model:
+                self.agent_status.update(f"{model.get('model')} ({model.get('provider')})")
 
     def _save_block_to_session(self, block: BaseBlock) -> None:
         """Save a block to the session transcript if enabled."""
