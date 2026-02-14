@@ -32,17 +32,17 @@ models:
   deepseek:
     provider: "ollama"
     model: "deepseek-r1:1.5b"
-    thinking_budget: "1024"
+    thinking_budget: 1024
   
   haiku:
     provider: "anthropic"
     model: "claude-haiku-4-5"
-    thinking_budget: "1024"
+    thinking_budget: 1024
   
   sonnet:
     provider: "anthropic"
     model: "claude-sonnet-4-5"
-    thinking_budget: "1024"
+    thinking_budget: 1024
   
   gpt-5:
     provider: "copilot"
