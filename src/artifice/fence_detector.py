@@ -42,7 +42,7 @@ class StreamingFenceDetector:
         self._lang_buffer = ""
         self._pending_buffer = ""  # Text to add to current block
         self._chunk_buffer = ""  # Accumulates text for current chunk to display
-        self._current_lang = "python"
+        self._current_lang = "bash"
         self._current_block: BaseBlock | None = (
             None  # The block we're currently appending to
         )
@@ -205,7 +205,7 @@ class StreamingFenceDetector:
         """Process language line after opening fence."""
         if ch == "\n":
             # Language line complete - start code block
-            lang = self._lang_buffer.strip() or "python"
+            lang = self._lang_buffer.strip() or "bash"
             # Normalize language aliases
             lang = _LANG_ALIASES.get(lang, lang)
             self._current_lang = lang

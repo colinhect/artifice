@@ -15,7 +15,7 @@ from textual.widget import Widget
 from textual.widgets import LoadingIndicator, Static
 
 from .assistant import AssistantBase, create_assistant
-from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor
+from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor, TmuxShellExecutor
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
 from .terminal_output import (
@@ -92,7 +92,7 @@ class ArtificeTerminal(Widget):
         self._config = app.config
 
         self._executor = CodeExecutor()
-        self._shell_executor = ShellExecutor()
+        self._shell_executor = TmuxShellExecutor("hect:artifice.1", prompt_pattern="^colin@lucidity:\\S+\\$ ")
 
         # Set shell init script from config
         if self._config.shell_init_script:
@@ -286,7 +286,8 @@ class ArtificeTerminal(Widget):
             markdown_enabled, in_context
         )
 
-        executor = self._shell_executor if language == "bash" else self._executor
+        #executor = self._shell_executor if language == "bash" else self._executor
+        executor = self._shell_executor
         result = await executor.execute(code, on_output=on_output, on_error=on_error)
         flush_output()  # Ensure any remaining buffered output is rendered
 
