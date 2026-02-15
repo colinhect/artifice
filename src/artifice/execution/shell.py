@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import os
-import pty
 import re
-import shlex
 import tempfile
 import traceback
+
 from typing import Callable, Optional
 
 from .common import ExecutionStatus, ExecutionResult
@@ -120,180 +119,197 @@ class ShellExecutor:
 
         return result
 
-    async def _execute_pty(
+
+class TmuxShellExecutor:
+    """Executes commands by sending them to an existing tmux session.
+
+    Output is captured via `tmux pipe-pane` streaming to a temp file.
+    Command completion is detected by the shell prompt reappearing, and
+    the exit code is retrieved by a follow-up `echo $?`.
+
+    Security Note: Commands run with full user permissions in the target
+    tmux session without sandboxing. Only execute commands from trusted sources.
+    """
+
+    def __init__(self, target: str, prompt_pattern: str) -> None:
+        """Initialize with a tmux target string and prompt pattern.
+
+        Args:
+            target: A tmux target like 'session:window' or 'session:window.pane'.
+            prompt_pattern: Regex matching the shell prompt (used with re.MULTILINE).
+                Example: r"^colin@lucidity:\\S+\\$ " for a prompt like "colin@lucidity:~$ ".
+        """
+        self.target = target
+        self.prompt_re = re.compile(prompt_pattern, re.MULTILINE)
+
+    @staticmethod
+    def _strip_escapes(text: str) -> str:
+        """Strip ANSI/OSC escape sequences and carriage returns from terminal output."""
+        text = re.sub(r"\x1b\].*?(?:\x1b\\|\x07)", "", text)
+        text = re.sub(r"\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]", "", text)
+        text = re.sub(r"\x1b.", "", text)
+        text = text.replace("\r", "")
+        return text
+
+    async def _run_tmux(self, *args: str) -> tuple[int, str, str]:
+        """Run a tmux command and return (returncode, stdout, stderr)."""
+        proc = await asyncio.create_subprocess_exec(
+            "tmux",
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        return (
+            proc.returncode or 0,
+            stdout.decode("utf-8", errors="replace"),
+            stderr.decode("utf-8", errors="replace"),
+        )
+
+    def _read_content(self, tmpfile: str) -> str:
+        """Read and clean the pipe-pane output file."""
+        with open(tmpfile, "r", errors="replace") as f:
+            return self._strip_escapes(f.read())
+
+    async def execute(
         self,
         command: str,
         on_output: Optional[Callable[[str], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
+        timeout: Optional[float] = None,
     ) -> ExecutionResult:
-        """Execute a shell command using PTY for terminal emulation.
+        """Execute a command in the tmux target with streaming output.
 
-        The command is executed with a pseudo-TTY to ensure color output is preserved.
+        Sends the command, detects completion when the prompt reappears,
+        then queries the exit code with `echo $?`.
 
         Args:
             command: The shell command string to execute.
-            on_output: Optional callback invoked for each stdout line.
-            on_error: Optional callback invoked for each stderr line.
+            on_output: Optional callback invoked for each chunk of output.
+            on_error: Optional callback invoked for error messages.
+            timeout: Optional timeout in seconds. None means no timeout.
 
         Returns:
             ExecutionResult with status (SUCCESS/ERROR), output, and any errors.
         """
         result = ExecutionResult(code=command, status=ExecutionStatus.RUNNING)
-        init_file = None
+        tmpfile = None
 
         try:
-            # Create a pseudo-terminal to make commands think they're in a real terminal
-            master_fd, slave_fd = pty.openpty()
+            # Validate target exists
+            rc, _, err = await self._run_tmux(
+                "has-session", "-t", self.target.split(":")[0]
+            )
+            if rc != 0:
+                result.status = ExecutionStatus.ERROR
+                result.error = f"tmux session not found: {err.strip()}"
+                if on_error:
+                    on_error(result.error)
+                return result
 
-            # Always use shell mode to preserve working directory changes
-            use_shell = True
+            # Create temp file for pipe-pane output
+            tmpfd, tmpfile = tempfile.mkstemp(prefix="artifice_tmux_")
+            os.close(tmpfd)
 
-            # Set TERM environment variable to enable color
-            env = os.environ.copy()
-            env["TERM"] = env.get("TERM", "xterm-256color")
+            # Start output capture and send command
+            await self._run_tmux("pipe-pane", "-t", self.target, f"cat >> {tmpfile}")
+            await self._run_tmux("send-keys", "-t", self.target, command, "Enter")
 
-            # Prepare the actual command to execute
-            if self.init_script and use_shell:
-                # Write a complete script that includes init + command + pwd capture
-                # This is the most reliable way to handle aliases
-                init_file = tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".sh", delete=False
-                )
-                init_file.write("#!/bin/bash\n")
-                init_file.write("shopt -s expand_aliases\n")
-                init_file.write(self.init_script)
-                init_file.write("\n")
-                init_file.write(command)
-                init_file.write("\n")
-                init_file.write('echo "###ARTIFICE_PWD###$(pwd)###"\n')
-                init_file.close()
-                os.chmod(init_file.name, 0o700)
-                wrapped_command = init_file.name
-            else:
-                # Append pwd capture to the command
-                if use_shell:
-                    wrapped_command = f'cd "{self.working_directory}" && {command} ; echo "###ARTIFICE_PWD###$(pwd)###"'
-                else:
-                    wrapped_command = command
+            # Phase 1: Capture command output until prompt reappears
+            streamed_len = 0
+            cmd_echo_end = -1
+            poll_interval = 0.05
+            elapsed = 0.0
 
-            if use_shell:
-                # Use shell for commands with shell metacharacters
-                process = await asyncio.create_subprocess_shell(
-                    wrapped_command,
-                    stdin=slave_fd,
-                    stdout=slave_fd,
-                    stderr=slave_fd,
-                    env=env,
-                    cwd=self.working_directory,
-                    start_new_session=True,
-                )
-            else:
-                # Parse command into arguments to avoid shell injection
-                try:
-                    args = shlex.split(command)
-                except ValueError as e:
-                    # If command parsing fails, return error immediately
-                    os.close(master_fd)
-                    os.close(slave_fd)
+            while True:
+                if timeout is not None and elapsed >= timeout:
                     result.status = ExecutionStatus.ERROR
-                    result.error = f"Invalid command syntax: {e}"
+                    result.error = f"Command timed out after {timeout}s"
                     if on_error:
                         on_error(result.error)
                     return result
+                await asyncio.sleep(poll_interval)
+                elapsed += poll_interval
 
-                # Create subprocess with argument list (more secure than shell=True)
-                process = await asyncio.create_subprocess_exec(
-                    *args,
-                    stdin=slave_fd,
-                    stdout=slave_fd,
-                    stderr=slave_fd,
-                    env=env,
-                    cwd=self.working_directory,
-                    start_new_session=True,
-                )
+                content = self._read_content(tmpfile)
 
-            # Close slave fd in parent process (child has its own copy)
-            os.close(slave_fd)
+                # Find command echo line end
+                if cmd_echo_end < 0:
+                    echo_pos = content.find(command)
+                    if echo_pos < 0:
+                        continue
+                    nl = content.find("\n", echo_pos)
+                    if nl < 0:
+                        continue
+                    cmd_echo_end = nl + 1
 
-            # Read output from master fd
-            output_buffer = []
+                body = content[cmd_echo_end:]
 
-            async def read_pty_output():
-                """Read all output from the PTY."""
-                loop = asyncio.get_event_loop()
-                while True:
-                    try:
-                        # Read from master fd in non-blocking way
-                        data = await loop.run_in_executor(
-                            None, os.read, master_fd, 4096
-                        )
-                        if not data:
-                            break
-                        text = data.decode("utf-8", errors="replace")
-                        output_buffer.append(text)
-                        # Filter out the marker from live output
-                        if on_output:
-                            filtered_text = re.sub(
-                                r"###ARTIFICE_PWD###[^#]+###\r?\n?", "", text
-                            )
-                            if filtered_text:
-                                on_output(filtered_text)
-                    except OSError:
-                        # PTY closed
-                        break
+                # Look for prompt after command output
+                prompt_match = self.prompt_re.search(body)
+                if prompt_match:
+                    command_output = body[: prompt_match.start()].rstrip("\n")
+                    if len(command_output) > streamed_len and on_output:
+                        on_output(command_output[streamed_len:])
+                    result.output = command_output
+                    break
+                else:
+                    if len(body) > streamed_len:
+                        chunk = body[streamed_len:]
+                        streamed_len = len(body)
+                        if chunk and on_output:
+                            on_output(chunk)
 
-            # Start reading output
-            read_task = asyncio.create_task(read_pty_output())
-
-            try:
-                # Wait for process to complete
-                await process.wait()
-
-                # Wait for all output to be read
-                await read_task
-            except asyncio.CancelledError:
-                # Cancel the read task
-                read_task.cancel()
-                # Terminate the process
-                try:
-                    process.terminate()
-                    await asyncio.wait_for(process.wait(), timeout=1.0)
-                except asyncio.TimeoutError:
-                    process.kill()
-                    await process.wait()
-                result.status = ExecutionStatus.ERROR
-                result.error = "\n[Execution cancelled]\n"
-                if on_error:
-                    on_error(result.error)
-                raise
-            finally:
-                # Close master fd
-                try:
-                    os.close(master_fd)
-                except OSError:
-                    pass  # Already closed
-
-            # Collect results
-            full_output = "".join(output_buffer)
-
-            # Extract and remove the working directory marker
-            # The marker format is: ###ARTIFICE_PWD###/path/to/dir###
-            pwd_match = re.search(r"###ARTIFICE_PWD###([^#]+)###", full_output)
-            if pwd_match:
-                new_pwd = pwd_match.group(1).strip()
-                if new_pwd and os.path.isdir(new_pwd):
-                    self.working_directory = new_pwd
-
-            # Remove the entire marker line from output (including newlines)
-            full_output = re.sub(r"###ARTIFICE_PWD###[^#]+###\r?\n?", "", full_output)
-
-            result.output = full_output
-            result.status = (
-                ExecutionStatus.SUCCESS
-                if process.returncode == 0
-                else ExecutionStatus.ERROR
+            # Phase 2: Query exit code
+            content_before_len = len(self._read_content(tmpfile))
+            await self._run_tmux(
+                "send-keys", "-t", self.target, "echo $?", "Enter"
             )
 
+            while True:
+                if timeout is not None and elapsed >= timeout:
+                    result.status = ExecutionStatus.ERROR
+                    result.error = f"Command timed out after {timeout}s"
+                    if on_error:
+                        on_error(result.error)
+                    return result
+                await asyncio.sleep(poll_interval)
+                elapsed += poll_interval
+
+                content = self._read_content(tmpfile)
+                new_content = content[content_before_len:]
+
+                prompt_match = self.prompt_re.search(new_content)
+                if not prompt_match:
+                    continue
+
+                # Parse exit code between "echo $?" echo and prompt
+                before_prompt = new_content[: prompt_match.start()]
+                echo_pos = before_prompt.find("echo $?")
+                if echo_pos < 0:
+                    continue
+                nl = before_prompt.find("\n", echo_pos)
+                if nl < 0:
+                    continue
+                exit_str = before_prompt[nl + 1 :].strip()
+                try:
+                    exit_code = int(exit_str)
+                except ValueError:
+                    exit_code = -1
+
+                result.status = (
+                    ExecutionStatus.SUCCESS
+                    if exit_code == 0
+                    else ExecutionStatus.ERROR
+                )
+                break
+
+        except asyncio.CancelledError:
+            result.status = ExecutionStatus.ERROR
+            result.error = "\n[Execution cancelled]\n"
+            if on_error:
+                on_error(result.error)
+            raise
         except Exception as e:
             result.status = ExecutionStatus.ERROR
             result.exception = e
@@ -304,11 +320,15 @@ class ShellExecutor:
             if on_error:
                 on_error(error_text)
         finally:
-            # Clean up temporary init file if created
-            if init_file:
+            try:
+                await self._run_tmux("pipe-pane", "-t", self.target)
+            except Exception:
+                pass
+            if tmpfile:
                 try:
-                    os.unlink(init_file.name)
-                except Exception:
-                    pass  # Ignore cleanup errors
+                    os.unlink(tmpfile)
+                except OSError:
+                    pass
 
         return result
+
