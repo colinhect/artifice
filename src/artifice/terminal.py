@@ -132,6 +132,7 @@ class ArtificeTerminal(Widget):
         self._thinking_block: ThinkingOutputBlock | None = None  # Active thinking block
         self._chunk_buf = ChunkBuffer(self.call_later, self._drain_chunks)
         self._thinking_buf = ChunkBuffer(self.call_later, self._drain_thinking)
+        self._stream_paused = False
 
         def on_connect(_):
             self.connection_status.add_class("connected")
@@ -193,20 +194,20 @@ class ArtificeTerminal(Widget):
         self.input.clear()
 
         async def do_execute():
+            language = ""
             if event.is_assistant_prompt:
                 await self._handle_assistant_prompt(code)
+                return
             elif event.is_shell_command:
-                result = await self._execute_code(
-                    code, language="bash", in_context=self._auto_send_to_assistant
-                )
-                if self._auto_send_to_assistant:
-                    await self._send_execution_result_to_assistant(code, result)
+                language = "bash"
             else:
-                result = await self._execute_code(
-                    code, language="python", in_context=self._auto_send_to_assistant
-                )
-                if self._auto_send_to_assistant:
-                    await self._send_execution_result_to_assistant(code, result)
+                language = "python"
+
+            result = await self._execute_code(
+                code, language=language, in_context=self._auto_send_to_assistant
+            )
+            if self._auto_send_to_assistant:
+                await self._send_execution_result_to_assistant(code, language, result)
 
         self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
 
@@ -286,8 +287,7 @@ class ArtificeTerminal(Widget):
             markdown_enabled, in_context
         )
 
-        #executor = self._shell_executor if language == "bash" else self._executor
-        executor = self._shell_executor
+        executor = self._shell_executor if language == "bash" else self._executor
         result = await executor.execute(code, on_output=on_output, on_error=on_error)
         flush_output()  # Ensure any remaining buffered output is rendered
 
@@ -390,6 +390,7 @@ class ArtificeTerminal(Widget):
             self.output,
             self.output.auto_scroll,
             save_callback=self._save_block_to_session,
+            pause_after_code=True,
         )
         self._detector_started = False
 
@@ -440,14 +441,13 @@ class ArtificeTerminal(Widget):
             self.input.add_class("in-context")
 
     async def _send_execution_result_to_assistant(
-        self, code: str, result: ExecutionResult
+        self, code: str, language: str, result: ExecutionResult
     ) -> None:
         """Send execution results back to the assistant and split the response."""
         if self._assistant is not None:
             prompt = (
-                "Executed:\n```\n"
-                + code
-                + "```\n\nOutput:\n"
+                f"Executed: <{language}>{code}</{language}>"
+                + "\n\nOutput:\n"
                 + result.output
                 + result.error
                 + "\n"
@@ -511,7 +511,7 @@ class ArtificeTerminal(Widget):
             block.update_status(state["result"])
             if self._auto_send_to_assistant:
                 state["sent_to_assistant"] = True
-                await self._send_execution_result_to_assistant(code, state["result"])
+                await self._send_execution_result_to_assistant(code, language, state["result"])
 
         def cleanup():
             if state["result"]:
@@ -546,6 +546,21 @@ class ArtificeTerminal(Widget):
                 self._current_detector.feed(text)
             # Schedule scroll after layout refresh so Markdown widget height is recalculated
             self.call_after_refresh(lambda: self.output.scroll_end(animate=False))
+
+            # Check if detector paused after a code block
+            if self._current_detector.is_paused:
+                self._chunk_buf.pause()
+                self._stream_paused = True
+                # Highlight the code block that just completed
+                code_block = self._current_detector.last_code_block
+                if code_block is not None:
+                    try:
+                        idx = self.output._blocks.index(code_block)
+                        self.output._highlighted_index = idx
+                        self.output._update_highlight()
+                        self.output.focus()
+                    except ValueError:
+                        pass
         except Exception:
             logger.exception("Error processing chunk buffer")
 
@@ -565,6 +580,65 @@ class ArtificeTerminal(Widget):
             self.output.scroll_end(animate=False)
         except Exception:
             logger.exception("Error processing thinking buffer")
+
+    def _resume_stream(self) -> None:
+        """Resume streaming after a pause-on-code-block."""
+        self._stream_paused = False
+        # Restore assistant status
+        if self._config.assistants:
+            assistant = self._config.assistants.get(self._config.assistant)
+            if assistant:
+                self.assistant_status.update(
+                    f"{assistant.get('model').lower()} ({assistant.get('provider').lower()})"
+                )
+            else:
+                self.assistant_status.update("")
+        else:
+            self.assistant_status.update("")
+        # Feed detector's remainder
+        if self._current_detector:
+            self._current_detector.resume()
+        # Resume chunk buffer (will flush any accumulated chunks)
+        self._chunk_buf.resume()
+
+    async def _execute_paused_code_block(self) -> None:
+        """Execute the code block that triggered the pause, then resume."""
+        if not self._current_detector:
+            self._resume_stream()
+            return
+        code_block = self._current_detector.last_code_block
+        if code_block is None or not isinstance(code_block, CodeInputBlock):
+            self._resume_stream()
+            return
+        code = code_block.get_code()
+        mode = code_block.get_mode()
+        language = "bash" if mode == "shell" else "python"
+        await self._execute_code(
+            code,
+            language=language,
+            code_input_block=code_block,
+            in_context=self._auto_send_to_assistant,
+        )
+        self._resume_stream()
+
+    def on_key(self, event) -> None:
+        """Handle key events, including pause-state shortcuts."""
+        if not self._stream_paused:
+            return
+        if event.key == "enter":
+            event.prevent_default()
+            event.stop()
+            asyncio.create_task(self._execute_paused_code_block())
+        elif event.key == "s":
+            event.prevent_default()
+            event.stop()
+            self._resume_stream()
+        elif event.key == "c":
+            event.prevent_default()
+            event.stop()
+            self._stream_paused = False
+            self.assistant_status.update("")
+            self.action_cancel_execution()
 
     def action_clear(self) -> None:
         """Clear the output."""
@@ -625,6 +699,16 @@ class ArtificeTerminal(Widget):
             self.input.add_class("in-context")
         else:
             self.input.remove_class("in-context")
+
+    def on_terminal_input_prompt_selected(self, event: TerminalInput.PromptSelected) -> None:
+        """Handle prompt template selection: append to assistant's system prompt."""
+        if self._assistant is not None:
+            if self._assistant.system_prompt:
+                self._assistant.system_prompt += "\n\n" + event.content
+            else:
+                self._assistant.system_prompt = event.content
+            self._assistant.prompt_updated()
+            self.app.notify(f"Loaded prompt: {event.name}")
 
     def action_clear_assistant_context(self) -> None:
         """Clear the assistant's conversation context and unhighlight all in-context blocks."""

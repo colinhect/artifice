@@ -293,6 +293,58 @@ class TestIncompleteBlocks:
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 0
 
+    def test_tags_inside_backtick_spans_ignored(self):
+        """Tags inside inline backtick code spans should not trigger detection."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Use `<python>` to write code")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 0
+        assert "`<python>`" in d.all_blocks[0]._text
+
+    def test_tags_inside_triple_backtick_spans_ignored(self):
+        """Tags inside triple-backtick code spans should not trigger detection."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Example: ```<shell>ls</shell>``` is how you run it")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 0
+
+    def test_tag_after_backtick_span_still_works(self):
+        """Real tags after a backtick span should still be detected."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Use `<python>` like this:\n<python>x = 1</python>")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "x = 1" in code_blocks[0]._code
+
+    def test_shell_tag_inside_backtick_ignored(self):
+        """<shell> inside backticks should not create a code block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("The `<shell>` tag runs bash commands")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 0
+
+    def test_think_tag_inside_backtick_ignored(self):
+        """<think> inside backticks should not create a thinking block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("The `<think>` tag is for reasoning")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 0
+
 
 class TestWhitespaceStripping:
     def test_newline_after_closing_code_tag_stripped(self):
@@ -572,3 +624,180 @@ class TestThinkTagDetection:
 
         # Verify all are marked as successful
         assert all(b._success for b in thinking_blocks)
+
+
+class TestDetailTagDetection:
+    def test_simple_detail_tag(self):
+        """Basic <detail>...</detail> detection creates a thinking block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Before<detail>detail content</detail>After")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 1
+        assert "detail content" in thinking_blocks[0]._text
+
+    def test_detail_tag_with_newlines(self):
+        """Detail tags can span multiple lines."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Before\n<detail>\nline 1\nline 2\n</detail>\nAfter")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 1
+        assert "line 1" in thinking_blocks[0]._text
+        assert "line 2" in thinking_blocks[0]._text
+
+    def test_detail_tag_split_across_chunks(self):
+        """Detail tags split across feed() calls should still be detected."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Text<det")
+        d.feed("ail>thinking")
+        d.feed("</det")
+        d.feed("ail>")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 1
+        assert "thinking" in thinking_blocks[0]._text
+
+    def test_detail_does_not_close_with_think(self):
+        """</think> should NOT close a <detail> block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("<detail>content</think>still detail</detail>After")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) >= 1
+        # The </think> text should be inside the thinking block, not closing it
+        combined = "".join(b._text for b in thinking_blocks)
+        assert "</think>" in combined
+        assert "still detail" in combined
+
+    def test_think_does_not_close_with_detail(self):
+        """</detail> should NOT close a <think> block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("<think>content</detail>still thinking</think>After")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) >= 1
+        combined = "".join(b._text for b in thinking_blocks)
+        assert "</detail>" in combined
+        assert "still thinking" in combined
+
+    def test_detail_inside_backtick_ignored(self):
+        """<detail> inside backticks should not create a thinking block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("The `<detail>` tag is for details")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 0
+
+    def test_detail_and_code_together(self):
+        """<detail> and code tags can coexist."""
+        d, out = make_detector()
+        d.start()
+        d.feed("<detail>reasoning</detail>\n<python>code</python>Done")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(thinking_blocks) == 1
+        assert len(code_blocks) == 1
+        assert "reasoning" in thinking_blocks[0]._text
+        assert "code" in code_blocks[0]._code
+
+    def test_state_transitions_with_detail(self):
+        """State machine transitions correctly with detail tags."""
+        d, _ = make_detector()
+        d.start()
+        assert d._state == _FenceState.PROSE
+
+        d.feed("<detail>")
+        assert d._state == _FenceState.THINKING
+
+        d.feed("content</detail>")
+        assert d._state == _FenceState.PROSE
+
+
+class TestPauseAfterCodeBlock:
+    def make_pausing_detector(self):
+        """Create a detector with pause_after_code enabled."""
+        output = FakeOutput()
+        detector = StreamingFenceDetector(
+            output, auto_scroll=True, pause_after_code=True
+        )
+        detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
+        detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
+        detector._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
+        return detector, output
+
+    def test_pauses_after_code_block(self):
+        """Detector pauses after a code block closes."""
+        d, out = self.make_pausing_detector()
+        d.start()
+        d.feed("Hello<python>x=1</python>After code")
+        assert d.is_paused
+        assert d._remainder == "After code"
+
+    def test_last_code_block_set(self):
+        """last_code_block is set to the block that triggered the pause."""
+        d, out = self.make_pausing_detector()
+        d.start()
+        d.feed("Hello<python>x=1</python>rest")
+        assert d.last_code_block is not None
+        assert isinstance(d.last_code_block, FakeCodeBlock)
+        assert "x=1" in d.last_code_block._code
+
+    def test_resume_feeds_remainder(self):
+        """resume() processes the saved remainder text."""
+        d, out = self.make_pausing_detector()
+        d.start()
+        d.feed("Hello<python>x=1</python>After text")
+        assert d.is_paused
+
+        d.resume()
+        # After resume, paused should be False (no more code blocks in remainder)
+        assert not d.is_paused
+        # The "After text" should now be in a prose block
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
+        combined = "".join(b._text for b in prose_blocks)
+        assert "After text" in combined
+
+    def test_resume_with_second_code_block(self):
+        """resume() pauses again if remainder contains another code block."""
+        d, out = self.make_pausing_detector()
+        d.start()
+        d.feed("Hello<python>first</python>Middle<shell>ls</shell>End")
+        assert d.is_paused
+        assert "Middle<shell>ls</shell>End" == d._remainder
+
+        d.resume()
+        # Should pause again on second code block
+        assert d.is_paused
+        assert "End" == d._remainder
+
+    def test_no_pause_without_flag(self):
+        """Default detector (no pause_after_code) does not pause."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Hello<python>x=1</python>After")
+        assert not d.is_paused
+
+    def test_pause_with_split_tag(self):
+        """Pause works correctly when closing tag is split across chunks."""
+        d, out = self.make_pausing_detector()
+        d.start()
+        d.feed("Hello<python>x=1</py")
+        assert not d.is_paused  # Tag not complete yet
+        d.feed("thon>After")
+        assert d.is_paused
+        assert d._remainder == "After"

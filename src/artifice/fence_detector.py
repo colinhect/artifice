@@ -14,7 +14,7 @@ from .terminal_output import (
 
 _CODE_OPEN_TAGS = {"<python>": "python", "<shell>": "bash"}
 _CODE_CLOSE_TAGS = {"python": "</python>", "bash": "</shell>"}
-_PROSE_TAG_TARGETS = ["<think>", "<python>", "<shell>"]
+_PROSE_TAG_TARGETS = ["<think>", "<detail>", "<python>", "<shell>"]
 
 
 class _FenceState(enum.Enum):
@@ -33,10 +33,14 @@ class StreamingFenceDetector:
     Creates blocks as tags are detected, accumulating text to update once per chunk.
     """
 
-    def __init__(self, output: TerminalOutput, auto_scroll, save_callback=None) -> None:
+    def __init__(self, output: TerminalOutput, auto_scroll, save_callback=None, pause_after_code: bool = False) -> None:
         self._output = output
         self._auto_scroll = auto_scroll
         self._save_callback = save_callback  # Callback to save blocks to session
+        self._pause_after_code = pause_after_code
+        self._paused = False
+        self._remainder = ""
+        self._last_code_block: BaseBlock | None = None
         self._state = _FenceState.PROSE
         self._pending_buffer = ""  # Text to add to current block
         self._chunk_buffer = ""  # Accumulates text for current chunk to display
@@ -51,6 +55,11 @@ class StreamingFenceDetector:
             ""  # Tracks current line in PROSE for blank line detection
         )
         self._strip_leading_whitespace = False  # Strip whitespace after closing tags
+        self._current_thinking_close_tag = "</think>"  # Tracks which close tag to match
+        # Backtick tracking - skip tag detection inside inline code spans
+        self._in_backtick = False
+        self._backtick_count = 0  # Counts consecutive backticks for opening
+        self._backtick_closer = 0  # Number of backticks needed to close
         # Tag detection
         self._tag_buffer = ""  # Buffer for detecting tags
         # Factory methods for block creation (can be overridden for testing)
@@ -66,6 +75,24 @@ class StreamingFenceDetector:
         )
         self._make_thinking_block = lambda: ThinkingOutputBlock(activity=True)
 
+    @property
+    def is_paused(self) -> bool:
+        """True if processing paused after a code block closed."""
+        return self._paused
+
+    @property
+    def last_code_block(self) -> BaseBlock | None:
+        """The most recently completed CodeInputBlock."""
+        return self._last_code_block
+
+    def resume(self) -> None:
+        """Resume processing after a pause, feeding any saved remainder."""
+        self._paused = False
+        remainder = self._remainder
+        self._remainder = ""
+        if remainder:
+            self.feed(remainder)
+
     def start(self) -> None:
         """Create the initial AssistantOutputBlock for streaming prose."""
         self._current_block = self._make_prose_block(activity=True)
@@ -74,10 +101,18 @@ class StreamingFenceDetector:
         self.first_assistant_block = self._current_block
 
     def feed(self, text: str) -> None:
-        """Process a chunk of streaming text, creating blocks as needed."""
+        """Process a chunk of streaming text, creating blocks as needed.
+
+        If pause_after_code is enabled and a code block closes, processing
+        stops early and remaining text is saved in _remainder.
+        """
         self._chunk_buffer = ""  # Reset for this chunk
-        for ch in text:
+        for i, ch in enumerate(text):
             self._feed_char(ch)
+            if self._paused:
+                # Save unprocessed remainder (chars after current one)
+                self._remainder = text[i + 1:]
+                break
         # Flush any pending text to the chunk buffer for display
         self._flush_pending_to_chunk()
         # Update current block with accumulated chunk text
@@ -131,6 +166,33 @@ class StreamingFenceDetector:
             self._update_current_block_with_chunk()
             self._chunk_buffer = ""
 
+    def _handle_backtick(self, ch: str) -> bool:
+        """Track backtick spans. Returns True if the character was consumed."""
+        if ch == "`":
+            if self._in_backtick:
+                # Inside a backtick span - count consecutive backticks
+                self._backtick_count += 1
+                if self._backtick_count >= self._backtick_closer:
+                    # Closing backtick sequence found
+                    self._in_backtick = False
+                    self._backtick_count = 0
+                    self._backtick_closer = 0
+                return False  # Still add to pending buffer
+            else:
+                # Not inside a span - count opening backticks
+                self._backtick_count += 1
+                return False
+        else:
+            if not self._in_backtick and self._backtick_count > 0:
+                # We had backticks followed by non-backtick - enter backtick span
+                self._backtick_closer = self._backtick_count
+                self._backtick_count = 0
+                self._in_backtick = True
+            elif self._in_backtick:
+                # Non-backtick inside span - reset consecutive backtick count
+                self._backtick_count = 0
+            return False
+
     def _feed_prose(self, ch: str) -> None:
         """Process prose text, looking for opening code tags or think tag."""
         # Strip leading whitespace after closing tags
@@ -139,17 +201,25 @@ class StreamingFenceDetector:
                 return
             self._strip_leading_whitespace = False
 
-        # Check for tags (<think>, <python>, <shell>)
-        if self._tag_buffer or ch == "<":
+        # Track backtick spans
+        self._handle_backtick(ch)
+
+        # Check for tags (<think>, <python>, <shell>) - skip inside backtick spans
+        if not self._in_backtick and (self._tag_buffer or ch == "<"):
             result = self._check_tags(ch, _PROSE_TAG_TARGETS)
-            if result == "<think>":
-                # Complete <think> tag detected
+            if result in ("<think>", "<detail>"):
+                # Complete thinking/detail tag detected
                 self._flush_pending_to_chunk()
                 self._flush_and_update_chunk()
 
                 # Mark current prose block as complete
                 if isinstance(self._current_block, AssistantOutputBlock):
                     self._current_block.mark_success()
+
+                # Track which close tag to match
+                self._current_thinking_close_tag = (
+                    "</think>" if result == "<think>" else "</detail>"
+                )
 
                 # Create new thinking block
                 self._current_block = self._make_thinking_block()
@@ -226,9 +296,12 @@ class StreamingFenceDetector:
                 self._flush_pending_to_chunk()
                 self._flush_and_update_chunk()
 
-                # Start new prose block
+                # Capture as the last completed code block
                 if isinstance(self._current_block, CodeInputBlock):
+                    self._last_code_block = self._current_block
                     self._current_block.finish_streaming()
+
+                # Start new prose block
                 self._current_block = self._make_prose_block(activity=True)
                 self._output.append_block(self._current_block)
                 self.all_blocks.append(self._current_block)
@@ -236,17 +309,21 @@ class StreamingFenceDetector:
                 self._current_line_buffer = ""
                 self._strip_leading_whitespace = True
                 self._state = _FenceState.PROSE
+
+                # Pause after code block if enabled
+                if self._pause_after_code:
+                    self._paused = True
             return
 
         # Regular code character
         self._pending_buffer += ch
 
     def _feed_thinking(self, ch: str) -> None:
-        """Process thinking text, looking for closing </think> tag."""
-        # Check for </think> tag
+        """Process thinking text, looking for closing </think> or </detail> tag."""
+        # Check for the matching close tag
         if self._tag_buffer or ch == "<":
-            result = self._check_tags(ch, ["</think>"])
-            if result == "</think>":
+            result = self._check_tags(ch, [self._current_thinking_close_tag])
+            if result == self._current_thinking_close_tag:
                 # Complete </think> tag detected
                 self._flush_pending_to_chunk()
                 self._flush_and_update_chunk()

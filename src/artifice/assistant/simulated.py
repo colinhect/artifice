@@ -52,6 +52,9 @@ class SimulatedAssistant(AssistantBase):
             provider=self._provider, system_prompt=system_prompt
         )
 
+    def prompt_updated(self):
+        pass
+
     def default_scenarios_and_response(self):
         """Configure default test scenarios."""
         self._provider._setup_default_scenarios()

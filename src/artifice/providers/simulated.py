@@ -11,66 +11,198 @@ from .provider import ProviderBase, ProviderResponse
 
 logger = logging.getLogger(__name__)
 
-_TEST_MARKDOWN = """
-Here's an example of how to organize multiple sections with Markdown, using headers, lists, and formatted text:
+_RESP_PROJECT_STRUCTURE = """\
+Let me take a look at the project layout.
 
----
+<shell>find . -type f -name "*.py" | head -20</shell>
 
-## Introduction
-This section introduces the topic. Markdown provides a simple way to structure content using **headers**, *italics*, and other formatting options.
-- Easy to read
-- Lightweight syntax
-- Converts to HTML
+That will give us an overview of the Python files. While we wait, here's what I'd typically expect in a well-structured project:
 
----
+- `src/` — main source code
+- `tests/` — test suite
+- `pyproject.toml` — build configuration
 
-## Methodology
-Here's how we'll approach the task:
-1. Use `##` for section headers
-2. Add **bold** or _italics_ for emphasis
-3. Create unordered/ordered lists
-4. Include code snippets:
+Let me also check if there's a config file:
 
-### 1 Code
+<shell>cat pyproject.toml</shell>
+
+Once we see the output, I can give you a more detailed breakdown of the architecture.\
+"""
+
+_RESP_DATA_ANALYSIS = """\
+Sure, let me write a quick analysis of that CSV data.
 
 <python>
-def example():
-       return "Hello, Markdown!"
+import pandas as pd
+
+df = pd.read_csv("data.csv")
+print(f"Shape: {df.shape}")
+print(f"\\nColumns: {list(df.columns)}")
+print(f"\\nFirst 5 rows:")
+print(df.head())
+print(f"\\nBasic statistics:")
+print(df.describe())
 </python>
 
-## Results
-Key findings from the experiment:
-- **Bold text** draws attention
-- _Italics_ are subtler than bold
-- [Link to a resource](https://example.com) demonstrates hyperlinks
-- Tables can also be added:
+That should give us a good starting point. If there are any **missing values** or **outliers**, we can handle those next. Common strategies include:
 
-| Feature       | Status  |
-|--------------|---------|
-| Headers      | ✅ Done |
-| Lists        | ✅ Done |
-| Links        | ✅ Done |
+1. **Drop** rows with nulls (`df.dropna()`)
+2. **Fill** with median/mean (`df.fillna(df.median())`)
+3. **Interpolate** for time-series data
 
----
+Let me know what you'd like to explore further.\
+"""
 
-## Discussion
-Markdown is versatile but has limitations. It's ideal for:
-- Writing documentation
-- Formatting README files
-- Publishing blog posts
-However, complex layouts (e.g., nested tables) may require HTML/CSS.
+_RESP_REFACTOR = """\
+I see a few things we can improve here. Let me first check the current test coverage:
 
----
+<shell>python -m pytest tests/ --co -q</shell>
 
-## Conclusion
-Summarize the main points:
-> "Simplicity is key in writing." – Unknown
+Now, the main issues I notice:
 
-Markdown balances readability and functionality, making it a great choice for structuring text across platforms.
+### 1. Extract repeated logic into a helper
 
----
+The `process_item()` function has duplicated validation. We can pull that out:
 
-This structure uses headers, lists, code blocks, tables, and inline formatting—key elements of Markdown's utility.
+<python>
+def validate_item(item: dict) -> bool:
+    \"\"\"Check that item has required fields and valid types.\"\"\"
+    required = ("name", "value", "timestamp")
+    if not all(k in item for k in required):
+        return False
+    if not isinstance(item["value"], (int, float)):
+        return False
+    return True
+</python>
+
+### 2. Use `pathlib` instead of `os.path`
+
+This is more idiomatic modern Python:
+
+```python
+# Before
+path = os.path.join(base_dir, "output", filename)
+
+# After
+path = Path(base_dir) / "output" / filename
+```
+
+### 3. Add type hints
+
+The function signatures are missing type annotations, which makes it harder for editors and linters to catch bugs.
+
+Let me know if you want me to apply these changes, or if you'd like to discuss the approach first.\
+"""
+
+_RESP_DEBUG = """\
+Alright, let's track this down. First, let me reproduce the error:
+
+<shell>python -m pytest tests/test_parser.py -x -v 2>&1 | tail -30</shell>
+
+Now let me check what the function is actually receiving:
+
+<python>
+import json
+
+# Reproduce the failing case
+test_input = {"entries": [{"id": 1, "value": None}, {"id": 2, "value": 42}]}
+print(json.dumps(test_input, indent=2))
+
+# The bug is likely here — we're not handling None values
+for entry in test_input["entries"]:
+    result = entry["value"] * 2  # TypeError when value is None
+    print(f"Entry {entry['id']}: {result}")
+</python>
+
+As I suspected — the code crashes on `None` values. The fix is straightforward:
+
+```python
+for entry in test_input["entries"]:
+    if entry["value"] is not None:
+        result = entry["value"] * 2
+```
+
+But we should also think about _why_ `None` is appearing here. It could mean:
+- The upstream API changed its contract
+- A database migration left null values
+- Input validation is missing
+
+Want me to apply the fix and add a test case for this edge case?\
+"""
+
+_RESP_SYSADMIN = """\
+Let me check a few things about the system state.
+
+<shell>df -h</shell>
+
+<shell>free -m</shell>
+
+Those will tell us about disk and memory usage. For a more complete picture, we can also look at running processes:
+
+<shell>ps aux --sort=-%mem | head -10</shell>
+
+| Resource | Warning Threshold | Critical Threshold |
+|----------|------------------|--------------------|
+| Disk     | 80%              | 95%                |
+| Memory   | 75%              | 90%                |
+| CPU      | 80% sustained    | 95% sustained      |
+
+> **Tip**: If disk usage is high, check for old log files with `du -sh /var/log/*` — they're often the culprit.
+
+Let me know what the output shows and I'll help you diagnose any issues.\
+"""
+
+_RESP_MARKDOWN_DEMO = """\
+Here's a showcase of different formatting options:
+
+## Text Formatting
+
+You can use **bold**, *italic*, ~~strikethrough~~, and `inline code`. For emphasis, combine them: ***bold italic***.
+
+## Lists
+
+Ordered:
+1. First item
+2. Second item
+3. Third item
+
+Unordered:
+- Alpha
+- Bravo
+  - Nested item
+  - Another nested
+- Charlie
+
+## Code Block
+
+<python>
+def fibonacci(n: int) -> list[int]:
+    \"\"\"Generate the first n Fibonacci numbers.\"\"\"
+    if n <= 0:
+        return []
+    fib = [0, 1]
+    for _ in range(2, n):
+        fib.append(fib[-1] + fib[-2])
+    return fib[:n]
+
+print(fibonacci(10))
+</python>
+
+## Blockquote
+
+> "Any fool can write code that a computer can understand. Good programmers write code that humans can understand."
+> — Martin Fowler
+
+## Table
+
+| Language   | Typing     | Use Case          |
+|------------|------------|-------------------|
+| Python     | Dynamic    | Data science, web |
+| Rust       | Static     | Systems, CLI      |
+| TypeScript | Static     | Web frontends     |
+| Go         | Static     | Cloud, networking |
+
+That covers the basics. Markdown is expressive enough for most documentation needs without being overwhelming.\
 """
 
 
@@ -110,39 +242,51 @@ class SimulatedProvider(ProviderBase):
         """Set up default test scenarios."""
         self.scenarios = [
             {
-                "pattern": r"markdown",
-                "response": _TEST_MARKDOWN,
-                "thinking": "Hmmm, this will take a while",
+                "pattern": r"structure|layout|project|files",
+                "response": _RESP_PROJECT_STRUCTURE,
+                "thinking": "The user wants to understand the project structure. I should explore the filesystem and explain what I find.",
             },
             {
-                "pattern": r"shell",
-                "response": "<shell>ls -al</shell>\n\nThat one lists all files in the directory",
-                "thinking": "I will test shell commands:",
+                "pattern": r"data|csv|analy|pandas",
+                "response": _RESP_DATA_ANALYSIS,
+                "thinking": "They want to analyze some data. I'll use pandas to load and summarize the CSV, then suggest next steps for cleaning.",
             },
             {
-                "pattern": r"hello|hi|hey",
-                "response": "Hello! I'm a **simulated** . How can I help you today?",
-                "thinking": "The user is greeting me. I should respond in a friendly manner and offer to help.",
+                "pattern": r"refactor|clean|improve|review",
+                "response": _RESP_REFACTOR,
+                "thinking": "Let me look at the code quality issues. I see duplicated validation logic, old-style path handling, and missing type hints. I'll prioritize by impact.",
             },
             {
-                "pattern": r"blank",
-                "response": '<python>\nimport time\ntime.sleep(3)\nresult = 10 + 5\nprint(f"The result is: {result}")\n</python>\n\nI can help with that calculation!\n\n<python>\nresult = 10 + 5\nprint(f"The result is: {result}")\n</python>\n\nThere it is, leave it or not',
-                "thinking": "Let me think about this problem. I need to write some Python code to demonstrate a calculation with a delay.",
+                "pattern": r"bug|error|fix|debug|crash|fail",
+                "response": _RESP_DEBUG,
+                "thinking": "There's a bug to track down. Let me first reproduce it, then inspect the failing input to understand the root cause before proposing a fix.",
             },
             {
-                "pattern": r"calculate|math|sum|add",
-                "response": 'I can help with that calculation!\n\n<python>\nresult = 10 + 5\nprint(f"The result is: {result}")\n</python>\n\nI can help with that calculation!\n\n<python>\nresult = 10 + 5\nprint(f"The result is: {result}")\n</python>\n\nThere it is, leave it or not',
-                "thinking": "The user wants me to perform a calculation. I should write Python code to compute the result and display it clearly.",
+                "pattern": r"disk|memory|system|server|process",
+                "response": _RESP_SYSADMIN,
+                "thinking": "They need system diagnostics. I'll check disk, memory, and top processes to identify any resource pressure.",
             },
             {
-                "pattern": r"goodbye|bye|exit",
-                "response": "Goodbye! Thanks for chatting with me.",
-                "thinking": "The user is saying goodbye. I should acknowledge and thank them for the conversation.",
+                "pattern": r"markdown|format|demo|test",
+                "response": _RESP_MARKDOWN_DEMO,
+                "thinking": "Let me put together a comprehensive markdown demo that exercises all the major formatting features — headers, lists, tables, code, and blockquotes.",
             },
         ]
 
-        self.default_response = "I'm not sure how to respond to that. Try asking about math or saying hello!"
-        self.default_thinking = "Hmm, I'm not sure how to respond to this. Let me think about what the user might be asking for."
+        self.default_response = (
+            "I'd be happy to help with that. Could you give me a bit more context?\n\n"
+            "Here are some things I can assist with:\n"
+            "- **Project exploration** — understanding codebases and file structure\n"
+            "- **Data analysis** — loading, cleaning, and summarizing datasets\n"
+            "- **Debugging** — tracking down errors and writing fixes\n"
+            "- **Code review** — suggesting refactors and improvements\n"
+            "- **System admin** — checking disk, memory, and processes\n\n"
+            "Just describe what you're working on and I'll dive in."
+        )
+        self.default_thinking = (
+            "The user's request doesn't match any of my specific scenarios. "
+            "I should offer some guidance on what I can help with."
+        )
 
     def configure_scenarios(self, scenarios: list[dict[str, Any]]) -> None:
         """Configure the provider with predefined scenarios.

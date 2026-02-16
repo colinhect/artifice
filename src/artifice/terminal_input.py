@@ -46,13 +46,13 @@ class PromptAutoComplete(AutoComplete):
         super().__init__(search_input, **kwargs)
 
     def apply_completion(self, value: str, state: TargetState) -> None:
-        """Load the selected prompt content into the input."""
+        """Load the selected prompt and append to system prompt."""
         content = load_prompt(value)
         if content is not None:
-            self._terminal_input.code = content.strip()
+            self._terminal_input.post_message(
+                TerminalInput.PromptSelected(name=value, content=content.strip())
+            )
         self._terminal_input._exit_prompt_search_mode()
-        # Switch to AI mode since prompts are for the assistant
-        self._terminal_input.set_mode("ai")
 
 
 class InputTextArea(TextArea):
@@ -199,6 +199,14 @@ class TerminalInput(Static):
         """Message requesting prompt template search interface."""
 
         pass
+
+    class PromptSelected(Message):
+        """Message sent when a prompt template is selected via / command."""
+
+        def __init__(self, name: str, content: str) -> None:
+            self.name = name
+            self.content = content
+            super().__init__()
 
     class Submitted(Message):
         """Message sent when code is submitted."""

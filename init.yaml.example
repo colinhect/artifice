@@ -6,13 +6,7 @@
 # ============================================================================
 # System Prompt
 # ============================================================================
-system_prompt: |
-  - You are collaborating with the user to interface with their Linux system with access to a bash shell and a Python session.
-  - All Python code or shell commands in your responses are interpreted as requests by you to execute that code. Make one request at a time.
-  - Do not over explain unless asked to. Explanations precede the code.
-  - If you give more than one option then the first is considered the main option.
-  - Always use ```python or ```shell to mark code or shell command.
-
+system_prompt: ""
 prompt_prefix: ""
 
 # ============================================================================

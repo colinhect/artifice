@@ -21,6 +21,8 @@ class AssistantResponse:
 class AssistantBase(ABC):
     """Base class for AI s."""
 
+    system_prompt: str | None = None
+
     @abstractmethod
     async def send_prompt(
         self,
@@ -38,6 +40,10 @@ class AssistantBase(ABC):
         Returns:
             AssistantResponse with the complete response.
         """
+        pass
+
+    @abstractmethod
+    def prompt_updated(self):
         pass
 
     @abstractmethod

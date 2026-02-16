@@ -24,6 +24,7 @@ class ChunkBuffer:
         self._scheduled: bool = False
         self._min_interval = min_interval
         self._last_drain_time: float = 0.0
+        self._paused: bool = False
 
     def append(self, text: str) -> None:
         """Add *text* to the buffer and schedule a drain if needed."""
@@ -45,8 +46,20 @@ class ChunkBuffer:
         """Schedule a flush after the specified delay."""
         asyncio.get_event_loop().call_later(delay, self._flush)
 
+    def pause(self) -> None:
+        """Pause draining - buffer keeps accumulating but won't flush."""
+        self._paused = True
+
+    def resume(self) -> None:
+        """Resume draining - triggers a flush if buffer has content."""
+        self._paused = False
+        if self._buffer:
+            self._flush()
+
     def _flush(self) -> None:
         self._scheduled = False
+        if self._paused:
+            return
         if self._buffer:
             text = self._buffer
             self._buffer = ""

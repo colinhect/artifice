@@ -38,9 +38,11 @@ class Assistant(AssistantBase):
         self.system_prompt = system_prompt
         self.openai_format = openai_format
         self.messages: list[dict] = []  # Conversation history
+        self.prompt_updated()
 
-        if openai_format and system_prompt:
-            self.messages = [{"role": "system", "content": system_prompt}]
+    def prompt_updated(self):
+        if self.openai_format and self.system_prompt:
+            self.messages = [{"role": "system", "content": self.system_prompt}]
 
     async def send_prompt(
         self,
@@ -98,6 +100,5 @@ class Assistant(AssistantBase):
     def clear_conversation(self):
         """Clear conversation history."""
         self.messages = []
-        if self.openai_format and self.system_prompt:
-            self.messages = [{"role": "system", "content": self.system_prompt}]
+        self.prompt_updated()
         logger.info("[Assistant] Conversation history cleared")

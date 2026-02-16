@@ -48,6 +48,9 @@ class CopilotAssistant(AssistantBase):
             provider=self._provider, system_prompt=system_prompt
         )
 
+    def prompt_updated(self):
+        self._assistant.prompt_updated()
+
     async def send_prompt(
         self,
         prompt: str,
