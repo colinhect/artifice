@@ -1,4 +1,4 @@
-"""Tests for StreamingFenceDetector - the code fence parser.
+"""Tests for StreamingFenceDetector - the code tag parser.
 
 Uses lightweight fakes instead of real Textual widgets to test
 the parsing state machine in isolation. We patch the isinstance
@@ -133,9 +133,9 @@ def make_detector(save_callback=None):
     return detector, output
 
 
-class TestBasicFenceDetection:
+class TestBasicTagDetection:
     def test_prose_only(self):
-        """Plain text without fences produces a single prose block."""
+        """Plain text without tags produces a single prose block."""
         d, out = make_detector()
         d.start()
         d.feed("Hello world, no code here.")
@@ -144,11 +144,11 @@ class TestBasicFenceDetection:
         assert isinstance(d.all_blocks[0], FakeAssistantBlock)
         assert "Hello world" in d.all_blocks[0]._text
 
-    def test_single_code_block(self):
-        """Standard code fence creates prose + code + prose blocks."""
+    def test_single_python_block(self):
+        """<python> tag creates prose + code + prose blocks."""
         d, out = make_detector()
         d.start()
-        d.feed("Here is code:\n```python\nprint('hi')\n```\nDone.")
+        d.feed("Here is code:<python>print('hi')</python>Done.")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
@@ -156,10 +156,22 @@ class TestBasicFenceDetection:
         assert "print('hi')" in code_blocks[0]._code
         assert code_blocks[0]._language == "python"
 
+    def test_single_shell_block(self):
+        """<shell> tag creates a bash code block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Run this:<shell>ls -la</shell>Done.")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "ls -la" in code_blocks[0]._code
+        assert code_blocks[0]._language == "bash"
+
     def test_multiple_code_blocks(self):
         d, out = make_detector()
         d.start()
-        d.feed("First:\n```python\nx = 1\n```\nSecond:\n```bash\nls -la\n```\nEnd.")
+        d.feed("First:<python>x = 1</python>Second:<shell>ls -la</shell>End.")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
@@ -172,7 +184,7 @@ class TestBasicFenceDetection:
     def test_code_with_prose_before_and_after(self):
         d, out = make_detector()
         d.start()
-        d.feed("Before\n```python\ncode\n```\nAfter")
+        d.feed("Before<python>code</python>After")
         d.finish()
 
         prose_blocks = [
@@ -185,59 +197,28 @@ class TestBasicFenceDetection:
         assert any("Before" in b._text for b in prose_blocks)
         assert any("After" in b._text for b in prose_blocks)
 
-
-class TestLanguageAliases:
-    def test_py_becomes_python(self):
+    def test_multiline_python_block(self):
+        """Code tags with newlines in code content."""
         d, out = make_detector()
         d.start()
-        d.feed("```py\ncode\n```")
+        d.feed("Code:\n<python>\nx = 1\ny = 2\nprint(x + y)\n</python>\nDone.")
         d.finish()
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert code_blocks[0]._language == "python"
 
-    def test_sh_becomes_bash(self):
-        d, out = make_detector()
-        d.start()
-        d.feed("```sh\necho hi\n```")
-        d.finish()
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert code_blocks[0]._language == "bash"
-
-    def test_shell_becomes_bash(self):
-        d, out = make_detector()
-        d.start()
-        d.feed("```shell\necho hi\n```")
-        d.finish()
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert code_blocks[0]._language == "bash"
-
-    def test_no_language_defaults_to_python(self):
-        d, out = make_detector()
-        d.start()
-        d.feed("```\ncode\n```")
-        d.finish()
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert code_blocks[0]._language == "python"
-
-    def test_unknown_language_preserved(self):
-        d, out = make_detector()
-        d.start()
-        d.feed("```rust\nfn main() {}\n```")
-        d.finish()
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert code_blocks[0]._language == "rust"
+        assert len(code_blocks) == 1
+        assert "x = 1" in code_blocks[0]._code
+        assert "y = 2" in code_blocks[0]._code
+        assert "print(x + y)" in code_blocks[0]._code
 
 
 class TestStreamingChunks:
-    def test_fence_split_across_chunks(self):
-        """Backticks arriving in separate chunks should still detect fence."""
+    def test_tag_split_across_chunks(self):
+        """Tags arriving in separate chunks should still be detected."""
         d, out = make_detector()
         d.start()
-        d.feed("Hello\n`")
-        d.feed("`")
-        d.feed("`python\nprint(1)\n`")
-        d.feed("``")
-        d.feed("\nDone")
+        d.feed("Hello<py")
+        d.feed("thon>print(1)</py")
+        d.feed("thon>Done")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
@@ -248,7 +229,7 @@ class TestStreamingChunks:
         """Feeding one character at a time should work correctly."""
         d, out = make_detector()
         d.start()
-        text = "Hi\n```python\nx=1\n```\nBye"
+        text = "Hi<python>x=1</python>Bye"
         for ch in text:
             d.feed(ch)
         d.finish()
@@ -261,7 +242,7 @@ class TestStreamingChunks:
         """Entire response in one feed() call."""
         d, out = make_detector()
         d.start()
-        d.feed("Try this:\n```python\nprint(42)\n```\nDone!")
+        d.feed("Try this:<python>print(42)</python>Done!")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
@@ -269,88 +250,141 @@ class TestStreamingChunks:
         assert "print(42)" in code_blocks[0]._code
 
 
-class TestIncompleteFences:
-    def test_incomplete_opening_fence(self):
-        """Incomplete fence at end of stream should be treated as prose."""
+class TestIncompleteBlocks:
+    def test_incomplete_opening_tag(self):
+        """Incomplete tag at end of stream should be treated as prose."""
         d, out = make_detector()
         d.start()
-        d.feed("Hello ```python")
+        d.feed("Hello <pyth")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 0
 
     def test_unclosed_code_block(self):
-        """Code block without closing fence keeps code in block."""
+        """Code block without closing tag keeps code in block."""
         d, out = make_detector()
         d.start()
-        d.feed("```python\nprint('hello')\n")
+        d.feed("<python>print('hello')\n")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
         assert "print('hello')" in code_blocks[0]._code
 
-    def test_trailing_backticks_not_fence(self):
-        """1-2 backticks in prose should remain as text, not start a fence."""
+    def test_angle_bracket_not_tag(self):
+        """< followed by non-tag text should remain as prose."""
         d, out = make_detector()
         d.start()
-        d.feed("Use `inline code` here")
+        d.feed("x < 5 and y > 3")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 0
-        assert "`inline code`" in d.all_blocks[0]._text
+        assert "x < 5" in d.all_blocks[0]._text
 
-    def test_two_backticks_not_fence(self):
+    def test_backticks_are_just_text(self):
+        """Backtick fences should be treated as plain text, not code fences."""
         d, out = make_detector()
         d.start()
-        d.feed("``not a fence``")
+        d.feed("Use ```python\ncode\n``` for formatting")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 0
 
 
-class TestStringAwareness:
-    def test_backticks_in_double_quoted_string(self):
-        """Backticks inside double-quoted string literals should not close the fence."""
-        d, out = make_detector()
+class TestWhitespaceStripping:
+    def test_newline_after_closing_code_tag_stripped(self):
+        """Whitespace after </python> should be stripped from the next prose block."""
+        d, _ = make_detector()
         d.start()
-        d.feed('```python\nx = "```"\nprint(x)\n```\nDone')
+        d.feed("<python>x = 1</python>\nNext text")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        # The prose after the code block should start with "Next", not "\n"
+        after_code = [b for b in prose_blocks if "Next text" in b._text]
+        assert len(after_code) == 1
+        assert after_code[0]._text.startswith("Next")
+
+    def test_multiple_whitespace_after_closing_tag_stripped(self):
+        """Multiple whitespace chars after closing tag should all be stripped."""
+        d, _ = make_detector()
+        d.start()
+        d.feed("<python>code</python>\n\n  After")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        after_code = [b for b in prose_blocks if "After" in b._text]
+        assert len(after_code) == 1
+        assert after_code[0]._text.startswith("After")
+
+    def test_whitespace_after_think_closing_tag_stripped(self):
+        """Whitespace after </think> should be stripped."""
+        d, _ = make_detector()
+        d.start()
+        d.feed("<think>thinking</think>\n\nVisible text")
+        d.finish()
+
+        prose_blocks = [
+            b for b in d.all_blocks
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        after_think = [b for b in prose_blocks if "Visible text" in b._text]
+        assert len(after_think) == 1
+        assert after_think[0]._text.startswith("Visible")
+
+    def test_no_stripping_within_prose(self):
+        """Normal whitespace within prose should not be affected."""
+        d, _ = make_detector()
+        d.start()
+        d.feed("Line one\n\nLine two")
+        d.finish()
+
+        # Should have split into multiple blocks on the empty line, as normal
+        prose_blocks = [
+            b for b in d.all_blocks
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        assert any("Line one" in b._text for b in prose_blocks)
+        assert any("Line two" in b._text for b in prose_blocks)
+
+    def test_tag_immediately_after_closing_tag(self):
+        """A new tag immediately after a closing tag (no whitespace) works."""
+        d, _ = make_detector()
+        d.start()
+        d.feed("<python>first</python><python>second</python>")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert "print(x)" in code_blocks[0]._code
-
-    def test_backticks_in_single_quoted_string(self):
-        d, out = make_detector()
-        d.start()
-        d.feed("```python\nx = '```'\nprint(x)\n```\nDone")
-        d.finish()
-
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert "print(x)" in code_blocks[0]._code
+        assert len(code_blocks) == 2
+        assert "first" in code_blocks[0]._code
+        assert "second" in code_blocks[1]._code
 
 
 class TestEmptyBlocks:
     def test_empty_prose_before_code_is_removed(self):
-        """If the response starts immediately with a fence, the empty prose is removed."""
+        """If the response starts immediately with a tag, the empty prose is removed."""
         d, out = make_detector()
         d.start()
-        d.feed("```python\nx = 1\n```")
+        d.feed("<python>x = 1</python>")
         d.finish()
 
         # Initial empty prose should have been removed from all_blocks
         assert d.first_assistant_block is None  # Was removed since it was empty
 
     def test_empty_trailing_prose_removed(self):
-        """Empty prose block after last code fence should be removed."""
+        """Empty prose block after last code tag should be removed."""
         d, out = make_detector()
         d.start()
-        d.feed("```python\nx = 1\n```")
+        d.feed("<python>x = 1</python>")
         d.finish()
 
         non_removed = [b for b in d.all_blocks if not b._removed]
@@ -365,22 +399,22 @@ class TestStateTransitions:
         d, _ = make_detector()
         assert d._state == _FenceState.PROSE
 
-    def test_opening_fence_transitions_to_lang_line(self):
+    def test_python_tag_transitions_to_code(self):
         d, _ = make_detector()
         d.start()
-        d.feed("```")
-        assert d._state == _FenceState.LANG_LINE
-
-    def test_newline_after_lang_transitions_to_code(self):
-        d, _ = make_detector()
-        d.start()
-        d.feed("```python\n")
+        d.feed("<python>")
         assert d._state == _FenceState.CODE
 
-    def test_closing_fence_transitions_to_prose(self):
+    def test_shell_tag_transitions_to_code(self):
         d, _ = make_detector()
         d.start()
-        d.feed("```python\ncode\n```")
+        d.feed("<shell>")
+        assert d._state == _FenceState.CODE
+
+    def test_closing_tag_transitions_to_prose(self):
+        d, _ = make_detector()
+        d.start()
+        d.feed("<python>code</python>")
         assert d._state == _FenceState.PROSE
 
 
@@ -389,7 +423,7 @@ class TestSaveCallback:
         saved = []
         d, _ = make_detector(save_callback=lambda b: saved.append(b))
         d.start()
-        d.feed("Hi\n```python\nx=1\n```\nBye")
+        d.feed("Hi<python>x=1</python>Bye")
         d.finish()
         assert len(saved) > 0
 
@@ -397,7 +431,7 @@ class TestSaveCallback:
         saved = []
         d, _ = make_detector(save_callback=lambda b: saved.append(b))
         d.start()
-        d.feed("Prose\n```python\ncode\n```\nMore prose")
+        d.feed("Prose<python>code</python>More prose")
         d.finish()
         types = {type(b) for b in saved}
         assert FakeAssistantBlock in types
@@ -466,10 +500,10 @@ class TestThinkTagDetection:
         assert "thinking without close" in thinking_blocks[0]._text
 
     def test_think_and_code_blocks_together(self):
-        """Think tags and code fences can coexist."""
+        """Think tags and code tags can coexist."""
         d, out = make_detector()
         d.start()
-        d.feed("<think>planning</think>\n```python\ncode\n```\nDone")
+        d.feed("<think>planning</think>\n<python>code</python>Done")
         d.finish()
 
         thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]

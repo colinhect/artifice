@@ -258,6 +258,10 @@ CodeInputBlock .code-unused {
     border: none;
 }
 
+CodeOutputBlock {
+    display: none;
+}
+
 CodeOutputBlock .code-output {
     background: $surface-darken-1;
     color: $foreground 66%;

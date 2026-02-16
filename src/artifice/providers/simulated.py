@@ -12,61 +12,61 @@ from .provider import ProviderBase, ProviderResponse
 logger = logging.getLogger(__name__)
 
 _TEST_MARKDOWN = """
-Here’s an example of how to organize multiple sections with Markdown, using headers, lists, and formatted text:
+Here's an example of how to organize multiple sections with Markdown, using headers, lists, and formatted text:
 
 ---
 
-## Introduction  
-This section introduces the topic. Markdown provides a simple way to structure content using **headers**, *italics*, and other formatting options.  
-- Easy to read  
-- Lightweight syntax  
-- Converts to HTML  
+## Introduction
+This section introduces the topic. Markdown provides a simple way to structure content using **headers**, *italics*, and other formatting options.
+- Easy to read
+- Lightweight syntax
+- Converts to HTML
 
 ---
 
-## Methodology  
-Here’s how we’ll approach the task:  
-1. Use `##` for section headers  
-2. Add **bold** or _italics_ for emphasis  
-3. Create unordered/ordered lists  
-4. Include code snippets with triple backticks:
+## Methodology
+Here's how we'll approach the task:
+1. Use `##` for section headers
+2. Add **bold** or _italics_ for emphasis
+3. Create unordered/ordered lists
+4. Include code snippets:
 
 ### 1 Code
 
-```python
-def example():  
+<python>
+def example():
        return "Hello, Markdown!"
-```
+</python>
 
-## Results  
-Key findings from the experiment:  
-- **Bold text** draws attention  
-- _Italics_ are subtler than bold  
-- [Link to a resource](https://example.com) demonstrates hyperlinks  
-- Tables can also be added:  
+## Results
+Key findings from the experiment:
+- **Bold text** draws attention
+- _Italics_ are subtler than bold
+- [Link to a resource](https://example.com) demonstrates hyperlinks
+- Tables can also be added:
 
-| Feature       | Status  |  
-|--------------|---------|  
-| Headers      | ✅ Done |  
-| Lists        | ✅ Done |  
-| Links        | ✅ Done |  
-
----
-
-## Discussion  
-Markdown is versatile but has limitations. It’s ideal for:  
-- Writing documentation  
-- Formatting README files  
-- Publishing blog posts  
-However, complex layouts (e.g., nested tables) may require HTML/CSS.  
+| Feature       | Status  |
+|--------------|---------|
+| Headers      | ✅ Done |
+| Lists        | ✅ Done |
+| Links        | ✅ Done |
 
 ---
 
-## Conclusion  
-Summarize the main points:  
-> "Simplicity is key in writing." – Unknown  
+## Discussion
+Markdown is versatile but has limitations. It's ideal for:
+- Writing documentation
+- Formatting README files
+- Publishing blog posts
+However, complex layouts (e.g., nested tables) may require HTML/CSS.
 
-Markdown balances readability and functionality, making it a great choice for structuring text across platforms.  
+---
+
+## Conclusion
+Summarize the main points:
+> "Simplicity is key in writing." – Unknown
+
+Markdown balances readability and functionality, making it a great choice for structuring text across platforms.
 
 ---
 
@@ -115,18 +115,23 @@ class SimulatedProvider(ProviderBase):
                 "thinking": "Hmmm, this will take a while",
             },
             {
+                "pattern": r"shell",
+                "response": "<shell>ls -al</shell>\n\nThat one lists all files in the directory",
+                "thinking": "I will test shell commands:",
+            },
+            {
                 "pattern": r"hello|hi|hey",
                 "response": "Hello! I'm a **simulated** . How can I help you today?",
                 "thinking": "The user is greeting me. I should respond in a friendly manner and offer to help.",
             },
             {
                 "pattern": r"blank",
-                "response": '```python\nimport time\ntime.sleep(3)\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
+                "response": '<python>\nimport time\ntime.sleep(3)\nresult = 10 + 5\nprint(f"The result is: {result}")\n</python>\n\nI can help with that calculation!\n\n<python>\nresult = 10 + 5\nprint(f"The result is: {result}")\n</python>\n\nThere it is, leave it or not',
                 "thinking": "Let me think about this problem. I need to write some Python code to demonstrate a calculation with a delay.",
             },
             {
                 "pattern": r"calculate|math|sum|add",
-                "response": 'I can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nI can help with that calculation!\n\n```python\nresult = 10 + 5\nprint(f"The result is: {result}")\n```\n\nThere it is, leave it or not',
+                "response": 'I can help with that calculation!\n\n<python>\nresult = 10 + 5\nprint(f"The result is: {result}")\n</python>\n\nI can help with that calculation!\n\n<python>\nresult = 10 + 5\nprint(f"The result is: {result}")\n</python>\n\nThere it is, leave it or not',
                 "thinking": "The user wants me to perform a calculation. I should write Python code to compute the result and display it clearly.",
             },
             {
