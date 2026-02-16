@@ -12,6 +12,8 @@ from textual.widgets import Static, TextArea, Input, LoadingIndicator
 from textual import events
 from textual_autocomplete import AutoComplete, DropdownItem, TargetState
 
+from .prompts import list_prompts, load_prompt, fuzzy_match
+
 if TYPE_CHECKING:
     from .history import History
 
@@ -32,6 +34,25 @@ class HistoryAutoComplete(AutoComplete):
         full_text = self._truncated_to_full.get(value, value)
         self._terminal_input.code = full_text
         self._terminal_input._exit_search_mode()
+
+
+class PromptAutoComplete(AutoComplete):
+    """AutoComplete for slash-command prompt templates."""
+
+    def __init__(
+        self, terminal_input: TerminalInput, search_input: Input, **kwargs
+    ) -> None:
+        self._terminal_input = terminal_input
+        super().__init__(search_input, **kwargs)
+
+    def apply_completion(self, value: str, state: TargetState) -> None:
+        """Load the selected prompt content into the input."""
+        content = load_prompt(value)
+        if content is not None:
+            self._terminal_input.code = content.strip()
+        self._terminal_input._exit_prompt_search_mode()
+        # Switch to AI mode since prompts are for the assistant
+        self._terminal_input.set_mode("ai")
 
 
 class InputTextArea(TextArea):
@@ -125,6 +146,12 @@ class InputTextArea(TextArea):
             event.stop()
             self.post_message(TerminalInput.SetMode(_EMPTY_INPUT_SHORTCUTS[event.key]))
             return
+        # Slash on empty input triggers prompt search
+        if not self.text.strip() and event.character == "/":
+            event.prevent_default()
+            event.stop()
+            self.post_message(TerminalInput.PromptSearchRequested())
+            return
         # Let parent handle other keys
         await super()._on_key(event)
 
@@ -168,6 +195,11 @@ class TerminalInput(Static):
 
         pass
 
+    class PromptSearchRequested(Message):
+        """Message requesting prompt template search interface."""
+
+        pass
+
     class Submitted(Message):
         """Message sent when code is submitted."""
 
@@ -200,8 +232,9 @@ class TerminalInput(Static):
         self.mode = "ai"
         self._history = history
         self._search_mode = False
+        self._prompt_search_mode = False
         self._search_input: Input | None = None
-        self._autocomplete: HistoryAutoComplete | None = None
+        self._autocomplete: AutoComplete | None = None
         self.add_class("in-context")
 
     def compose(self) -> ComposeResult:
@@ -414,10 +447,66 @@ class TerminalInput(Static):
         text_area.display = True
         text_area.focus()
 
+    def on_terminal_input_prompt_search_requested(
+        self, _: PromptSearchRequested
+    ) -> None:
+        """Handle / key to enter prompt search mode."""
+        self._enter_prompt_search_mode()
+
+    def _enter_prompt_search_mode(self) -> None:
+        """Enter prompt template search mode with autocomplete dropdown."""
+        prompts = list_prompts()
+        if not prompts:
+            return
+
+        if self._search_mode:
+            return
+
+        self._search_mode = True
+        self._prompt_search_mode = True
+
+        text_area = self.query_one("#code-input", InputTextArea)
+        horizontal = self.query_one(Horizontal)
+
+        text_area.display = False
+
+        self._search_input = Input(
+            placeholder="Search prompts...", id="prompt-search-input"
+        )
+        horizontal.mount(self._search_input)
+
+        prompt_names = sorted(prompts.keys())
+
+        def get_prompt_candidates(state: TargetState) -> list[DropdownItem]:
+            query = state.text.strip()
+            if not query:
+                return [DropdownItem(main=name) for name in prompt_names]
+            return [
+                DropdownItem(main=name)
+                for name in prompt_names
+                if fuzzy_match(query, name)
+            ]
+
+        self._autocomplete = PromptAutoComplete(
+            terminal_input=self,
+            search_input=self._search_input,
+            candidates=get_prompt_candidates,
+        )
+        self.screen.mount(self._autocomplete)
+        self._search_input.focus()
+
+    def _exit_prompt_search_mode(self) -> None:
+        """Exit prompt search mode."""
+        self._prompt_search_mode = False
+        self._exit_search_mode()
+
     def on_key(self, event: events.Key) -> None:
         """Handle key events for exiting search mode."""
         if self._search_mode and event.key == "escape":
-            self._exit_search_mode()
+            if self._prompt_search_mode:
+                self._exit_prompt_search_mode()
+            else:
+                self._exit_search_mode()
             event.prevent_default()
             event.stop()
 
