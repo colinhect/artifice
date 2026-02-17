@@ -109,6 +109,10 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
             config.assistant = data["assistant"]
         if "assistants" in data:
             config.assistants = data["assistants"]
+        if "tmux_target" in data:
+            config.tmux_target = data["tmux_target"]
+        if "tmux_prompt_pattern" in data:
+            config.tmux_prompt_pattern = data["tmux_prompt_pattern"]
         if "system_prompt" in data:
             config.system_prompt = data["system_prompt"]
         if "prompt_prefix" in data:
@@ -160,6 +164,8 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
             "shell_init_script",
             "save_sessions",
             "sessions_dir",
+            "tmux_target",
+            "tmux_prompt_pattern",
         }
         for key, value in data.items():
             if key not in known_keys:

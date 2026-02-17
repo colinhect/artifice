@@ -11,7 +11,7 @@ prompt_prefix: ""
 
 # TMUX integration
 tmux_target: "session:window.pane"
-tmux_prompt: "^\S+@\S+:\S+\$ "
+tmux_prompt_pattern: '^\S+@\S+:\S+\$ '
 
 # ============================================================================
 # Assistant Configuration

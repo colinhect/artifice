@@ -186,7 +186,7 @@ Unordered:
 
 ## Code Block
 
-<python>
+```python
 def fibonacci(n: int) -> list[int]:
     \"\"\"Generate the first n Fibonacci numbers.\"\"\"
     if n <= 0:
@@ -197,7 +197,7 @@ def fibonacci(n: int) -> list[int]:
     return fib[:n]
 
 print(fibonacci(10))
-</python>
+```
 
 ## Blockquote
 

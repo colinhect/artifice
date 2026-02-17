@@ -77,7 +77,7 @@ def create_assistant(
             model=model, system_prompt=config.system_prompt, on_connect=on_connect
         )
     elif provider.lower() == "simulated":
-        assistant = SimulatedAssistant(response_delay=0.005, on_connect=on_connect)
+        assistant = SimulatedAssistant(response_delay=0.0005, on_connect=on_connect)
         assistant.default_scenarios_and_response()
         return assistant
     else:

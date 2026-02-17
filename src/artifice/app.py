@@ -1,4 +1,5 @@
 import argparse
+import sys
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -101,6 +102,11 @@ def main():
     # Load configuration from ~/.config/artifice/init.yaml
     config, config_error = load_config()
 
+    # Exit immediately if config failed to load
+    if config_error:
+        print(f"\n❌ Configuration Error:\n{config_error}\n", file=sys.stderr)
+        sys.exit(1)
+
     # Auto-load system prompt from prompts/system.md if not set in config
     if config.system_prompt is None:
         system_prompt_content = load_prompt("system")
@@ -132,14 +138,6 @@ def main():
         logging.getLogger("artifice.assistant").setLevel(logging.DEBUG)
 
     app = ArtificeApp(config)
-
-    # Show config error if any (as a notification once app starts)
-    if config_error:
-        app.call_later(
-            lambda: app.notify(
-                f"Config error: {config_error}", severity="warning", timeout=10
-            )
-        )
 
     if args.fullscreen:
         app.run()

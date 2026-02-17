@@ -259,7 +259,7 @@ CodeInputBlock .code-unused {
 }
 
 CodeOutputBlock {
-    display: none;
+    /*display: none;*/
 }
 
 CodeOutputBlock .code-output {
