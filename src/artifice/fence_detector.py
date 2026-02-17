@@ -352,44 +352,63 @@ class StreamingFenceDetector:
 
     def _feed_code(self, ch: str) -> None:
         """Process code text, looking for closing tag (</python> or </shell>) or closing fence (```)."""
-        # If we're in a markdown fence, look for closing ```
+        # If we're in a markdown fence, look for closing ``` at start of line
         if self._in_markdown_fence:
             if ch == "`":
-                self._fence_close_backtick_count += 1
-                if self._fence_close_backtick_count == 3:
-                    # We've seen three backticks - this closes the fence
-                    # Remove any trailing newline from code before the closing fence
-                    if self._pending_buffer.endswith("\n"):
-                        self._pending_buffer = self._pending_buffer[:-1]
+                # Check if we're at start of line before starting fence close detection
+                # We need to look at pending_buffer to see what's on the current line
+                # Split by newline and check if the last line (current line) is whitespace-only
+                lines = self._pending_buffer.split("\n")
+                current_line_in_pending = lines[-1] if lines else ""
 
-                    # Flush pending code (without the closing backticks)
-                    self._flush_pending_to_chunk()
-                    self._flush_and_update_chunk()
+                # Only detect closing fence if at start of line
+                if current_line_in_pending.strip() == "":
+                    self._fence_close_backtick_count += 1
+                    if self._fence_close_backtick_count == 3:
+                        # We've seen three backticks at start of line - this closes the fence
+                        # Remove any trailing newline from code before the closing fence
+                        if self._pending_buffer.endswith("\n"):
+                            self._pending_buffer = self._pending_buffer[:-1]
 
-                    # Mark as last completed code block
-                    if isinstance(self._current_block, CodeInputBlock):
-                        self._last_code_block = self._current_block
-                        self._current_block.finish_streaming()
+                        # Flush pending code (without the closing backticks)
+                        self._flush_pending_to_chunk()
+                        self._flush_and_update_chunk()
 
-                    # Reset fence state
-                    self._in_markdown_fence = False
-                    self._fence_close_backtick_count = 0
+                        # Mark as last completed code block
+                        if isinstance(self._current_block, CodeInputBlock):
+                            self._last_code_block = self._current_block
+                            self._current_block.finish_streaming()
 
-                    # Start new prose block
-                    self._current_block = self._make_prose_block(activity=True)
-                    self._output.append_block(self._current_block)
-                    self.all_blocks.append(self._current_block)
+                        # Reset fence state
+                        self._in_markdown_fence = False
+                        self._fence_close_backtick_count = 0
 
-                    self._current_line_buffer = ""
-                    self._strip_leading_whitespace = True
-                    self._state = _FenceState.PROSE
+                        # Start new prose block
+                        self._current_block = self._make_prose_block(activity=True)
+                        self._output.append_block(self._current_block)
+                        self.all_blocks.append(self._current_block)
 
-                    # Pause after code block if enabled
-                    if self._pause_after_code:
-                        self._paused = True
-                return
+                        self._current_line_buffer = ""
+                        self._strip_leading_whitespace = True
+                        self._state = _FenceState.PROSE
+
+                        # Pause after code block if enabled
+                        if self._pause_after_code:
+                            self._paused = True
+                    # Don't add backtick to pending - we're accumulating them for fence detection
+                    return
+                else:
+                    # Backtick not at start of line - it's part of code content
+                    # First, add any accumulated fence-close backticks from start of line
+                    if self._fence_close_backtick_count > 0:
+                        self._pending_buffer += "`" * self._fence_close_backtick_count
+                        self._fence_close_backtick_count = 0
+                    # Add current backtick as regular code content
+                    self._pending_buffer += ch
+                    return
             elif self._fence_close_backtick_count > 0:
-                # We had some backticks but not 3 - add them as code
+                # We had some backticks at start of line but got interrupted by non-backtick
+                # Add them as code content
                 self._pending_buffer += "`" * self._fence_close_backtick_count
                 self._fence_close_backtick_count = 0
                 # Fall through to add current character

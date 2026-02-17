@@ -290,7 +290,7 @@ class TestIncompleteBlocks:
         """Markdown code fences should create code blocks like XML tags."""
         d, out = make_detector()
         d.start()
-        d.feed("Use ```python\ncode\n``` for formatting")
+        d.feed("Use ```python\ncode\n```\nfor formatting")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
