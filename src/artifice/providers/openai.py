@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from typing import Callable, Optional
 
 from openai import OpenAI
@@ -75,6 +76,7 @@ class OpenAICompatibleProvider(ProviderBase):
 
             # Run synchronous streaming in executor to avoid blocking
             loop = asyncio.get_running_loop()
+            cancelled = threading.Event()
 
             def sync_stream():
                 """Synchronously stream from OpenAI-compatible API."""
@@ -88,6 +90,9 @@ class OpenAICompatibleProvider(ProviderBase):
                 thinking_text = ""
                 chunk_count = 0
                 for chunk in stream:
+                    if cancelled.is_set():
+                        break
+
                     if chunk.choices and len(chunk.choices) > 0:
                         delta = chunk.choices[0].delta
 
@@ -111,9 +116,13 @@ class OpenAICompatibleProvider(ProviderBase):
 
                 return text, thinking_text, chunk_count
 
-            text, thinking_text, chunk_count = await loop.run_in_executor(
-                None, sync_stream
-            )
+            try:
+                text, thinking_text, chunk_count = await loop.run_in_executor(
+                    None, sync_stream
+                )
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
 
             if thinking_text:
                 logger.info(

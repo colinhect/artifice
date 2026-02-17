@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import threading
 from typing import Callable, Optional
 
 from .provider import ProviderBase, ProviderResponse
@@ -75,6 +76,7 @@ class OllamaProvider(ProviderBase):
         try:
             client = self._get_client()
             loop = asyncio.get_running_loop()
+            cancelled = threading.Event()
 
             def sync_stream():
                 """Synchronously stream from Ollama with thinking support."""
@@ -99,20 +101,23 @@ class OllamaProvider(ProviderBase):
 
                 stop_reason = None
                 for chunk in stream:
+                    if cancelled.is_set():
+                        break
+
                     if "message" in chunk:
                         # Regular content
                         content = chunk["message"].get("content", "")
                         if content:
                             chunks.append(content)
                             if on_chunk:
-                                on_chunk(content)
+                                loop.call_soon_threadsafe(on_chunk, content)
 
                         # Thinking content (separate field from Ollama API)
                         thinking = chunk["message"].get("thinking", "")
                         if thinking:
                             thinking_chunks.append(thinking)
                             if on_thinking_chunk:
-                                on_thinking_chunk(thinking)
+                                loop.call_soon_threadsafe(on_thinking_chunk, thinking)
 
                     # Check if this is the final chunk
                     if chunk.get("done", False):
@@ -122,9 +127,13 @@ class OllamaProvider(ProviderBase):
                 return "".join(chunks), stop_reason, thinking_text
 
             # Execute streaming in thread pool
-            text, stop_reason, thinking_text = await loop.run_in_executor(
-                None, sync_stream
-            )
+            try:
+                text, stop_reason, thinking_text = await loop.run_in_executor(
+                    None, sync_stream
+                )
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
 
             return ProviderResponse(
                 text=text,

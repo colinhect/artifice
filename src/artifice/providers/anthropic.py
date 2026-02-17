@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import threading
 from typing import Callable, Optional
 
 from .provider import ProviderBase, ProviderResponse
@@ -79,6 +80,7 @@ class AnthropicProvider(ProviderBase):
         try:
             client = self._get_client()
             loop = asyncio.get_running_loop()
+            cancelled = threading.Event()
 
             def sync_stream():
                 """Synchronously stream from Claude."""
@@ -105,15 +107,19 @@ class AnthropicProvider(ProviderBase):
 
                 if self.thinking_budget:
                     return self._stream_with_thinking(
-                        client, api_params, chunks, loop, on_chunk, on_thinking_chunk
+                        client, api_params, chunks, loop, on_chunk, on_thinking_chunk, cancelled
                     )
                 else:
                     return self._stream_text_only(
-                        client, api_params, chunks, loop, on_chunk
+                        client, api_params, chunks, loop, on_chunk, cancelled
                     )
 
             # Execute streaming in thread pool
-            result = await loop.run_in_executor(None, sync_stream)
+            try:
+                result = await loop.run_in_executor(None, sync_stream)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
             text, stop_reason, thinking_text, content_blocks = result
 
             return ProviderResponse(
@@ -129,10 +135,12 @@ class AnthropicProvider(ProviderBase):
             error_msg = f"Error communicating with Claude: {e}"
             return ProviderResponse(text="", error=error_msg)
 
-    def _stream_text_only(self, client, api_params, chunks, loop, on_chunk):
+    def _stream_text_only(self, client, api_params, chunks, loop, on_chunk, cancelled):
         """Stream using text_stream (no thinking)."""
         with client.messages.stream(**api_params) as stream:
             for text in stream.text_stream:
+                if cancelled.is_set():
+                    break
                 chunks.append(text)
                 if on_chunk:
                     loop.call_soon_threadsafe(on_chunk, text)
@@ -140,13 +148,15 @@ class AnthropicProvider(ProviderBase):
         return "".join(chunks), message.stop_reason, None, None
 
     def _stream_with_thinking(
-        self, client, api_params, chunks, loop, on_chunk, on_thinking_chunk
+        self, client, api_params, chunks, loop, on_chunk, on_thinking_chunk, cancelled
     ):
         """Stream with extended thinking support, capturing both thinking and text deltas."""
         thinking_chunks = []
 
         with client.messages.stream(**api_params) as stream:
             for event in stream:
+                if cancelled.is_set():
+                    break
                 if event.type == "content_block_delta":
                     delta = event.delta
                     if delta.type == "thinking_delta":

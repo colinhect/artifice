@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Callable, Optional
 
@@ -66,12 +67,18 @@ class Assistant(AssistantBase):
             logger.info(f"[Assistant] Sending prompt: {prompt[:100]}...")
 
         # Delegate to provider
-        response = await self.provider.send(
-            messages=self.messages,
-            system_prompt=self.system_prompt,
-            on_chunk=on_chunk,
-            on_thinking_chunk=on_thinking_chunk,
-        )
+        try:
+            response = await self.provider.send(
+                messages=self.messages,
+                system_prompt=self.system_prompt,
+                on_chunk=on_chunk,
+                on_thinking_chunk=on_thinking_chunk,
+            )
+        except asyncio.CancelledError:
+            # Remove the orphaned user message on cancellation
+            if self.messages and self.messages[-1].get("role") == "user":
+                self.messages.pop()
+            raise
 
         # Handle errors
         if response.error:

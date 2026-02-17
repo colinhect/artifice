@@ -401,6 +401,7 @@ class ArtificeTerminal(Widget):
             save_callback=self._save_block_to_session,
             pause_after_code=True,
         )
+
         def on_chunk(text):
             self.post_message(StreamChunk(text))
 
@@ -411,9 +412,15 @@ class ArtificeTerminal(Widget):
             prompt = self._config.prompt_prefix + " " + prompt
 
         self._set_assistant_active()
-        response = await assistant.send_prompt(
-            prompt, on_chunk=on_chunk, on_thinking_chunk=on_thinking_chunk
-        )
+        try:
+            response = await assistant.send_prompt(
+                prompt, on_chunk=on_chunk, on_thinking_chunk=on_thinking_chunk
+            )
+        except asyncio.CancelledError:
+            self._set_assistant_inactive()
+            self._finalize_stream()
+            self._current_detector = None
+            raise
         self._set_assistant_inactive()
 
         self._finalize_stream()
