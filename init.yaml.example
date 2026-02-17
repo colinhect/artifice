@@ -9,6 +9,10 @@
 system_prompt: ""
 prompt_prefix: ""
 
+# TMUX integration
+tmux_target: "session:window.pane"
+tmux_prompt: "^\S+@\S+:\S+\$ "
+
 # ============================================================================
 # Assistant Configuration
 # ============================================================================
