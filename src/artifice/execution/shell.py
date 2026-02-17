@@ -124,23 +124,28 @@ class TmuxShellExecutor:
     """Executes commands by sending them to an existing tmux session.
 
     Output is captured via `tmux pipe-pane` streaming to a temp file.
-    Command completion is detected by the shell prompt reappearing, and
-    the exit code is retrieved by a follow-up `echo $?`.
+    Command completion is detected by the shell prompt reappearing. If
+    check_exit_code is True, the exit code is retrieved by a follow-up
+    `echo $?`. Otherwise, seeing the prompt is assumed to be success.
 
     Security Note: Commands run with full user permissions in the target
     tmux session without sandboxing. Only execute commands from trusted sources.
     """
 
-    def __init__(self, target: str, prompt_pattern: str) -> None:
+    def __init__(
+        self, target: str, prompt_pattern: str, check_exit_code: bool = False
+    ) -> None:
         """Initialize with a tmux target string and prompt pattern.
 
         Args:
             target: A tmux target like 'session:window' or 'session:window.pane'.
             prompt_pattern: Regex matching the shell prompt (used with re.MULTILINE).
                 Example: r"^colin@lucidity:\\S+\\$ " for a prompt like "colin@lucidity:~$ ".
+            check_exit_code: Whether to check exit code with `echo $?` (default False).
         """
         self.target = target
         self.prompt_re = re.compile(prompt_pattern, re.MULTILINE)
+        self.check_exit_code = check_exit_code
 
     @staticmethod
     def _strip_escapes(text: str) -> str:
@@ -266,45 +271,51 @@ class TmuxShellExecutor:
                         if chunk and on_output:
                             on_output(chunk)
 
-            # Phase 2: Query exit code
-            content_before_len = len(self._read_content(tmpfile))
-            await self._run_tmux("send-keys", "-t", self.target, "echo $?", "Enter")
+            # Phase 2: Query exit code (if enabled)
+            if self.check_exit_code:
+                content_before_len = len(self._read_content(tmpfile))
+                await self._run_tmux("send-keys", "-t", self.target, "echo $?", "Enter")
 
-            while True:
-                if timeout is not None and elapsed >= timeout:
-                    result.status = ExecutionStatus.ERROR
-                    result.error = f"Command timed out after {timeout}s"
-                    if on_error:
-                        on_error(result.error)
-                    return result
-                await asyncio.sleep(poll_interval)
-                elapsed += poll_interval
+                while True:
+                    if timeout is not None and elapsed >= timeout:
+                        result.status = ExecutionStatus.ERROR
+                        result.error = f"Command timed out after {timeout}s"
+                        if on_error:
+                            on_error(result.error)
+                        return result
+                    await asyncio.sleep(poll_interval)
+                    elapsed += poll_interval
 
-                content = self._read_content(tmpfile)
-                new_content = content[content_before_len:]
+                    content = self._read_content(tmpfile)
+                    new_content = content[content_before_len:]
 
-                prompt_match = self.prompt_re.search(new_content)
-                if not prompt_match:
-                    continue
+                    prompt_match = self.prompt_re.search(new_content)
+                    if not prompt_match:
+                        continue
 
-                # Parse exit code between "echo $?" echo and prompt
-                before_prompt = new_content[: prompt_match.start()]
-                echo_pos = before_prompt.find("echo $?")
-                if echo_pos < 0:
-                    continue
-                nl = before_prompt.find("\n", echo_pos)
-                if nl < 0:
-                    continue
-                exit_str = before_prompt[nl + 1 :].strip()
-                try:
-                    exit_code = int(exit_str)
-                except ValueError:
-                    exit_code = -1
+                    # Parse exit code between "echo $?" echo and prompt
+                    before_prompt = new_content[: prompt_match.start()]
+                    echo_pos = before_prompt.find("echo $?")
+                    if echo_pos < 0:
+                        continue
+                    nl = before_prompt.find("\n", echo_pos)
+                    if nl < 0:
+                        continue
+                    exit_str = before_prompt[nl + 1 :].strip()
+                    try:
+                        exit_code = int(exit_str)
+                    except ValueError:
+                        exit_code = -1
 
-                result.status = (
-                    ExecutionStatus.SUCCESS if exit_code == 0 else ExecutionStatus.ERROR
-                )
-                break
+                    result.status = (
+                        ExecutionStatus.SUCCESS
+                        if exit_code == 0
+                        else ExecutionStatus.ERROR
+                    )
+                    break
+            else:
+                # Assume success when prompt appears
+                result.status = ExecutionStatus.SUCCESS
 
         except asyncio.CancelledError:
             result.status = ExecutionStatus.ERROR

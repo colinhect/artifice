@@ -18,18 +18,22 @@ class OutputCallbackHandler:
         in_context: bool,
         save_callback: Callable[[BaseBlock], None] | None,
         schedule_fn: Callable[[Callable], None],
+        use_code_block: bool = True,
     ):
         self._output = output
         self._markdown_enabled = markdown_enabled
         self._in_context = in_context
         self._save_callback = save_callback
         self._schedule_fn = schedule_fn
+        self._use_code_block = use_code_block
         self._block: CodeOutputBlock | None = None
         self._flush_scheduled = False
         self._saved = False
 
-    def _ensure_block(self) -> CodeOutputBlock:
+    def _ensure_block(self) -> CodeOutputBlock | None:
         """Lazily create output block on first output."""
+        if not self._use_code_block:
+            return None
         if self._block is None:
             from .terminal_output import CodeOutputBlock
 
@@ -58,13 +62,17 @@ class OutputCallbackHandler:
 
     def on_output(self, text: str) -> None:
         """Handle stdout text from execution."""
-        self._ensure_block().append_output(text)
-        self._schedule_flush()
+        block = self._ensure_block()
+        if block:
+            block.append_output(text)
+            self._schedule_flush()
 
     def on_error(self, text: str) -> None:
         """Handle stderr text from execution."""
-        self._ensure_block().append_error(text)
-        self._schedule_flush()
+        block = self._ensure_block()
+        if block:
+            block.append_error(text)
+            self._schedule_flush()
 
     def flush(self) -> None:
         """Force flush any remaining buffered output."""

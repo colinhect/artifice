@@ -103,7 +103,9 @@ class ArtificeTerminal(Widget):
         if self._config.tmux_target:
             prompt_pattern = self._config.tmux_prompt_pattern or r"^\$ "
             self._shell_executor = TmuxShellExecutor(
-                self._config.tmux_target, prompt_pattern=prompt_pattern
+                self._config.tmux_target,
+                prompt_pattern=prompt_pattern,
+                check_exit_code=self._config.tmux_echo_exit_code,
             )
         else:
             self._shell_executor = ShellExecutor()
@@ -230,7 +232,9 @@ class ArtificeTerminal(Widget):
 
         self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
 
-    def _make_output_callbacks(self, markdown_enabled: bool, in_context: bool = False):
+    def _make_output_callbacks(
+        self, markdown_enabled: bool, in_context: bool = False, use_code_block: bool = True
+    ):
         """Create on_output/on_error/flush callbacks that lazily create a CodeOutputBlock.
 
         Returns (on_output, on_error, flush) — call flush() after execution to
@@ -242,6 +246,7 @@ class ArtificeTerminal(Widget):
             in_context=in_context,
             save_callback=self._save_block_to_session,
             schedule_fn=self.call_later,
+            use_code_block=use_code_block,
         )
 
         # Mark block in context if needed
@@ -251,7 +256,7 @@ class ArtificeTerminal(Widget):
 
             def ensure_and_track():
                 block = original_ensure()
-                if block not in self._context_blocks:
+                if block is not None and block not in self._context_blocks:
                     self._context_blocks.append(block)
                 return block
 
@@ -281,13 +286,21 @@ class ArtificeTerminal(Widget):
             self.output.append_block(code_input_block)
             self._save_block_to_session(code_input_block)
 
-        markdown_enabled = (
-            self._shell_markdown_enabled
-            if language == "bash"
-            else self._python_markdown_enabled
-        )
+        # Determine markdown and code block settings
+        if language == "bash":
+            markdown_enabled = self._shell_markdown_enabled
+            # Check if using tmux or regular shell
+            use_code_block = (
+                self._config.tmux_output_code_block
+                if isinstance(self._shell_executor, TmuxShellExecutor)
+                else self._config.shell_output_code_block
+            )
+        else:
+            markdown_enabled = self._python_markdown_enabled
+            use_code_block = self._config.python_output_code_block
+
         on_output, on_error, flush_output = self._make_output_callbacks(
-            markdown_enabled, in_context
+            markdown_enabled, in_context, use_code_block
         )
 
         executor = self._shell_executor if language == "bash" else self._executor

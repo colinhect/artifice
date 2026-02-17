@@ -38,6 +38,11 @@ class ArtificeConfig:
         self.assistant_markdown: bool = True
         self.shell_markdown: bool = False
 
+        # Output code block settings (whether to wrap output in CodeOutputBlock)
+        self.shell_output_code_block: bool = True
+        self.tmux_output_code_block: bool = False
+        self.python_output_code_block: bool = True
+
         # Auto-send settings
         self.auto_send_to_assistant: bool = True
 
@@ -47,6 +52,7 @@ class ArtificeConfig:
         # Tmux settings
         self.tmux_target: Optional[str] = None
         self.tmux_prompt_pattern: Optional[str] = None
+        self.tmux_echo_exit_code: bool = False  # Whether to check exit code with echo $?
 
         # Session settings
         self.save_sessions: bool = True
@@ -134,6 +140,16 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
         if "shell_markdown" in data:
             config.shell_markdown = data["shell_markdown"]
 
+        # Output code block settings
+        if "shell_output_code_block" in data:
+            config.shell_output_code_block = data["shell_output_code_block"]
+        if "tmux_output_code_block" in data:
+            config.tmux_output_code_block = data["tmux_output_code_block"]
+        if "python_output_code_block" in data:
+            config.python_output_code_block = data["python_output_code_block"]
+        if "tmux_echo_exit_code" in data:
+            config.tmux_echo_exit_code = data["tmux_echo_exit_code"]
+
         # Auto-send settings
         if "auto_send_to_assistant" in data:
             config.auto_send_to_assistant = data["auto_send_to_assistant"]
@@ -160,12 +176,16 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
             "python_markdown",
             "assistant_markdown",
             "shell_markdown",
+            "shell_output_code_block",
+            "tmux_output_code_block",
+            "python_output_code_block",
             "auto_send_to_assistant",
             "shell_init_script",
             "save_sessions",
             "sessions_dir",
             "tmux_target",
             "tmux_prompt_pattern",
+            "tmux_echo_exit_code",
         }
         for key, value in data.items():
             if key not in known_keys:

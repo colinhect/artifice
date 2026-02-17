@@ -68,7 +68,17 @@ async def tmux_session():
 
 @pytest.fixture
 def executor(tmux_session):
-    return TmuxShellExecutor(target=tmux_session, prompt_pattern=TEST_PROMPT_PATTERN)
+    return TmuxShellExecutor(
+        target=tmux_session, prompt_pattern=TEST_PROMPT_PATTERN, check_exit_code=True
+    )
+
+
+@pytest.fixture
+def executor_no_exit_check(tmux_session):
+    """Executor that doesn't check exit codes (assumes success on prompt)."""
+    return TmuxShellExecutor(
+        target=tmux_session, prompt_pattern=TEST_PROMPT_PATTERN, check_exit_code=False
+    )
 
 
 class TestTmuxBasicExecution:
@@ -132,7 +142,39 @@ class TestTmuxTargetWithWindow:
         executor = TmuxShellExecutor(
             target=f"{tmux_session}:0",
             prompt_pattern=TEST_PROMPT_PATTERN,
+            check_exit_code=True,
         )
         result = await executor.execute("echo window_test", timeout=5.0)
         assert result.status == ExecutionStatus.SUCCESS
         assert "window_test" in result.output
+
+
+class TestTmuxExitCodeCheck:
+    """Tests for the check_exit_code option."""
+
+    @pytest.mark.asyncio
+    async def test_with_exit_code_check_success(self, executor):
+        """With check_exit_code=True, successful commands return SUCCESS."""
+        result = await executor.execute("true", timeout=5.0)
+        assert result.status == ExecutionStatus.SUCCESS
+
+    @pytest.mark.asyncio
+    async def test_with_exit_code_check_failure(self, executor):
+        """With check_exit_code=True, failed commands return ERROR."""
+        result = await executor.execute("false", timeout=5.0)
+        assert result.status == ExecutionStatus.ERROR
+
+    @pytest.mark.asyncio
+    async def test_without_exit_code_check_success(self, executor_no_exit_check):
+        """With check_exit_code=False, successful commands return SUCCESS."""
+        result = await executor_no_exit_check.execute("true", timeout=5.0)
+        assert result.status == ExecutionStatus.SUCCESS
+
+    @pytest.mark.asyncio
+    async def test_without_exit_code_check_failure(self, executor_no_exit_check):
+        """With check_exit_code=False, failed commands still return SUCCESS (no check)."""
+        result = await executor_no_exit_check.execute("false", timeout=5.0)
+        # When check_exit_code is False, we assume success when prompt appears
+        assert result.status == ExecutionStatus.SUCCESS
+        # Output should still be captured
+        assert result.output is not None
