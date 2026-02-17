@@ -286,15 +286,17 @@ class TestIncompleteBlocks:
         assert len(code_blocks) == 0
         assert "x < 5" in d.all_blocks[0]._text
 
-    def test_backticks_are_just_text(self):
-        """Backtick fences should be treated as plain text, not code fences."""
+    def test_backticks_create_code_blocks(self):
+        """Markdown code fences should create code blocks like XML tags."""
         d, out = make_detector()
         d.start()
         d.feed("Use ```python\ncode\n``` for formatting")
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 0
+        assert len(code_blocks) == 1
+        assert "code" in code_blocks[0]._code
+        assert code_blocks[0]._language == "python"
 
     def test_tags_inside_backtick_spans_ignored(self):
         """Tags inside inline backtick code spans should not trigger detection."""
@@ -1017,3 +1019,144 @@ class TestLiberalTagParsing:
         assert len(code_blocks) == 0
         thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
         assert len(thinking_blocks) == 0
+
+
+class TestMarkdownFences:
+    """Tests for markdown code fence support (```language)."""
+
+    def test_simple_python_fence(self):
+        """```python fence creates a python code block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Here is code:\n```python\nprint('hello')\n```\nDone")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "print('hello')" in code_blocks[0]._code
+        assert code_blocks[0]._language == "python"
+
+    def test_simple_bash_fence(self):
+        """```bash fence creates a bash code block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Run this:\n```bash\nls -la\n```\nDone")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "ls -la" in code_blocks[0]._code
+        assert code_blocks[0]._language == "bash"
+
+    def test_shell_fence_maps_to_bash(self):
+        """```shell fence should create a bash code block."""
+        d, out = make_detector()
+        d.start()
+        d.feed("```shell\necho hi\n```")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert code_blocks[0]._language == "bash"
+
+    def test_fence_without_language(self):
+        """``` without language should default to bash."""
+        d, out = make_detector()
+        d.start()
+        d.feed("```\nsome command\n```")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert code_blocks[0]._language == "bash"
+
+    def test_empty_lines_in_fence_dont_split(self):
+        """Empty lines inside a fence should NOT split into multiple blocks."""
+        d, out = make_detector()
+        d.start()
+        d.feed("```python\ndef foo():\n    pass\n\ndef bar():\n    pass\n```")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "def foo():" in code_blocks[0]._code
+        assert "def bar():" in code_blocks[0]._code
+
+    def test_multiple_fences(self):
+        """Multiple fences in one response."""
+        d, out = make_detector()
+        d.start()
+        d.feed("First:\n```python\nx = 1\n```\nSecond:\n```bash\nls\n```\nEnd")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 2
+        assert code_blocks[0]._language == "python"
+        assert code_blocks[1]._language == "bash"
+        assert "x = 1" in code_blocks[0]._code
+        assert "ls" in code_blocks[1]._code
+
+    def test_fence_with_prose_before_and_after(self):
+        """Fences create separate blocks from surrounding prose."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Before\n```python\ncode\n```\nAfter")
+        d.finish()
+
+        prose_blocks = [
+            b
+            for b in d.all_blocks
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert any("Before" in b._text for b in prose_blocks)
+        assert any("After" in b._text for b in prose_blocks)
+
+    def test_fence_split_across_chunks(self):
+        """Fence split across feed() calls should work."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Text\n```py")
+        d.feed("thon\nco")
+        d.feed("de\n```")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "code" in code_blocks[0]._code
+
+    def test_xml_tags_and_fences_together(self):
+        """XML tags and markdown fences can coexist."""
+        d, out = make_detector()
+        d.start()
+        d.feed("<python>x = 1</python>\nThen:\n```bash\nls\n```")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 2
+        assert "x = 1" in code_blocks[0]._code
+        assert "ls" in code_blocks[1]._code
+
+    def test_backticks_inside_xml_tags_ignored(self):
+        """``` inside <python> tags should be treated as code content."""
+        d, out = make_detector()
+        d.start()
+        d.feed("<python>s = '''multi\nline\nstring'''\n</python>")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "'''" in code_blocks[0]._code
+
+    def test_pause_after_fence(self):
+        """Pause after code block works with markdown fences."""
+        output = FakeOutput()
+        d = StreamingFenceDetector(output, pause_after_code=True)
+        d._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
+        d._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
+        d._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
+        d.start()
+        d.feed("Hello\n```python\nx=1\n```\nAfter")
+        assert d.is_paused
+        assert "After" in d._remainder

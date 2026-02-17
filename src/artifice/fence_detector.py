@@ -29,7 +29,7 @@ class StreamingFenceDetector:
     """Detects code tags in streaming text and splits into blocks in real-time.
 
     Processes chunks character-by-character using a state machine:
-    PROSE -> CODE (on <python>/<shell>) -> PROSE (on </python>/</shell>)
+    PROSE -> CODE (on <python>/<shell> or ```language) -> PROSE (on </python>/</shell> or ```)
     PROSE -> THINKING (on <think>) -> PROSE (on </think>)
 
     Creates blocks as tags are detected, accumulating text to update once per chunk.
@@ -63,6 +63,13 @@ class StreamingFenceDetector:
         # Tag detection and backtick tracking
         self._tag_parser = TagParser()
         self._backtick_tracker = BacktickTracker()
+        # Markdown fence detection
+        self._in_markdown_fence = False  # True if we entered CODE via markdown fence
+        self._fence_backtick_count = 0  # Count backticks for fence detection
+        self._fence_language_buffer = ""  # Accumulate language after ```
+        self._detecting_fence_open = False  # True when we've seen ``` and reading language
+        self._detecting_fence_close = False  # True when we might be seeing closing ```
+        self._fence_close_backtick_count = 0  # Count backticks for closing fence
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AssistantOutputBlock(
             activity=activity
@@ -176,15 +183,88 @@ class StreamingFenceDetector:
         self._backtick_tracker.feed(ch)
 
     def _feed_prose(self, ch: str) -> None:
-        """Process prose text, looking for opening code tags or think tag."""
+        """Process prose text, looking for opening code tags, think tag, or markdown fences."""
         # Strip leading whitespace after closing tags
         if self._strip_leading_whitespace:
             if ch.isspace():
                 return
             self._strip_leading_whitespace = False
 
-        # Track backtick spans
-        self._handle_backtick(ch)
+        # Check for markdown fence opening (```language)
+        if self._detecting_fence_open:
+            # We've seen ``` and are now reading the language identifier
+            if ch == "\n":
+                # End of language line - transition to CODE state
+                lang = self._fence_language_buffer.strip().lower()
+                # Map common language names to our internal names
+                if lang in ("bash", "sh", "shell"):
+                    lang = "bash"
+                elif lang in ("python", "py"):
+                    lang = "python"
+                elif lang == "":
+                    # Default to bash if no language specified
+                    lang = "bash"
+                else:
+                    # For other languages, default to python for syntax highlighting
+                    lang = "python"
+
+                self._current_lang = lang
+                self._in_markdown_fence = True
+                self._detecting_fence_open = False
+                self._fence_language_buffer = ""
+
+                # Don't include the backticks or language in the prose
+                # (they're already been skipped via not adding to pending_buffer)
+                self._flush_pending_to_chunk()
+                self._flush_and_update_chunk()
+
+                # Remove empty prose block, or mark it complete
+                current_is_empty = (
+                    isinstance(self._current_block, AssistantOutputBlock)
+                    and not self._current_block._full.strip()
+                )
+                if current_is_empty:
+                    if self._current_block is self.first_assistant_block:
+                        self.first_assistant_block = None
+                    if self._current_block is not None:
+                        self._remove_block(self._current_block)
+                elif isinstance(self._current_block, AssistantOutputBlock):
+                    self._current_block.mark_success()
+
+                # Create new code block
+                self._current_block = self._make_code_block("", lang)
+                self._output.append_block(self._current_block)
+                self.all_blocks.append(self._current_block)
+
+                self._pending_buffer = ""
+                self._current_line_buffer = ""
+                self._state = _FenceState.CODE
+            else:
+                # Accumulate language name
+                self._fence_language_buffer += ch
+            return
+
+        # Check if we're starting a fence (```)
+        if ch == "`":
+            self._fence_backtick_count += 1
+            if self._fence_backtick_count == 3:
+                # We've seen ``` - now read the language
+                self._detecting_fence_open = True
+                # Don't add the backticks to pending buffer
+            # Don't feed to backtick tracker yet - wait to see if it's a fence
+            return
+        elif self._fence_backtick_count > 0:
+            # We had some backticks but didn't reach 3, or got interrupted
+            # Feed them to the backtick tracker and add to pending buffer
+            for _ in range(self._fence_backtick_count):
+                self._backtick_tracker.feed("`")
+            self._pending_buffer += "`" * self._fence_backtick_count
+            self._fence_backtick_count = 0
+            # Continue processing current character normally
+
+        # Track backtick spans for inline code (not fences)
+        if ch != "`":  # Already handled backticks above
+            self._handle_backtick(ch)
 
         # Check for tags (<think>, <python>, <shell>) - skip inside backtick spans
         if not self._backtick_tracker.in_span and (
@@ -271,9 +351,53 @@ class StreamingFenceDetector:
             self._current_line_buffer += ch
 
     def _feed_code(self, ch: str) -> None:
-        """Process code text, looking for closing tag (</python> or </shell>)."""
-        # Check for closing tag
-        if self._tag_parser.has_buffered or ch == "<":
+        """Process code text, looking for closing tag (</python> or </shell>) or closing fence (```)."""
+        # If we're in a markdown fence, look for closing ```
+        if self._in_markdown_fence:
+            if ch == "`":
+                self._fence_close_backtick_count += 1
+                if self._fence_close_backtick_count == 3:
+                    # We've seen three backticks - this closes the fence
+                    # Remove any trailing newline from code before the closing fence
+                    if self._pending_buffer.endswith("\n"):
+                        self._pending_buffer = self._pending_buffer[:-1]
+
+                    # Flush pending code (without the closing backticks)
+                    self._flush_pending_to_chunk()
+                    self._flush_and_update_chunk()
+
+                    # Mark as last completed code block
+                    if isinstance(self._current_block, CodeInputBlock):
+                        self._last_code_block = self._current_block
+                        self._current_block.finish_streaming()
+
+                    # Reset fence state
+                    self._in_markdown_fence = False
+                    self._fence_close_backtick_count = 0
+
+                    # Start new prose block
+                    self._current_block = self._make_prose_block(activity=True)
+                    self._output.append_block(self._current_block)
+                    self.all_blocks.append(self._current_block)
+
+                    self._current_line_buffer = ""
+                    self._strip_leading_whitespace = True
+                    self._state = _FenceState.PROSE
+
+                    # Pause after code block if enabled
+                    if self._pause_after_code:
+                        self._paused = True
+                return
+            elif self._fence_close_backtick_count > 0:
+                # We had some backticks but not 3 - add them as code
+                self._pending_buffer += "`" * self._fence_close_backtick_count
+                self._fence_close_backtick_count = 0
+                # Fall through to add current character
+
+        # Check for XML closing tag (if not in markdown fence)
+        if not self._in_markdown_fence and (
+            self._tag_parser.has_buffered or ch == "<"
+        ):
             result = self._check_tags(ch, [self._current_close_tag])
             if isinstance(result, str):
                 # Found closing tag - flush pending code and transition
