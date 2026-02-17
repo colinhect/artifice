@@ -87,12 +87,14 @@ class Assistant(AssistantBase):
 
         # Add assistant response to history
         if response.text:
-            if response.content_blocks:
+            if response.content_blocks and not self.openai_format:
                 # Claude's structured content (for multi-turn thinking)
+                # Only use this format for providers that support it (not OpenAI)
                 self.messages.append(
                     {"role": "assistant", "content": response.content_blocks}
                 )
             else:
+                # Use plain text format for OpenAI-compatible providers
                 self.messages.append({"role": "assistant", "content": response.text})
             logger.info(
                 f"[Assistant] Received response ({len(response.text)} chars, stop_reason={response.stop_reason})"

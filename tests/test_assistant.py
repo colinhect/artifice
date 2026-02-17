@@ -118,3 +118,46 @@ async def test_assistant_empty_prompt():
     # Whitespace-only prompt should also be ignored
     await assistant.send_prompt("   ")
     assert len(assistant.messages) <= 2
+
+
+@pytest.mark.asyncio
+async def test_assistant_openai_format_no_content_blocks():
+    """Test that openai_format=True prevents content_blocks in message history.
+
+    This is critical for OpenAI compatibility - OpenAI expects simple string
+    content, not Claude's structured content_blocks format. Using content_blocks
+    with OpenAI causes context loss as it can't parse those messages.
+    """
+    provider = SimulatedProvider(response_delay=0.001)
+
+    # Mock provider to return content_blocks (like Anthropic does)
+    async def send_with_blocks(*args, **kwargs):
+        from artifice.providers.provider import ProviderResponse
+
+        return ProviderResponse(
+            text="This is the text response",
+            content_blocks=[
+                {"type": "text", "text": "This is the text response"}
+            ],
+        )
+
+    provider.send = send_with_blocks
+
+    # Test with openai_format=False (Claude format)
+    assistant_claude = Assistant(provider=provider, openai_format=False)
+    await assistant_claude.send_prompt("Hello")
+
+    # Should use content_blocks format
+    assert len(assistant_claude.messages) == 2
+    assert assistant_claude.messages[1]["role"] == "assistant"
+    assert isinstance(assistant_claude.messages[1]["content"], list)
+
+    # Test with openai_format=True (OpenAI format)
+    assistant_openai = Assistant(provider=provider, openai_format=True, system_prompt="Test")
+    await assistant_openai.send_prompt("Hello")
+
+    # Should use plain text format even though provider returned content_blocks
+    assert len(assistant_openai.messages) == 3  # system + user + assistant
+    assert assistant_openai.messages[2]["role"] == "assistant"
+    assert isinstance(assistant_openai.messages[2]["content"], str)
+    assert assistant_openai.messages[2]["content"] == "This is the text response"
