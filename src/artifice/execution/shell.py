@@ -152,7 +152,7 @@ class TmuxShellExecutor:
         # Other escape sequences (but not ESC followed by arbitrary chars)
         # Only strip: ESC followed by specific single-char sequences
         text = re.sub(r"\x1b[()#].", "", text)  # Character set selection
-        text = re.sub(r"\x1b[=>]", "", text)     # Keypad modes
+        text = re.sub(r"\x1b[=>]", "", text)  # Keypad modes
         # Strip carriage returns
         text = text.replace("\r", "")
         return text
@@ -268,9 +268,7 @@ class TmuxShellExecutor:
 
             # Phase 2: Query exit code
             content_before_len = len(self._read_content(tmpfile))
-            await self._run_tmux(
-                "send-keys", "-t", self.target, "echo $?", "Enter"
-            )
+            await self._run_tmux("send-keys", "-t", self.target, "echo $?", "Enter")
 
             while True:
                 if timeout is not None and elapsed >= timeout:
@@ -304,9 +302,7 @@ class TmuxShellExecutor:
                     exit_code = -1
 
                 result.status = (
-                    ExecutionStatus.SUCCESS
-                    if exit_code == 0
-                    else ExecutionStatus.ERROR
+                    ExecutionStatus.SUCCESS if exit_code == 0 else ExecutionStatus.ERROR
                 )
                 break
 
@@ -337,4 +333,3 @@ class TmuxShellExecutor:
                     pass
 
         return result
-

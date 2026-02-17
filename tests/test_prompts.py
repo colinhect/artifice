@@ -1,9 +1,7 @@
 """Tests for prompt template loading."""
 
-import os
 from pathlib import Path
 
-import pytest
 
 from artifice.prompts import list_prompts, load_prompt, fuzzy_match, get_prompt_dirs
 

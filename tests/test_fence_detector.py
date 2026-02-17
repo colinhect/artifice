@@ -129,9 +129,7 @@ def _patch_block_types():
 def make_detector(save_callback=None):
     """Create a detector with fake dependencies."""
     output = FakeOutput()
-    detector = StreamingFenceDetector(
-        output, save_callback=save_callback
-    )
+    detector = StreamingFenceDetector(output, save_callback=save_callback)
     detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
     detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
     detector._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
@@ -360,7 +358,8 @@ class TestWhitespaceStripping:
         d.finish()
 
         prose_blocks = [
-            b for b in d.all_blocks
+            b
+            for b in d.all_blocks
             if isinstance(b, FakeAssistantBlock) and b._text.strip()
         ]
         # The prose after the code block should start with "Next", not "\n"
@@ -376,7 +375,8 @@ class TestWhitespaceStripping:
         d.finish()
 
         prose_blocks = [
-            b for b in d.all_blocks
+            b
+            for b in d.all_blocks
             if isinstance(b, FakeAssistantBlock) and b._text.strip()
         ]
         after_code = [b for b in prose_blocks if "After" in b._text]
@@ -391,7 +391,8 @@ class TestWhitespaceStripping:
         d.finish()
 
         prose_blocks = [
-            b for b in d.all_blocks
+            b
+            for b in d.all_blocks
             if isinstance(b, FakeAssistantBlock) and b._text.strip()
         ]
         after_think = [b for b in prose_blocks if "Visible text" in b._text]
@@ -407,7 +408,8 @@ class TestWhitespaceStripping:
 
         # Should have split into multiple blocks on the empty line, as normal
         prose_blocks = [
-            b for b in d.all_blocks
+            b
+            for b in d.all_blocks
             if isinstance(b, FakeAssistantBlock) and b._text.strip()
         ]
         assert any("Line one" in b._text for b in prose_blocks)
@@ -616,11 +618,15 @@ class TestThinkTagDetection:
         """Empty lines within <think> tags should split into multiple thinking blocks."""
         d, out = make_detector()
         d.start()
-        d.feed("<think>\nFirst paragraph\n\nSecond paragraph\n\nThird paragraph\n</think>")
+        d.feed(
+            "<think>\nFirst paragraph\n\nSecond paragraph\n\nThird paragraph\n</think>"
+        )
         d.finish()
 
         thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
-        assert len(thinking_blocks) == 3, f"Expected 3 thinking blocks, got {len(thinking_blocks)}"
+        assert len(thinking_blocks) == 3, (
+            f"Expected 3 thinking blocks, got {len(thinking_blocks)}"
+        )
 
         # Check content of each thinking block
         assert "First paragraph" in thinking_blocks[0]._text
@@ -737,11 +743,13 @@ class TestPauseAfterCodeBlock:
     def make_pausing_detector(self):
         """Create a detector with pause_after_code enabled."""
         output = FakeOutput()
-        detector = StreamingFenceDetector(
-            output, pause_after_code=True
+        detector = StreamingFenceDetector(output, pause_after_code=True)
+        detector._make_prose_block = lambda activity: FakeAssistantBlock(
+            activity=activity
         )
-        detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
-        detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
+        detector._make_code_block = lambda code, lang: FakeCodeBlock(
+            code, language=lang
+        )
         detector._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
         return detector, output
 
@@ -969,7 +977,11 @@ class TestLiberalTagParsing:
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
         # The "x < 5 " should appear as prose
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()]
+        prose_blocks = [
+            b
+            for b in d.all_blocks
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+        ]
         assert any("x < 5" in b._text for b in prose_blocks)
 
     def test_newline_in_tag_aborts(self):

@@ -107,7 +107,13 @@ class AnthropicProvider(ProviderBase):
 
                 if self.thinking_budget:
                     return self._stream_with_thinking(
-                        client, api_params, chunks, loop, on_chunk, on_thinking_chunk, cancelled
+                        client,
+                        api_params,
+                        chunks,
+                        loop,
+                        on_chunk,
+                        on_thinking_chunk,
+                        cancelled,
                     )
                 else:
                     return self._stream_text_only(

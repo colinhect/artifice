@@ -85,11 +85,15 @@ def main():
         "--logging", action="store_true", default=None, help="Enable logging"
     )
     parser.add_argument(
-        "--tmux", default=None, metavar="TARGET",
+        "--tmux",
+        default=None,
+        metavar="TARGET",
         help="Use tmux shell executor with the given target (e.g. 'session:window.pane')",
     )
     parser.add_argument(
-        "--tmux-prompt", default=None, metavar="PATTERN",
+        "--tmux-prompt",
+        default=None,
+        metavar="PATTERN",
         help="Regex matching the shell prompt in the tmux pane",
     )
     args = parser.parse_args()

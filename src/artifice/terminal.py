@@ -15,7 +15,13 @@ from textual.widget import Widget
 from textual.widgets import LoadingIndicator, Static
 
 from .assistant import AssistantBase, create_assistant
-from .execution import ExecutionResult, ExecutionStatus, CodeExecutor, ShellExecutor, TmuxShellExecutor
+from .execution import (
+    ExecutionResult,
+    ExecutionStatus,
+    CodeExecutor,
+    ShellExecutor,
+    TmuxShellExecutor,
+)
 from .history import History
 from .terminal_input import TerminalInput, InputTextArea
 from .terminal_output import (
@@ -24,6 +30,7 @@ from .terminal_output import (
     AssistantOutputBlock,
     ThinkingOutputBlock,
     CodeInputBlock,
+    CodeOutputBlock,
     WidgetOutputBlock,
     BaseBlock,
 )
@@ -95,12 +102,16 @@ class ArtificeTerminal(Widget):
         self._executor = CodeExecutor()
         if self._config.tmux_target:
             prompt_pattern = self._config.tmux_prompt_pattern or r"^\$ "
-            self._shell_executor = TmuxShellExecutor(self._config.tmux_target, prompt_pattern=prompt_pattern)
+            self._shell_executor = TmuxShellExecutor(
+                self._config.tmux_target, prompt_pattern=prompt_pattern
+            )
         else:
             self._shell_executor = ShellExecutor()
 
         # Set shell init script from config (only applicable to ShellExecutor)
-        if self._config.shell_init_script and isinstance(self._shell_executor, ShellExecutor):
+        if self._config.shell_init_script and isinstance(
+            self._shell_executor, ShellExecutor
+        ):
             self._shell_executor.init_script = self._config.shell_init_script
 
         # Create history manager
@@ -213,7 +224,9 @@ class ArtificeTerminal(Widget):
                     code, language="python", in_context=self._auto_send_to_assistant
                 )
                 if self._auto_send_to_assistant:
-                    await self._send_execution_result_to_assistant(code, "python", result)
+                    await self._send_execution_result_to_assistant(
+                        code, "python", result
+                    )
 
         self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
 
@@ -300,7 +313,6 @@ class ArtificeTerminal(Widget):
         for block in self._context_blocks:
             block.remove_class("in-context")
         self._context_blocks.clear()
-
 
     def _finalize_stream(self) -> None:
         """Flush buffers and finalize thinking block and detector after streaming ends."""
@@ -394,7 +406,9 @@ class ArtificeTerminal(Widget):
             self._current_detector = None
             raise
         self._status_manager.set_inactive()
-        self._status_manager.update_assistant_info(usage=getattr(response, "usage", None))
+        self._status_manager.update_assistant_info(
+            usage=getattr(response, "usage", None)
+        )
 
         self._finalize_stream()
         self._apply_assistant_response(self._current_detector, response)
@@ -464,7 +478,11 @@ class ArtificeTerminal(Widget):
         block = event.block
 
         # If stream is paused and this is the paused code block, use the pause handler
-        if self._stream_paused and self._current_detector and block is self._current_detector.last_code_block:
+        if (
+            self._stream_paused
+            and self._current_detector
+            and block is self._current_detector.last_code_block
+        ):
             self._current_task = asyncio.create_task(
                 self._run_cancellable(self._execute_paused_code_block())
             )
@@ -495,7 +513,9 @@ class ArtificeTerminal(Widget):
             block.update_status(state["result"])
             if self._auto_send_to_assistant:
                 state["sent_to_assistant"] = True
-                await self._send_execution_result_to_assistant(code, language, state["result"])
+                await self._send_execution_result_to_assistant(
+                    code, language, state["result"]
+                )
 
         def cleanup():
             if state["result"]:
@@ -667,7 +687,9 @@ class ArtificeTerminal(Widget):
         else:
             self.input.remove_class("in-context")
 
-    def on_terminal_input_prompt_selected(self, event: TerminalInput.PromptSelected) -> None:
+    def on_terminal_input_prompt_selected(
+        self, event: TerminalInput.PromptSelected
+    ) -> None:
         """Handle prompt template selection: append to assistant's system prompt."""
         if self._assistant is not None:
             if self._assistant.system_prompt:

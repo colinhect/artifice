@@ -463,7 +463,11 @@ class TerminalInput(Static):
 
     def on_key(self, event: events.Key) -> None:
         """Handle key events for exiting search mode."""
-        if self._search_manager and self._search_manager.active and event.key == "escape":
+        if (
+            self._search_manager
+            and self._search_manager.active
+            and event.key == "escape"
+        ):
             self._search_manager.exit_search()
             event.prevent_default()
             event.stop()

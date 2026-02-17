@@ -35,7 +35,9 @@ class StreamingFenceDetector:
     Creates blocks as tags are detected, accumulating text to update once per chunk.
     """
 
-    def __init__(self, output: TerminalOutput, save_callback=None, pause_after_code: bool = False) -> None:
+    def __init__(
+        self, output: TerminalOutput, save_callback=None, pause_after_code: bool = False
+    ) -> None:
         self._output = output
         self._save_callback = save_callback  # Callback to save blocks to session
         self._pause_after_code = pause_after_code
@@ -117,10 +119,10 @@ class StreamingFenceDetector:
             if self._paused:
                 # Save unprocessed remainder (chars after current one),
                 # stripping any trailing junk on the same line as the closing tag
-                raw_remainder = text[i + 1:]
+                raw_remainder = text[i + 1 :]
                 newline_pos = raw_remainder.find("\n")
                 if newline_pos >= 0:
-                    self._remainder = raw_remainder[newline_pos + 1:]
+                    self._remainder = raw_remainder[newline_pos + 1 :]
                 else:
                     self._remainder = ""
                 break
@@ -185,7 +187,9 @@ class StreamingFenceDetector:
         self._handle_backtick(ch)
 
         # Check for tags (<think>, <python>, <shell>) - skip inside backtick spans
-        if not self._backtick_tracker.in_span and (self._tag_parser.has_buffered or ch == "<"):
+        if not self._backtick_tracker.in_span and (
+            self._tag_parser.has_buffered or ch == "<"
+        ):
             result = self._check_tags(ch, _PROSE_TAG_TARGETS)
             if result in ("<think>", "<detail>"):
                 # Complete thinking/detail tag detected
@@ -331,9 +335,10 @@ class StreamingFenceDetector:
             # Only split if the current block has accumulated some content
             if self._current_line_buffer.strip() == "":
                 # Check if current thinking block has content (including pending)
-                current_has_content = (
-                    isinstance(self._current_block, ThinkingOutputBlock)
-                    and (self._current_block._full.strip() or self._pending_buffer.strip())
+                current_has_content = isinstance(
+                    self._current_block, ThinkingOutputBlock
+                ) and (
+                    self._current_block._full.strip() or self._pending_buffer.strip()
                 )
 
                 if current_has_content:
@@ -367,7 +372,9 @@ class StreamingFenceDetector:
             if isinstance(self._current_block, CodeInputBlock):
                 existing = self._current_block.get_code()
                 self._current_block.update_code(existing + self._chunk_buffer)
-            elif isinstance(self._current_block, (AssistantOutputBlock, ThinkingOutputBlock)):
+            elif isinstance(
+                self._current_block, (AssistantOutputBlock, ThinkingOutputBlock)
+            ):
                 self._current_block.append(self._chunk_buffer)
                 self._current_block.flush()
 

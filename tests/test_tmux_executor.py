@@ -24,33 +24,51 @@ async def tmux_session():
     """Create a temporary tmux session with a known prompt."""
     session_name = f"artifice_test_{uuid.uuid4().hex[:8]}"
     proc = await asyncio.create_subprocess_exec(
-        "tmux", "new-session", "-d", "-s", session_name, "-x", "200", "-y", "50",
+        "tmux",
+        "new-session",
+        "-d",
+        "-s",
+        session_name,
+        "-x",
+        "200",
+        "-y",
+        "50",
     )
     await proc.wait()
     # Set a known prompt for reliable detection
     proc = await asyncio.create_subprocess_exec(
-        "tmux", "send-keys", "-t", session_name,
-        f"export PS1='{TEST_PROMPT_PS1}'", "Enter",
+        "tmux",
+        "send-keys",
+        "-t",
+        session_name,
+        f"export PS1='{TEST_PROMPT_PS1}'",
+        "Enter",
     )
     await proc.wait()
     # Send a simple command to ensure prompt is ready and visible
     proc = await asyncio.create_subprocess_exec(
-        "tmux", "send-keys", "-t", session_name, ":", "Enter",
+        "tmux",
+        "send-keys",
+        "-t",
+        session_name,
+        ":",
+        "Enter",
     )
     await proc.wait()
     await asyncio.sleep(0.5)
     yield session_name
     proc = await asyncio.create_subprocess_exec(
-        "tmux", "kill-session", "-t", session_name,
+        "tmux",
+        "kill-session",
+        "-t",
+        session_name,
     )
     await proc.wait()
 
 
 @pytest.fixture
 def executor(tmux_session):
-    return TmuxShellExecutor(
-        target=tmux_session, prompt_pattern=TEST_PROMPT_PATTERN
-    )
+    return TmuxShellExecutor(target=tmux_session, prompt_pattern=TEST_PROMPT_PATTERN)
 
 
 class TestTmuxBasicExecution:
