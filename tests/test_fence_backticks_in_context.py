@@ -8,7 +8,7 @@ Ensures that triple backticks don't trigger false positives when they appear:
 
 import pytest
 from unittest.mock import patch
-from tests.test_fence_detector import (
+from .test_fence_detector import (
     make_detector,
     FakeCodeBlock,
     FakeThinkingBlock,
