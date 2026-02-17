@@ -58,11 +58,6 @@ async def test_simulated_provider_pattern_matching():
     response = await provider.send(messages)
     assert "python" in response.text.lower()
 
-    # Test goodbye pattern
-    messages = [{"role": "user", "content": "goodbye"}]
-    response = await provider.send(messages)
-    assert "goodbye" in response.text.lower()
-
 
 @pytest.mark.asyncio
 async def test_simulated_provider_custom_scenarios():

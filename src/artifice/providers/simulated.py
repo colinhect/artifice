@@ -130,6 +130,17 @@ But we should also think about _why_ `None` is appearing here. It could mean:
 Want me to apply the fix and add a test case for this edge case?\
 """
 
+_RESP_CALCULATE = """\
+Let me calculate that for you.
+
+<python>
+result = 2 + 2
+print(f"2 + 2 = {result}")
+</python>
+
+The answer is 4. If you need more complex calculations, just let me know!\
+"""
+
 _RESP_SYSADMIN = """\
 Let me check a few things about the system state.
 
@@ -270,6 +281,11 @@ class SimulatedProvider(ProviderBase):
                 "pattern": r"markdown|format|demo|test",
                 "response": _RESP_MARKDOWN_DEMO,
                 "thinking": "Let me put together a comprehensive markdown demo that exercises all the major formatting features — headers, lists, tables, code, and blockquotes.",
+            },
+            {
+                "pattern": r"calculat|math|add|subtract|multiply|divide",
+                "response": _RESP_CALCULATE,
+                "thinking": "The user wants me to perform a calculation. I'll use Python to compute the result.",
             },
         ]
 

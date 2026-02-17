@@ -145,9 +145,15 @@ class TmuxShellExecutor:
     @staticmethod
     def _strip_escapes(text: str) -> str:
         """Strip ANSI/OSC escape sequences and carriage returns from terminal output."""
+        # OSC sequences: ESC ] ... (ST or BEL)
         text = re.sub(r"\x1b\].*?(?:\x1b\\|\x07)", "", text)
+        # CSI sequences: ESC [ ... letter
         text = re.sub(r"\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]", "", text)
-        text = re.sub(r"\x1b.", "", text)
+        # Other escape sequences (but not ESC followed by arbitrary chars)
+        # Only strip: ESC followed by specific single-char sequences
+        text = re.sub(r"\x1b[()#].", "", text)  # Character set selection
+        text = re.sub(r"\x1b[=>]", "", text)     # Keypad modes
+        # Strip carriage returns
         text = text.replace("\r", "")
         return text
 

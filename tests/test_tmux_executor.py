@@ -14,7 +14,9 @@ TMUX_AVAILABLE = shutil.which("tmux") is not None
 pytestmark = pytest.mark.skipif(not TMUX_AVAILABLE, reason="tmux not installed")
 
 TEST_PROMPT_PS1 = "TESTPROMPT$ "
-TEST_PROMPT_PATTERN = r"^TESTPROMPT\$ "
+# Make pattern more specific: match lines that start with TESTPROMPT$ followed by space
+# This avoids matching command echo lines like "TESTPROMPT$ echo hello"
+TEST_PROMPT_PATTERN = r"^TESTPROMPT\$ (?!\S)"
 
 
 @pytest_asyncio.fixture
@@ -31,7 +33,12 @@ async def tmux_session():
         f"export PS1='{TEST_PROMPT_PS1}'", "Enter",
     )
     await proc.wait()
-    await asyncio.sleep(0.3)
+    # Send a simple command to ensure prompt is ready and visible
+    proc = await asyncio.create_subprocess_exec(
+        "tmux", "send-keys", "-t", session_name, ":", "Enter",
+    )
+    await proc.wait()
+    await asyncio.sleep(0.5)
     yield session_name
     proc = await asyncio.create_subprocess_exec(
         "tmux", "kill-session", "-t", session_name,
@@ -49,25 +56,25 @@ def executor(tmux_session):
 class TestTmuxBasicExecution:
     @pytest.mark.asyncio
     async def test_echo(self, executor):
-        result = await executor.execute("echo hello")
+        result = await executor.execute("echo hello", timeout=5.0)
         assert result.status == ExecutionStatus.SUCCESS
         assert "hello" in result.output
 
     @pytest.mark.asyncio
     async def test_multiline_output(self, executor):
-        result = await executor.execute("echo line1; echo line2")
+        result = await executor.execute("echo line1; echo line2", timeout=5.0)
         assert result.status == ExecutionStatus.SUCCESS
         assert "line1" in result.output
         assert "line2" in result.output
 
     @pytest.mark.asyncio
     async def test_exit_code_success(self, executor):
-        result = await executor.execute("true")
+        result = await executor.execute("true", timeout=5.0)
         assert result.status == ExecutionStatus.SUCCESS
 
     @pytest.mark.asyncio
     async def test_exit_code_failure(self, executor):
-        result = await executor.execute("false")
+        result = await executor.execute("false", timeout=5.0)
         assert result.status == ExecutionStatus.ERROR
 
 
@@ -76,7 +83,7 @@ class TestTmuxOutputStreaming:
     async def test_stdout_callback(self, executor):
         chunks = []
         await executor.execute(
-            "echo one; echo two", on_output=lambda t: chunks.append(t)
+            "echo one; echo two", on_output=lambda t: chunks.append(t), timeout=5.0
         )
         combined = "".join(chunks)
         assert "one" in combined
@@ -90,13 +97,13 @@ class TestTmuxErrorHandling:
             target="nonexistent_session_xyz_12345",
             prompt_pattern=TEST_PROMPT_PATTERN,
         )
-        result = await executor.execute("echo hello")
+        result = await executor.execute("echo hello", timeout=5.0)
         assert result.status == ExecutionStatus.ERROR
         assert "not found" in result.error.lower() or "session" in result.error.lower()
 
     @pytest.mark.asyncio
     async def test_failed_command(self, executor):
-        result = await executor.execute("bash -c 'exit 42'")
+        result = await executor.execute("bash -c 'exit 42'", timeout=5.0)
         assert result.status == ExecutionStatus.ERROR
 
 
@@ -108,6 +115,6 @@ class TestTmuxTargetWithWindow:
             target=f"{tmux_session}:0",
             prompt_pattern=TEST_PROMPT_PATTERN,
         )
-        result = await executor.execute("echo window_test")
+        result = await executor.execute("echo window_test", timeout=5.0)
         assert result.status == ExecutionStatus.SUCCESS
         assert "window_test" in result.output
