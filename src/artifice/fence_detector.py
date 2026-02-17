@@ -1,4 +1,4 @@
-"""Main Artifice terminal widget."""
+"""Streaming fence detector for code block extraction."""
 
 from __future__ import annotations
 
@@ -11,23 +11,12 @@ from .terminal_output import (
     CodeInputBlock,
     BaseBlock,
 )
+from .tag_parser import TagParser
+from .backtick_tracker import BacktickTracker
 
 _CODE_OPEN_TAGS = {"<python>": "python", "<shell>": "bash"}
 _CODE_CLOSE_TAGS = {"python": "</python>", "bash": "</shell>"}
 _PROSE_TAG_TARGETS = ["<think>", "<detail>", "<python>", "<shell>"]
-
-# Aliases: normalize alternative tag names to canonical ones
-_TAG_NAME_ALIASES = {
-    "py": "python",
-    "code": "python",
-    "tool_call": "shell",
-    "bash": "shell",
-    "sh": "shell",
-    "cmd": "shell",
-}
-
-# Maximum length for a tag buffer before we give up (e.g. "< prefix:tool_call >")
-_MAX_TAG_LEN = 50
 
 
 class _FenceState(enum.Enum):
@@ -69,12 +58,9 @@ class StreamingFenceDetector:
         )
         self._strip_leading_whitespace = False  # Strip whitespace after closing tags
         self._current_thinking_close_tag = "</think>"  # Tracks which close tag to match
-        # Backtick tracking - skip tag detection inside inline code spans
-        self._in_backtick = False
-        self._backtick_count = 0  # Counts consecutive backticks for opening
-        self._backtick_closer = 0  # Number of backticks needed to close
-        # Tag detection
-        self._tag_buffer = ""  # Buffer for detecting tags
+        # Tag detection and backtick tracking
+        self._tag_parser = TagParser()
+        self._backtick_tracker = BacktickTracker()
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AssistantOutputBlock(
             activity=activity
@@ -153,80 +139,29 @@ class StreamingFenceDetector:
         elif self._state == _FenceState.THINKING:
             self._feed_thinking(ch)
 
-    def _flush_tag_buffer_to_pending(self) -> None:
-        """Flush accumulated tag buffer (that wasn't a complete tag) to the pending buffer."""
-        if self._tag_buffer:
-            self._pending_buffer += self._tag_buffer
-            self._tag_buffer = ""
-
     def _check_tags(self, ch: str, targets: list[str]) -> str | bool:
-        """Accumulate characters between < and >, then normalize and check targets.
-
-        Handles liberal tag syntax:
-        - Whitespace inside tags: < shell >, < /python >
-        - Namespace prefixes: <minimax:tool_call>, <ns:shell>
-        - Aliases: <tool_call> treated as <shell>
+        """Check for matching tags using the tag parser.
 
         Returns:
-            str: The canonical matched tag string if a complete tag was detected.
+            str: The canonical matched tag string if detected.
             True: Still accumulating (haven't seen '>' yet).
-            False: No match (buffer was flushed to pending).
+            False: No match (need to add buffered text to pending).
         """
-        self._tag_buffer += ch
+        result = self._tag_parser.feed_char(ch, targets)
 
-        if ch == ">":
-            # Complete tag — normalize and check
-            canonical = self._normalize_tag(self._tag_buffer)
-            if canonical and canonical in targets:
-                self._tag_buffer = ""
-                return canonical
-            # Not a matching tag — flush raw text to pending
-            self._flush_tag_buffer_to_pending()
-            return False
+        # If False, flush the tag buffer to pending (unless it's a second '<')
+        if result is False:
+            if ch == "<" and len(self._tag_parser._buffer) > 1:
+                # Flush everything except the new '<'
+                old_buffer = self._tag_parser._buffer[:-1]
+                self._tag_parser._buffer = "<"
+                self._pending_buffer += old_buffer
+                return True  # Still accumulating from the new '<'
+            else:
+                # Flush everything including the failed tag attempt
+                self._pending_buffer += self._tag_parser.flush_to_text()
 
-        # Bail on a second '<' (means the first wasn't a real tag)
-        if ch == "<" and len(self._tag_buffer) > 1:
-            # Flush everything except the new '<', which starts a new potential tag
-            old = self._tag_buffer[:-1]
-            self._tag_buffer = "<"
-            self._pending_buffer += old
-            return True  # Still accumulating from the new '<'
-
-        # Bail on newline inside a tag
-        if ch == "\n":
-            self._flush_tag_buffer_to_pending()
-            return False
-
-        # Bail if buffer is too long
-        if len(self._tag_buffer) > _MAX_TAG_LEN:
-            self._flush_tag_buffer_to_pending()
-            return False
-
-        return True
-
-    @staticmethod
-    def _normalize_tag(raw_tag: str) -> str | None:
-        """Normalize a raw tag like '< minimax:tool_call >' to canonical '<shell>'.
-
-        Strips outer angle brackets, whitespace, namespace prefixes, and maps aliases.
-        """
-        inner = raw_tag[1:-1].strip()  # Strip < > and whitespace
-
-        # Handle closing tag
-        is_closing = inner.startswith("/")
-        if is_closing:
-            inner = inner[1:].strip()
-
-        # Strip namespace prefix (e.g. "minimax:tool_call" -> "tool_call")
-        if ":" in inner:
-            inner = inner.split(":", 1)[1].strip()
-
-        # Map aliases
-        name = _TAG_NAME_ALIASES.get(inner, inner)
-
-        if is_closing:
-            return f"</{name}>"
-        return f"<{name}>"
+        return result
 
     def _flush_and_update_chunk(self) -> None:
         """Flush pending text and update the current block with the chunk buffer."""
@@ -234,32 +169,9 @@ class StreamingFenceDetector:
             self._update_current_block_with_chunk()
             self._chunk_buffer = ""
 
-    def _handle_backtick(self, ch: str) -> bool:
-        """Track backtick spans. Returns True if the character was consumed."""
-        if ch == "`":
-            if self._in_backtick:
-                # Inside a backtick span - count consecutive backticks
-                self._backtick_count += 1
-                if self._backtick_count >= self._backtick_closer:
-                    # Closing backtick sequence found
-                    self._in_backtick = False
-                    self._backtick_count = 0
-                    self._backtick_closer = 0
-                return False  # Still add to pending buffer
-            else:
-                # Not inside a span - count opening backticks
-                self._backtick_count += 1
-                return False
-        else:
-            if not self._in_backtick and self._backtick_count > 0:
-                # We had backticks followed by non-backtick - enter backtick span
-                self._backtick_closer = self._backtick_count
-                self._backtick_count = 0
-                self._in_backtick = True
-            elif self._in_backtick:
-                # Non-backtick inside span - reset consecutive backtick count
-                self._backtick_count = 0
-            return False
+    def _handle_backtick(self, ch: str) -> None:
+        """Track backtick spans using the backtick tracker."""
+        self._backtick_tracker.feed(ch)
 
     def _feed_prose(self, ch: str) -> None:
         """Process prose text, looking for opening code tags or think tag."""
@@ -273,7 +185,7 @@ class StreamingFenceDetector:
         self._handle_backtick(ch)
 
         # Check for tags (<think>, <python>, <shell>) - skip inside backtick spans
-        if not self._in_backtick and (self._tag_buffer or ch == "<"):
+        if not self._backtick_tracker.in_span and (self._tag_parser.has_buffered or ch == "<"):
             result = self._check_tags(ch, _PROSE_TAG_TARGETS)
             if result in ("<think>", "<detail>"):
                 # Complete thinking/detail tag detected
@@ -357,7 +269,7 @@ class StreamingFenceDetector:
     def _feed_code(self, ch: str) -> None:
         """Process code text, looking for closing tag (</python> or </shell>)."""
         # Check for closing tag
-        if self._tag_buffer or ch == "<":
+        if self._tag_parser.has_buffered or ch == "<":
             result = self._check_tags(ch, [self._current_close_tag])
             if isinstance(result, str):
                 # Found closing tag - flush pending code and transition
@@ -389,7 +301,7 @@ class StreamingFenceDetector:
     def _feed_thinking(self, ch: str) -> None:
         """Process thinking text, looking for closing </think> or </detail> tag."""
         # Check for the matching close tag
-        if self._tag_buffer or ch == "<":
+        if self._tag_parser.has_buffered or ch == "<":
             result = self._check_tags(ch, [self._current_thinking_close_tag])
             if result == self._current_thinking_close_tag:
                 # Complete </think> tag detected
@@ -471,7 +383,8 @@ class StreamingFenceDetector:
         self.start()
 
         # Flush any incomplete tag buffer
-        self._flush_tag_buffer_to_pending()
+        if self._tag_parser.has_buffered:
+            self._pending_buffer += self._tag_parser.flush_to_text()
 
         # Flush any remaining text ONLY if there's pending content
         if self._pending_buffer:

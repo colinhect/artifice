@@ -137,7 +137,7 @@ class BufferedOutputBlock(BaseBlock):
             self._output = None
             self._markdown = Markdown(output, classes=self._MARKDOWN_CSS_CLASS)
         else:
-            self._output = Static(output, classes=self._STATIC_CSS_CLASS)
+            self._output = Static(output, markup=False, classes=self._STATIC_CSS_CLASS)
             self._markdown = None
 
     def flush(self) -> None:
@@ -163,7 +163,7 @@ class BufferedOutputBlock(BaseBlock):
                 self._markdown.remove()
                 self._markdown = None
             self._output = Static(
-                self._format_plain_text(), classes=self._STATIC_CSS_CLASS
+                self._format_plain_text(), markup=False, classes=self._STATIC_CSS_CLASS
             )
             self._contents.mount(self._output)
 
@@ -338,7 +338,8 @@ class ThinkingOutputBlock(AssistantOutputBlock):
 class HighlightableContainerMixin:
     """Mixin for containers that support block highlighting and navigation."""
 
-    def _init_highlight(self) -> None:
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._blocks: list = []
         self._highlighted_index: int | None = None
 
@@ -438,11 +439,14 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         classes: str | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self._init_highlight()
         self._next_command_number: int = 1
+        self._numbered_blocks: dict[int, CodeInputBlock] = {}
 
     def append_block(self, block: BaseBlock):
         self._blocks.append(block)
+        # Index numbered code blocks for fast lookup
+        if isinstance(block, CodeInputBlock) and block._command_number is not None:
+            self._numbered_blocks[block._command_number] = block
         self.mount(block)
         self.scroll_end(animate=False)
         return block
@@ -465,6 +469,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
                     block._status_icon.update("")
                 block._command_number = None
         self._next_command_number = 1
+        self._numbered_blocks.clear()
 
     def remove_block(self, block: BaseBlock) -> None:
         """Remove a block from the blocks list and the DOM."""
@@ -486,6 +491,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         self._blocks.clear()
         self._highlighted_index = None
         self._next_command_number = 1
+        self._numbered_blocks.clear()
 
     def action_activate_block(self) -> None:
         """Copy the highlighted block's code to the input with the correct mode."""
@@ -590,10 +596,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
 
     def _find_numbered_block(self, number: int) -> CodeInputBlock | None:
         """Find a CodeInputBlock with the given command number."""
-        for block in self._blocks:
-            if isinstance(block, CodeInputBlock) and block._command_number == number:
-                return block
-        return None
+        return self._numbered_blocks.get(number)
 
     def on_focus(self) -> None:
         """When focusing on TerminalOutput, highlight the last CodeInputBlock."""
@@ -628,7 +631,6 @@ class PinnedOutput(HighlightableContainerMixin, Vertical):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._init_highlight()
 
     can_focus = True
 

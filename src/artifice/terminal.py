@@ -24,7 +24,6 @@ from .terminal_output import (
     AssistantOutputBlock,
     ThinkingOutputBlock,
     CodeInputBlock,
-    CodeOutputBlock,
     WidgetOutputBlock,
     BaseBlock,
 )
@@ -32,6 +31,9 @@ from .config import get_sessions_dir, ensure_sessions_dir
 from .session import SessionTranscript
 from .chunk_buffer import ChunkBuffer
 from .fence_detector import StreamingFenceDetector
+from .status_indicator import StatusIndicatorManager
+from .output_callbacks import OutputCallbackHandler
+from .input_mode import InputMode
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +128,15 @@ class ArtificeTerminal(Widget):
         self.assistant_loading = LoadingIndicator()
         self.connection_status = Static("◉", id="connection-status")
         self.assistant_status = Static("", id="assistant-status")
+
+        # Status indicator manager
+        self._status_manager = StatusIndicatorManager(
+            self.assistant_loading,
+            self.connection_status,
+            self.assistant_status,
+            self._config,
+        )
+
         self._current_task: asyncio.Task | None = None
         self._context_blocks: list[BaseBlock] = []  # Blocks in assistant context
         self._current_detector: StreamingFenceDetector | None = (
@@ -142,7 +153,7 @@ class ArtificeTerminal(Widget):
         # Create assistant
         self._assistant: AssistantBase | None = None
         self._assistant = create_assistant(self._config, on_connect=on_connect)
-        self._set_assistant_inactive()
+        self._status_manager.set_inactive()
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -154,33 +165,7 @@ class ArtificeTerminal(Widget):
                 yield self.assistant_status
 
     def on_mount(self) -> None:
-        self._update_assistant_status()
-
-    def _update_assistant_status(self, usage=None) -> None:
-        """Update the assistant status line from config and optional token usage."""
-        if self._config.assistants:
-            assistant = self._config.assistants.get(self._config.assistant)
-            if assistant:
-                status = f"{assistant.get('model').lower()} ({assistant.get('provider').lower()})"
-                if usage:
-                    context_window = assistant.get("context_window")
-                    if context_window and usage.input_tokens:
-                        pct = usage.input_tokens / context_window * 100
-                        status += f"  [{pct:.0f}% of {self._format_tokens(context_window)} · {self._format_tokens(usage.input_tokens)}in / {self._format_tokens(usage.output_tokens)}out]"
-                    else:
-                        status += f"  [{self._format_tokens(usage.input_tokens)}in / {self._format_tokens(usage.output_tokens)}out]"
-                self.assistant_status.update(status)
-                return
-        self.assistant_status.update("")
-
-    @staticmethod
-    def _format_tokens(n: int) -> str:
-        """Format token count as a compact string (e.g. 1.2k, 128k)."""
-        if n >= 1_000_000:
-            return f"{n / 1_000_000:.1f}M"
-        if n >= 1_000:
-            return f"{n / 1_000:.1f}k"
-        return str(n)
+        self._status_manager.update_assistant_info()
 
     def _save_block_to_session(self, block: BaseBlock) -> None:
         """Save a block to the session transcript if enabled."""
@@ -212,71 +197,54 @@ class ArtificeTerminal(Widget):
     async def on_terminal_input_submitted(self, event: TerminalInput.Submitted) -> None:
         """Handle code submission from input."""
         code = event.code
-
         self.input.clear()
 
         async def do_execute():
-            language = ""
             if event.is_assistant_prompt:
                 await self._handle_assistant_prompt(code)
-                return
             elif event.is_shell_command:
-                language = "bash"
+                result = await self._execute_code(
+                    code, language="bash", in_context=self._auto_send_to_assistant
+                )
+                if self._auto_send_to_assistant:
+                    await self._send_execution_result_to_assistant(code, "bash", result)
             else:
-                language = "python"
-
-            result = await self._execute_code(
-                code, language=language, in_context=self._auto_send_to_assistant
-            )
-            if self._auto_send_to_assistant:
-                await self._send_execution_result_to_assistant(code, language, result)
+                result = await self._execute_code(
+                    code, language="python", in_context=self._auto_send_to_assistant
+                )
+                if self._auto_send_to_assistant:
+                    await self._send_execution_result_to_assistant(code, "python", result)
 
         self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
 
     def _make_output_callbacks(self, markdown_enabled: bool, in_context: bool = False):
         """Create on_output/on_error/flush callbacks that lazily create a CodeOutputBlock.
 
-        Callbacks buffer text and schedule a single flush per event-loop tick,
-        so rapid output (e.g. many lines from a shell command) gets batched.
         Returns (on_output, on_error, flush) — call flush() after execution to
         ensure all buffered text is rendered.
         """
-        state = {"block": None, "flush_scheduled": False, "saved": False}
+        handler = OutputCallbackHandler(
+            output=self.output,
+            markdown_enabled=markdown_enabled,
+            in_context=in_context,
+            save_callback=self._save_block_to_session,
+            schedule_fn=self.call_later,
+        )
 
-        def ensure_block():
-            if state["block"] is None:
-                state["block"] = CodeOutputBlock(
-                    render_markdown=markdown_enabled, in_context=in_context
-                )
-                if in_context:
-                    self._context_blocks.append(state["block"])
-                self.output.append_block(state["block"])
-            return state["block"]
+        # Mark block in context if needed
+        if in_context:
+            # We need to track the block when it's created
+            original_ensure = handler._ensure_block
 
-        def flush():
-            state["flush_scheduled"] = False
-            if state["block"]:
-                state["block"].flush()
-                self.output.scroll_end(animate=False)
-                # Save to session on final flush if not already saved
-                if not state["saved"]:
-                    self._save_block_to_session(state["block"])
-                    state["saved"] = True
+            def ensure_and_track():
+                block = original_ensure()
+                if block not in self._context_blocks:
+                    self._context_blocks.append(block)
+                return block
 
-        def _schedule_flush():
-            if not state["flush_scheduled"]:
-                state["flush_scheduled"] = True
-                self.call_later(flush)
+            handler._ensure_block = ensure_and_track
 
-        def on_output(text):
-            ensure_block().append_output(text)
-            _schedule_flush()
-
-        def on_error(text):
-            ensure_block().append_error(text)
-            _schedule_flush()
-
-        return on_output, on_error, flush
+        return handler.on_output, handler.on_error, handler.flush
 
     async def _execute_code(
         self,
@@ -333,17 +301,6 @@ class ArtificeTerminal(Widget):
             block.remove_class("in-context")
         self._context_blocks.clear()
 
-    def _set_assistant_active(self) -> None:
-        """Update status indicators to show assistant is processing."""
-        self.assistant_loading.classes = "assistant-active"
-        self.connection_status.remove_class("assistant-inactive")
-        self.connection_status.add_class("assistant-active")
-
-    def _set_assistant_inactive(self) -> None:
-        """Update status indicators to show assistant is idle."""
-        self.connection_status.add_class("assistant-inactive")
-        self.connection_status.remove_class("assistant-active")
-        self.assistant_loading.classes = "assistant-inactive"
 
     def _finalize_stream(self) -> None:
         """Flush buffers and finalize thinking block and detector after streaming ends."""
@@ -426,18 +383,18 @@ class ArtificeTerminal(Widget):
         if self._config.prompt_prefix:
             prompt = self._config.prompt_prefix + " " + prompt
 
-        self._set_assistant_active()
+        self._status_manager.set_active()
         try:
             response = await assistant.send_prompt(
                 prompt, on_chunk=on_chunk, on_thinking_chunk=on_thinking_chunk
             )
         except asyncio.CancelledError:
-            self._set_assistant_inactive()
+            self._status_manager.set_inactive()
             self._finalize_stream()
             self._current_detector = None
             raise
-        self._set_assistant_inactive()
-        self._update_assistant_status(usage=getattr(response, "usage", None))
+        self._status_manager.set_inactive()
+        self._status_manager.update_assistant_info(usage=getattr(response, "usage", None))
 
         self._finalize_stream()
         self._apply_assistant_response(self._current_detector, response)
@@ -490,9 +447,13 @@ class ArtificeTerminal(Widget):
         """Handle block activation: copy code to input with correct mode."""
         # Set the code in the input
         self.input.code = event.code
-        # Set the correct mode
-        self.input.mode = event.mode
-        self.input._update_prompt()
+        # Set the correct mode (convert string to InputMode)
+        try:
+            self.input.mode = InputMode.from_name(event.mode)
+            self.input._update_prompt()
+        except ValueError:
+            # If mode conversion fails, just keep current mode
+            pass
         # Focus the input
         self.input.query_one("#code-input", InputTextArea).focus()
 
@@ -602,7 +563,7 @@ class ArtificeTerminal(Widget):
         """Resume streaming after a pause-on-code-block."""
         self._stream_paused = False
         # Restore assistant status
-        self._update_assistant_status()
+        self._status_manager.update_assistant_info()
         # Feed detector's remainder
         if self._current_detector:
             self._current_detector.resume()
@@ -667,7 +628,8 @@ class ArtificeTerminal(Widget):
 
     async def action_toggle_mode_markdown(self) -> None:
         """Toggle markdown rendering for the current input mode (affects future blocks only)."""
-        attr, label = self._MARKDOWN_SETTINGS[self.input.mode]
+        mode_name = self.input.mode.value.name
+        attr, label = self._MARKDOWN_SETTINGS[mode_name]
         setattr(self, attr, not getattr(self, attr))
         enabled_str = "enabled" if getattr(self, attr) else "disabled"
         self.app.notify(f"Markdown {enabled_str} for {label}")
@@ -680,26 +642,20 @@ class ArtificeTerminal(Widget):
 
     def action_navigate_up(self) -> None:
         """Navigate up: from input to output (bottom block), or up through output blocks."""
-        # Check if input has focus
         input_area = self.input.query_one("#code-input", InputTextArea)
-        if input_area.has_focus:
-            # Move focus to output and highlight the bottom block
-            if self.output._blocks:
-                self.output.focus()
+        if input_area.has_focus and self.output._blocks:
+            # Move from input to output
+            self.output.focus()
         elif self.output.has_focus:
             # Navigate up through blocks
             self.output.highlight_previous()
 
     def action_navigate_down(self) -> None:
         """Navigate down: through output blocks, or from output to input."""
-        # Check if output has focus
         if self.output.has_focus:
-            # Try to move to next block
-            moved = self.output.highlight_next()
-            if not moved:
-                # At the bottom, move to input
+            # Try to move to next block, or move to input if at bottom
+            if not self.output.highlight_next():
                 self.input.query_one("#code-input", InputTextArea).focus()
-        # If input has focus, do nothing (already at the bottom)
 
     def action_toggle_auto_send_to_assistant(self) -> None:
         """Toggle auto-send mode - when enabled, all code execution results are sent to assistant."""

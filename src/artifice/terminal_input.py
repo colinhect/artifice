@@ -8,51 +8,16 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
-from textual.widgets import Static, TextArea, Input, LoadingIndicator
+from textual.widgets import Static, TextArea, LoadingIndicator
 from textual import events
-from textual_autocomplete import AutoComplete, DropdownItem, TargetState
+from textual_autocomplete import DropdownItem, TargetState
 
 from .prompts import list_prompts, load_prompt, fuzzy_match
+from .input_mode import InputMode
+from .search_mode_manager import SearchModeManager
 
 if TYPE_CHECKING:
     from .history import History
-
-
-class HistoryAutoComplete(AutoComplete):
-    """Custom AutoComplete that applies completion to a TextArea."""
-
-    def __init__(
-        self, terminal_input: TerminalInput, search_input: Input, **kwargs
-    ) -> None:
-        self._terminal_input = terminal_input
-        self._truncated_to_full: dict[str, str] = {}  # Map truncated text to full text
-        super().__init__(search_input, **kwargs)
-
-    def apply_completion(self, value: str, state: TargetState) -> None:
-        """Apply completion by setting the TextArea text and exiting search mode."""
-        # Use the original full text if this was a truncated item
-        full_text = self._truncated_to_full.get(value, value)
-        self._terminal_input.code = full_text
-        self._terminal_input._exit_search_mode()
-
-
-class PromptAutoComplete(AutoComplete):
-    """AutoComplete for slash-command prompt templates."""
-
-    def __init__(
-        self, terminal_input: TerminalInput, search_input: Input, **kwargs
-    ) -> None:
-        self._terminal_input = terminal_input
-        super().__init__(search_input, **kwargs)
-
-    def apply_completion(self, value: str, state: TargetState) -> None:
-        """Load the selected prompt and append to system prompt."""
-        content = load_prompt(value)
-        if content is not None:
-            self._terminal_input.post_message(
-                TerminalInput.PromptSelected(name=value, content=content.strip())
-            )
-        self._terminal_input._exit_prompt_search_mode()
 
 
 class InputTextArea(TextArea):
@@ -73,87 +38,124 @@ class InputTextArea(TextArea):
 
     def action_insert_newline(self) -> None:
         """Insert a newline."""
-        # Insert newline at cursor position
         self.insert("\n")
 
     def action_clear_input(self) -> None:
         """Clear the input text area."""
         self.text = ""
 
-    def set_syntax_highlighting(self, language: str) -> None:
-        """Enable or disable Python syntax highlighting."""
+    def set_syntax_highlighting(self, language: str | None) -> None:
+        """Set syntax highlighting language."""
         self.language = language
         self.theme = "vscode_dark"
 
     async def _on_key(self, event: events.Key) -> None:
         """Intercept key events before TextArea processes them."""
-        # CTRL+R for history search
+        # Delegate to specific handlers
+        if await self._handle_ctrl_r(event):
+            return
+        if await self._handle_enter(event):
+            return
+        if await self._handle_insert(event):
+            return
+        if await self._handle_escape(event):
+            return
+        if await self._handle_up(event):
+            return
+        if await self._handle_down(event):
+            return
+        if await self._handle_empty_input_shortcuts(event):
+            return
+        if await self._handle_slash(event):
+            return
+
+        # Let parent handle other keys
+        await super()._on_key(event)
+
+    async def _handle_ctrl_r(self, event: events.Key) -> bool:
+        """Handle CTRL+R for history search."""
         if event.key == "ctrl+r":
             event.prevent_default()
             event.stop()
             self.post_message(TerminalInput.HistorySearchRequested())
-            return
+            return True
+        return False
 
-        # Plain Enter key (modifiers are handled via Bindings)
+    async def _handle_enter(self, event: events.Key) -> bool:
+        """Handle Enter key - submit on single line, insert newline on multi-line."""
         if event.key == "enter":
-            # Check if text has multiple lines
             line_count = self.document.line_count
             if line_count == 1:
-                # Single line: submit the code
                 event.prevent_default()
                 event.stop()
                 self.post_message(TerminalInput.SubmitRequested())
-                return
-            # Multi-line: let it fall through to insert newline
-        # Insert key - cycle through modes
+                return True
+        return False
+
+    async def _handle_insert(self, event: events.Key) -> bool:
+        """Handle Insert key - cycle through modes."""
         if event.key == "insert":
             event.prevent_default()
             event.stop()
             self.post_message(TerminalInput.CycleMode())
-            return
-        # Escape key
+            return True
+        return False
+
+    async def _handle_escape(self, event: events.Key) -> bool:
+        """Handle Escape key - return to Python mode."""
         if event.key == "escape":
             event.prevent_default()
             event.stop()
-            self.post_message(TerminalInput.SetMode("python"))
-            return
-        # Up/Down for history navigation when at top/bottom of input
+            self.post_message(TerminalInput.SetMode(InputMode.PYTHON))
+            return True
+        return False
+
+    async def _handle_up(self, event: events.Key) -> bool:
+        """Handle Up arrow - history navigation when at top of input."""
         if event.key == "up":
-            # Check if cursor is on the first line
             cursor_row, _ = self.cursor_location
             if cursor_row == 0:
                 event.prevent_default()
                 event.stop()
                 self.post_message(TerminalInput.HistoryPrevious())
-                return
-        elif event.key == "down":
-            # Check if cursor is on the last line
+                return True
+        return False
+
+    async def _handle_down(self, event: events.Key) -> bool:
+        """Handle Down arrow - history navigation when at bottom of input."""
+        if event.key == "down":
             cursor_row, _ = self.cursor_location
             line_count = self.document.line_count
             if cursor_row >= line_count - 1:
                 event.prevent_default()
                 event.stop()
                 self.post_message(TerminalInput.HistoryNext())
-                return
-        # If input is empty, switch mode on shortcut key
-        _EMPTY_INPUT_SHORTCUTS = {
-            "greater_than_sign": "ai",
-            "dollar_sign": "shell",
-            "right_square_bracket": "python",
-        }
-        if not self.text.strip() and event.key in _EMPTY_INPUT_SHORTCUTS:
-            event.prevent_default()
-            event.stop()
-            self.post_message(TerminalInput.SetMode(_EMPTY_INPUT_SHORTCUTS[event.key]))
-            return
-        # Slash on empty input triggers prompt search
+                return True
+        return False
+
+    async def _handle_empty_input_shortcuts(self, event: events.Key) -> bool:
+        """Handle mode shortcuts when input is empty."""
+        if not self.text.strip():
+            shortcuts = {
+                "greater_than_sign": InputMode.AI,
+                "dollar_sign": InputMode.SHELL,
+                "right_square_bracket": InputMode.PYTHON,
+            }
+            if mode := shortcuts.get(event.key):
+                event.prevent_default()
+                event.stop()
+                self.post_message(TerminalInput.SetMode(mode))
+                return True
+        return False
+
+    async def _handle_slash(self, event: events.Key) -> bool:
+        """Handle slash on empty input - trigger prompt search."""
         if not self.text.strip() and event.character == "/":
             event.prevent_default()
             event.stop()
             self.post_message(TerminalInput.PromptSearchRequested())
-            return
-        # Let parent handle other keys
-        await super()._on_key(event)
+            return True
+        return False
 
 
 class TerminalInput(Static):
@@ -171,7 +173,7 @@ class TerminalInput(Static):
     class SetMode(Message):
         """Message requesting a mode switch."""
 
-        def __init__(self, mode: str) -> None:
+        def __init__(self, mode: InputMode) -> None:
             super().__init__()
             self.mode = mode
 
@@ -222,12 +224,6 @@ class TerminalInput(Static):
             self.is_shell_command = is_shell_command
             super().__init__()
 
-    _MODE_CONFIG = {
-        "ai": (">", None),
-        "shell": ("$", "bash"),
-        "python": ("]", "python"),
-    }
-
     def __init__(
         self,
         history: History | None = None,
@@ -237,12 +233,9 @@ class TerminalInput(Static):
         classes: str | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self.mode = "ai"
+        self.mode = InputMode.AI
         self._history = history
-        self._search_mode = False
-        self._prompt_search_mode = False
-        self._search_input: Input | None = None
-        self._autocomplete: AutoComplete | None = None
+        self._search_manager: SearchModeManager | None = None
         self.add_class("in-context")
 
     def compose(self) -> ComposeResult:
@@ -254,10 +247,17 @@ class TerminalInput(Static):
 
     def on_mount(self) -> None:
         """Focus the text area on mount."""
-        self.query_one("#code-input", InputTextArea).focus()
+        text_area = self.query_one("#code-input", InputTextArea)
+        text_area.focus()
         # Hide the loading indicator initially
         self.query_one("#activity-indicator", LoadingIndicator).styles.display = "none"
         self._update_prompt()
+        # Initialize search manager
+        self._search_manager = SearchModeManager(
+            text_area=text_area,
+            horizontal=self.query_one(Horizontal),
+            screen=self.screen,
+        )
 
     def on_terminal_input_submit_requested(self, _: SubmitRequested) -> None:
         """Handle submission request from TextArea."""
@@ -267,7 +267,7 @@ class TerminalInput(Static):
         """Handle mode switch request."""
         self.set_mode(event.mode)
 
-    def set_mode(self, mode: str) -> None:
+    def set_mode(self, mode: InputMode) -> None:
         """Switch to the given mode if not already active."""
         if self.mode != mode:
             self.mode = mode
@@ -275,13 +275,7 @@ class TerminalInput(Static):
 
     def on_terminal_input_cycle_mode(self, _: CycleMode) -> None:
         """Handle Insert key press - cycle through modes while keeping input."""
-        # Cycle: python -> ai -> shell -> python
-        if self.mode == "python":
-            self.mode = "ai"
-        elif self.mode == "ai":
-            self.mode = "shell"
-        else:  # shell
-            self.mode = "python"
+        self.mode = self.mode.cycle_next()
         self._update_prompt()
 
     def on_terminal_input_history_previous(self, _: HistoryPrevious) -> None:
@@ -294,13 +288,12 @@ class TerminalInput(Static):
 
     def _update_prompt(self) -> None:
         """Update the prompt display based on current mode."""
-        prompt_char, lang = self._MODE_CONFIG[self.mode]
         prompt_widget = self.query_one("#prompt-display", Static)
         text_area = self.query_one("#code-input", InputTextArea)
 
         with self.app.batch_update():
-            prompt_widget.update(prompt_char)
-            text_area.set_syntax_highlighting(lang)
+            prompt_widget.update(self.mode.prompt_char)
+            text_area.set_syntax_highlighting(self.mode.language)
 
     @property
     def code(self) -> str:
@@ -322,15 +315,15 @@ class TerminalInput(Static):
         if code:
             # Add to history before submitting
             if self._history is not None:
-                self._history.add(code, self.mode)
+                self._history.add(code, self.mode.value.name)
                 self._history.save()
 
             # Submit with current mode
-            is_ai = self.mode == "ai"
-            is_shell = self.mode == "shell"
             self.post_message(
                 self.Submitted(
-                    code, is_assistant_prompt=is_ai, is_shell_command=is_shell
+                    code,
+                    is_assistant_prompt=self.mode.is_ai,
+                    is_shell_command=self.mode.is_shell,
                 )
             )
 
@@ -340,7 +333,7 @@ class TerminalInput(Static):
             return
 
         # Get previous entry
-        entry = self._history.navigate_back(self.mode, self.code)
+        entry = self._history.navigate_back(self.mode.value.name, self.code)
         if entry is not None:
             self.code = entry
 
@@ -350,7 +343,7 @@ class TerminalInput(Static):
             return
 
         # Get next entry
-        entry = self._history.navigate_forward(self.mode)
+        entry = self._history.navigate_forward(self.mode.value.name)
         if entry is not None:
             self.code = entry
 
@@ -362,42 +355,27 @@ class TerminalInput(Static):
 
     def action_history_search(self) -> None:
         """Enter history search mode with autocomplete dropdown."""
-        if self._history is None:
+        if self._history is None or self._search_manager is None:
             return
 
-        if self._search_mode:
+        if self._search_manager.active:
             # Already in search mode, exit it
-            self._exit_search_mode()
+            self._search_manager.exit_search()
             return
 
-        # Enter search mode
-        self._search_mode = True
-
-        # Get the text area and horizontal container
-        text_area = self.query_one("#code-input", InputTextArea)
-        horizontal = self.query_one(Horizontal)
-
-        # Hide the text area
-        text_area.display = False
-
-        # Create search input
-        self._search_input = Input(
-            placeholder="Search history...", id="history-search-input"
-        )
-        horizontal.mount(self._search_input)
-
-        # Create autocomplete with history items
+        # Create autocomplete candidates function
         def get_history_candidates(state: TargetState) -> list[DropdownItem]:
             """Get filtered history items based on search input."""
-            search_text = state.text.lower()
-
-            if self._history is None:
+            if self._history is None or self._search_manager is None:
                 return []
 
+            search_text = state.text.lower()
+
             # Get history for current mode
-            if self.mode == "ai":
+            mode_name = self.mode.value.name
+            if mode_name == "ai":
                 history_list = self._history._ai_history
-            elif self.mode == "shell":
+            elif mode_name == "shell":
                 history_list = self._history._shell_history
             else:
                 history_list = self._history._python_history
@@ -409,8 +387,7 @@ class TerminalInput(Static):
                 if len(lines) > 3:
                     truncated = "\n".join(lines[:2] + [lines[2] + "..."])
                     # Store mapping from truncated to full
-                    if self._autocomplete is not None:
-                        self._autocomplete._truncated_to_full[truncated] = item
+                    self._search_manager.set_truncation_mapping(truncated, item)
                     return truncated
                 return item
 
@@ -422,38 +399,20 @@ class TerminalInput(Static):
 
             return filtered[:50]  # Limit to 50 items
 
-        # Mount autocomplete at screen level to avoid clipping
-        self._autocomplete = HistoryAutoComplete(
-            terminal_input=self,
-            search_input=self._search_input,
-            candidates=get_history_candidates,
+        # Apply completion function
+        def apply_history(value: str) -> None:
+            """Apply history selection and exit search."""
+            if self._search_manager:
+                full_text = self._search_manager.get_full_text(value)
+                self.code = full_text
+                self._search_manager.exit_search()
+
+        # Enter search mode
+        self._search_manager.enter_search(
+            placeholder="Search history...",
+            candidates_fn=get_history_candidates,
+            apply_fn=apply_history,
         )
-        # Mount to screen instead of horizontal container to prevent clipping
-        self.screen.mount(self._autocomplete)
-
-        # Focus the search input
-        self._search_input.focus()
-
-    def _exit_search_mode(self) -> None:
-        """Exit history search mode."""
-        if not self._search_mode:
-            return
-
-        self._search_mode = False
-
-        # Remove autocomplete and search input
-        if self._autocomplete is not None:
-            self._autocomplete.remove()
-            self._autocomplete = None
-
-        if self._search_input is not None:
-            self._search_input.remove()
-            self._search_input = None
-
-        # Show and focus the text area
-        text_area = self.query_one("#code-input", InputTextArea)
-        text_area.display = True
-        text_area.focus()
 
     def on_terminal_input_prompt_search_requested(
         self, _: PromptSearchRequested
@@ -463,25 +422,15 @@ class TerminalInput(Static):
 
     def _enter_prompt_search_mode(self) -> None:
         """Enter prompt template search mode with autocomplete dropdown."""
+        if self._search_manager is None:
+            return
+
         prompts = list_prompts()
         if not prompts:
             return
 
-        if self._search_mode:
+        if self._search_manager.active:
             return
-
-        self._search_mode = True
-        self._prompt_search_mode = True
-
-        text_area = self.query_one("#code-input", InputTextArea)
-        horizontal = self.query_one(Horizontal)
-
-        text_area.display = False
-
-        self._search_input = Input(
-            placeholder="Search prompts...", id="prompt-search-input"
-        )
-        horizontal.mount(self._search_input)
 
         prompt_names = sorted(prompts.keys())
 
@@ -495,30 +444,31 @@ class TerminalInput(Static):
                 if fuzzy_match(query, name)
             ]
 
-        self._autocomplete = PromptAutoComplete(
-            terminal_input=self,
-            search_input=self._search_input,
-            candidates=get_prompt_candidates,
-        )
-        self.screen.mount(self._autocomplete)
-        self._search_input.focus()
+        def apply_prompt(value: str) -> None:
+            """Load the selected prompt and exit search."""
+            content = load_prompt(value)
+            if content is not None:
+                self.post_message(
+                    TerminalInput.PromptSelected(name=value, content=content.strip())
+                )
+            if self._search_manager:
+                self._search_manager.exit_search()
 
-    def _exit_prompt_search_mode(self) -> None:
-        """Exit prompt search mode."""
-        self._prompt_search_mode = False
-        self._exit_search_mode()
+        # Enter search mode
+        self._search_manager.enter_search(
+            placeholder="Search prompts...",
+            candidates_fn=get_prompt_candidates,
+            apply_fn=apply_prompt,
+        )
 
     def on_key(self, event: events.Key) -> None:
         """Handle key events for exiting search mode."""
-        if self._search_mode and event.key == "escape":
-            if self._prompt_search_mode:
-                self._exit_prompt_search_mode()
-            else:
-                self._exit_search_mode()
+        if self._search_manager and self._search_manager.active and event.key == "escape":
+            self._search_manager.exit_search()
             event.prevent_default()
             event.stop()
 
     def focus_input(self) -> None:
         """Focus the input text area."""
-        if not self._search_mode:
+        if not self._search_manager or not self._search_manager.active:
             self.query_one("#code-input", InputTextArea).focus()
