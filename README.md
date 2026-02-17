@@ -1,29 +1,21 @@
 # Artifice
 
-A minimal intelligence agent harness with a terminal user interface. Provides direct, human-in-the-loop control over AI model interactions, code execution, and shell commands—without complex frameworks, protocols, or abstractions. Built with [Textual](https://github.com/Textualize/textual).
+A minimal intelligence agent harness with a terminal user interface. Provides control over AI model interactions, code execution, and shell commands—without complex frameworks, protocols, or abstractions. Built with [Textual](https://github.com/Textualize/textual).
 
 ## Philosophy
 
 Artifice is built on the principle that agent harnesses should be **minimal and transparent**:
-
-- **No MCP/ACP protocols** - Direct model prompting with simple tool definitions
-- **No hidden abstractions** - Every action is visible and editable before execution
-- **Minimal dependencies** - Core TUI built on Textual, minimal external requirements
-- **Tmux integration** - Execute commands in real terminal sessions, not isolated subprocesses
-- **Human-in-the-loop** - Review, edit, and approve all AI-proposed actions
-- **Session persistence** - Full conversation and execution history saved locally
 
 ## Features
 
 ### Intelligence Agent Harness
 - **Direct Model Prompting** - Simple, transparent prompting without MCP/ACP protocols
 - **Tool Calling** - AI can propose Python code or shell commands as executable tools
-- **Human Approval Loop** - Review, edit, or reject all AI-proposed actions before execution
 - **Selective Context** - Explicitly mark which blocks to include in agent context
 - **Session Transcripts** - Full conversation and execution history saved locally
 
 ### Execution Environments
-- **Python REPL** - Full interactive Python console with persistent session state
+- **Python** - Full interactive Python console
 - **Shell Commands** - Execute bash commands with streaming output
 - **Tmux Integration** - Route shell commands to existing tmux panes for real terminal state
 - **Textual Widgets** - Python code returning Textual objects gets mounted directly in the UI
@@ -34,18 +26,6 @@ Artifice is built on the principle that agent harnesses should be **minimal and 
 - **Block Navigation** - Navigate, edit, and re-execute previous inputs (Ctrl+Up/Down)
 - **Multiline Input** - Write complex code with proper formatting
 - **Command History** - Persistent history across sessions with search (Ctrl+R)
-
-## Installation
-
-```bash
-pip install -e .
-```
-
-## Running
-
-```bash
-artifice
-```
 
 ## Tmux Integration
 
@@ -91,6 +71,18 @@ artifice --tmux "dev:1.0" --tmux-prompt "^➜ "
 - `tmux` must be installed and accessible in PATH
 - Target tmux session must exist before launching Artifice
 - Prompt pattern must reliably match your shell prompt for command completion detection
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+## Running
+
+```bash
+artifice
+```
 
 ## Usage
 
