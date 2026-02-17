@@ -16,6 +16,19 @@ _CODE_OPEN_TAGS = {"<python>": "python", "<shell>": "bash"}
 _CODE_CLOSE_TAGS = {"python": "</python>", "bash": "</shell>"}
 _PROSE_TAG_TARGETS = ["<think>", "<detail>", "<python>", "<shell>"]
 
+# Aliases: normalize alternative tag names to canonical ones
+_TAG_NAME_ALIASES = {
+    "py": "python",
+    "code": "python",
+    "tool_call": "shell",
+    "bash": "shell",
+    "sh": "shell",
+    "cmd": "shell",
+}
+
+# Maximum length for a tag buffer before we give up (e.g. "< prefix:tool_call >")
+_MAX_TAG_LEN = 50
+
 
 class _FenceState(enum.Enum):
     PROSE = "prose"
@@ -147,30 +160,73 @@ class StreamingFenceDetector:
             self._tag_buffer = ""
 
     def _check_tags(self, ch: str, targets: list[str]) -> str | bool:
-        """Check if ch continues building toward any of the target tags.
+        """Accumulate characters between < and >, then normalize and check targets.
+
+        Handles liberal tag syntax:
+        - Whitespace inside tags: < shell >, < /python >
+        - Namespace prefixes: <minimax:tool_call>, <ns:shell>
+        - Aliases: <tool_call> treated as <shell>
 
         Returns:
-            str: The matched tag string if a complete tag was detected.
-            True: Still accumulating (buffer is a prefix of at least one target).
+            str: The canonical matched tag string if a complete tag was detected.
+            True: Still accumulating (haven't seen '>' yet).
             False: No match (buffer was flushed to pending).
         """
         self._tag_buffer += ch
 
-        # Check which targets the buffer is still a prefix of
-        matching = [t for t in targets if t.startswith(self._tag_buffer)]
-        if not matching:
-            # Mismatch - flush and return False
+        if ch == ">":
+            # Complete tag — normalize and check
+            canonical = self._normalize_tag(self._tag_buffer)
+            if canonical and canonical in targets:
+                self._tag_buffer = ""
+                return canonical
+            # Not a matching tag — flush raw text to pending
             self._flush_tag_buffer_to_pending()
             return False
 
-        # Check if we completed any tag
-        for t in matching:
-            if self._tag_buffer == t:
-                self._tag_buffer = ""
-                return t
+        # Bail on a second '<' (means the first wasn't a real tag)
+        if ch == "<" and len(self._tag_buffer) > 1:
+            # Flush everything except the new '<', which starts a new potential tag
+            old = self._tag_buffer[:-1]
+            self._tag_buffer = "<"
+            self._pending_buffer += old
+            return True  # Still accumulating from the new '<'
 
-        # Still building toward a tag
+        # Bail on newline inside a tag
+        if ch == "\n":
+            self._flush_tag_buffer_to_pending()
+            return False
+
+        # Bail if buffer is too long
+        if len(self._tag_buffer) > _MAX_TAG_LEN:
+            self._flush_tag_buffer_to_pending()
+            return False
+
         return True
+
+    @staticmethod
+    def _normalize_tag(raw_tag: str) -> str | None:
+        """Normalize a raw tag like '< minimax:tool_call >' to canonical '<shell>'.
+
+        Strips outer angle brackets, whitespace, namespace prefixes, and maps aliases.
+        """
+        inner = raw_tag[1:-1].strip()  # Strip < > and whitespace
+
+        # Handle closing tag
+        is_closing = inner.startswith("/")
+        if is_closing:
+            inner = inner[1:].strip()
+
+        # Strip namespace prefix (e.g. "minimax:tool_call" -> "tool_call")
+        if ":" in inner:
+            inner = inner.split(":", 1)[1].strip()
+
+        # Map aliases
+        name = _TAG_NAME_ALIASES.get(inner, inner)
+
+        if is_closing:
+            return f"</{name}>"
+        return f"<{name}>"
 
     def _flush_and_update_chunk(self) -> None:
         """Flush pending text and update the current block with the chunk buffer."""

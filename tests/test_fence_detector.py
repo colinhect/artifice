@@ -816,3 +816,192 @@ class TestPauseAfterCodeBlock:
         d.feed("thon>\nAfter")
         assert d.is_paused
         assert d._remainder == "After"
+
+
+class TestLiberalTagParsing:
+    """Tests for liberal tag syntax: tool_call aliases, namespace prefixes, whitespace."""
+
+    def test_tool_call_tag_as_shell(self):
+        """<tool_call> should be treated as <shell>."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Run:<tool_call>ls -la</tool_call>Done.")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "ls -la" in code_blocks[0]._code
+        assert code_blocks[0]._language == "bash"
+
+    def test_namespaced_tool_call(self):
+        """<minimax:tool_call> should be treated as <shell>."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Run:<minimax:tool_call>echo hi</minimax:tool_call>Done.")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "echo hi" in code_blocks[0]._code
+        assert code_blocks[0]._language == "bash"
+
+    def test_arbitrary_namespace_prefix(self):
+        """<anything:shell> should work with any prefix."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Run:<foo:shell>pwd</foo:shell>Done.")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "pwd" in code_blocks[0]._code
+
+    def test_namespaced_python_tag(self):
+        """<ns:python> should be treated as <python>."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Code:<ns:python>x = 1</ns:python>Done.")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "x = 1" in code_blocks[0]._code
+        assert code_blocks[0]._language == "python"
+
+    def test_whitespace_in_opening_tag(self):
+        """< shell > with spaces should be treated as <shell>."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Run:< shell >ls< /shell >Done.")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "ls" in code_blocks[0]._code
+        assert code_blocks[0]._language == "bash"
+
+    def test_whitespace_in_python_tag(self):
+        """< python > with spaces should work."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Code:< python >x = 1< /python >Done.")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "x = 1" in code_blocks[0]._code
+
+    def test_whitespace_in_think_tag(self):
+        """< think > with spaces should work."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Before< think >thinking< /think >After")
+        d.finish()
+
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 1
+        assert "thinking" in thinking_blocks[0]._text
+
+    def test_whitespace_and_namespace_combined(self):
+        """< minimax : tool_call > with spaces and namespace should work."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Run:< minimax:tool_call >echo hi< /minimax:tool_call >Done.")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "echo hi" in code_blocks[0]._code
+
+    def test_tool_call_split_across_chunks(self):
+        """<tool_call> split across feed() calls should work."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Run:<tool_")
+        d.feed("call>echo hi</tool_")
+        d.feed("call>Done.")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "echo hi" in code_blocks[0]._code
+
+    def test_tool_call_char_by_char(self):
+        """<tool_call> fed character by character should work."""
+        d, out = make_detector()
+        d.start()
+        for ch in "Hi<tool_call>x=1</tool_call>Bye":
+            d.feed(ch)
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "x=1" in code_blocks[0]._code
+
+    def test_tool_call_state_transitions(self):
+        """<tool_call> should transition to CODE state like <shell>."""
+        d, _ = make_detector()
+        d.start()
+        d.feed("<tool_call>")
+        assert d._state == _FenceState.CODE
+
+        d.feed("code</tool_call>")
+        assert d._state == _FenceState.PROSE
+
+    def test_mixed_open_close_tags(self):
+        """Opening with <tool_call> and closing with </shell> should work."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Run:<tool_call>echo hi</shell>Done.")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        assert "echo hi" in code_blocks[0]._code
+
+    def test_second_angle_bracket_resets(self):
+        """A second < should flush the first and start a new tag."""
+        d, out = make_detector()
+        d.start()
+        d.feed("x < 5 <python>code</python>Done")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 1
+        # The "x < 5 " should appear as prose
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock) and b._text.strip()]
+        assert any("x < 5" in b._text for b in prose_blocks)
+
+    def test_newline_in_tag_aborts(self):
+        """A newline inside a potential tag should abort tag detection."""
+        d, out = make_detector()
+        d.start()
+        d.feed("x <\npython>code")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 0
+
+    def test_pause_with_tool_call(self):
+        """Pause after code block works with <tool_call> tags."""
+        output = FakeOutput()
+        d = StreamingFenceDetector(output, pause_after_code=True)
+        d._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
+        d._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
+        d._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
+        d.start()
+        d.feed("Hello<tool_call>ls</tool_call>\nAfter")
+        assert d.is_paused
+        assert d._remainder == "After"
+
+    def test_unrecognized_tag_is_prose(self):
+        """<unknown_tag> should be treated as prose."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Hello <unknown>world</unknown> end")
+        d.finish()
+
+        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
+        assert len(code_blocks) == 0
+        thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
+        assert len(thinking_blocks) == 0
