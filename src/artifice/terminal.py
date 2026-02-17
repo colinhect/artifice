@@ -340,6 +340,15 @@ class ArtificeTerminal(Widget):
             self._save_block_to_session(self._thinking_block)
             self._thinking_block = None
 
+        # If the stream was paused (code block detected), resume the detector
+        # so any remaining text gets processed before finalization.
+        if self._stream_paused and self._current_detector:
+            self._current_detector.resume()
+            self._chunk_buf.resume()
+
+        # Clear the pause flag — streaming is over
+        self._stream_paused = False
+
         # Flush any remaining buffered chunks and finalize detector
         self._chunk_buf.flush_sync()
         if self._current_detector:

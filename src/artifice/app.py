@@ -6,6 +6,7 @@ from textual.widgets import Footer, Static
 
 from artifice import ArtificeTerminal
 from artifice.config import load_config, ArtificeConfig
+from artifice.prompts import load_prompt
 from artifice.theme import create_artifice_theme
 
 
@@ -95,6 +96,12 @@ def main():
 
     # Load configuration from ~/.config/artifice/init.yaml
     config, config_error = load_config()
+
+    # Auto-load system prompt from prompts/system.md if not set in config
+    if config.system_prompt is None:
+        system_prompt_content = load_prompt("system")
+        if system_prompt_content is not None:
+            config.system_prompt = system_prompt_content
 
     # Command-line arguments override config
     if args.assistant is not None:
