@@ -33,11 +33,11 @@ class StreamingFenceDetector:
     Creates blocks as tags are detected, accumulating text to update once per chunk.
     """
 
-    def __init__(self, output: TerminalOutput, auto_scroll, save_callback=None, pause_after_code: bool = False) -> None:
+    def __init__(self, output: TerminalOutput, save_callback=None, pause_after_code: bool = False) -> None:
         self._output = output
-        self._auto_scroll = auto_scroll
         self._save_callback = save_callback  # Callback to save blocks to session
         self._pause_after_code = pause_after_code
+        self._started = False
         self._paused = False
         self._remainder = ""
         self._last_code_block: BaseBlock | None = None
@@ -94,7 +94,13 @@ class StreamingFenceDetector:
             self.feed(remainder)
 
     def start(self) -> None:
-        """Create the initial AssistantOutputBlock for streaming prose."""
+        """Create the initial AssistantOutputBlock for streaming prose.
+
+        Idempotent — safe to call multiple times; only the first call has effect.
+        """
+        if self._started:
+            return
+        self._started = True
         self._current_block = self._make_prose_block(activity=True)
         self._output.append_block(self._current_block)
         self.all_blocks.append(self._current_block)
@@ -110,8 +116,14 @@ class StreamingFenceDetector:
         for i, ch in enumerate(text):
             self._feed_char(ch)
             if self._paused:
-                # Save unprocessed remainder (chars after current one)
-                self._remainder = text[i + 1:]
+                # Save unprocessed remainder (chars after current one),
+                # stripping any trailing junk on the same line as the closing tag
+                raw_remainder = text[i + 1:]
+                newline_pos = raw_remainder.find("\n")
+                if newline_pos >= 0:
+                    self._remainder = raw_remainder[newline_pos + 1:]
+                else:
+                    self._remainder = ""
                 break
         # Flush any pending text to the chunk buffer for display
         self._flush_pending_to_chunk()
@@ -395,17 +407,12 @@ class StreamingFenceDetector:
         """Remove a block from tracking lists and the DOM."""
         if block in self.all_blocks:
             self.all_blocks.remove(block)
-        if block in self._output._blocks:
-            self._output._blocks.remove(block)
-        block.remove()
+        self._output.remove_block(block)
 
     def finish(self) -> None:
         """Flush any remaining state at end of stream."""
-        # Handle incomplete think tags
-        if self._state == _FenceState.THINKING:
-            # If we're still in thinking state, treat remaining content as thinking
-            # (the closing tag may come later or be missing)
-            pass
+        # Ensure start() was called (handles empty stream edge case)
+        self.start()
 
         # Flush any incomplete tag buffer
         self._flush_tag_buffer_to_pending()

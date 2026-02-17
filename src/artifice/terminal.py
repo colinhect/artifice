@@ -26,7 +26,6 @@ from .terminal_output import (
     CodeInputBlock,
     CodeOutputBlock,
     WidgetOutputBlock,
-    PinnedOutput,
     BaseBlock,
 )
 from .config import get_sessions_dir, ensure_sessions_dir
@@ -92,10 +91,14 @@ class ArtificeTerminal(Widget):
         self._config = app.config
 
         self._executor = CodeExecutor()
-        self._shell_executor = TmuxShellExecutor("hect:artifice.1", prompt_pattern="^colin@lucidity:\\S+\\$ ")
+        if self._config.tmux_target:
+            prompt_pattern = self._config.tmux_prompt_pattern or r"^\$ "
+            self._shell_executor = TmuxShellExecutor(self._config.tmux_target, prompt_pattern=prompt_pattern)
+        else:
+            self._shell_executor = ShellExecutor()
 
-        # Set shell init script from config
-        if self._config.shell_init_script:
+        # Set shell init script from config (only applicable to ShellExecutor)
+        if self._config.shell_init_script and isinstance(self._shell_executor, ShellExecutor):
             self._shell_executor.init_script = self._config.shell_init_script
 
         # Create history manager
@@ -123,7 +126,6 @@ class ArtificeTerminal(Widget):
         self.assistant_loading = LoadingIndicator()
         self.connection_status = Static("◉", id="connection-status")
         self.assistant_status = Static("", id="assistant-status")
-        # self.pinned_output = PinnedOutput(id="pinned")
         self._current_task: asyncio.Task | None = None
         self._context_blocks: list[BaseBlock] = []  # Blocks in assistant context
         self._current_detector: StreamingFenceDetector | None = (
@@ -146,19 +148,24 @@ class ArtificeTerminal(Widget):
         with Vertical():
             yield self.output
             yield self.input
-            # yield self.pinned_output
             with Horizontal(id="status-line"):
                 yield self.assistant_loading
                 yield self.connection_status
                 yield self.assistant_status
 
     def on_mount(self) -> None:
+        self._update_assistant_status()
+
+    def _update_assistant_status(self) -> None:
+        """Update the assistant status line from config."""
         if self._config.assistants:
             assistant = self._config.assistants.get(self._config.assistant)
             if assistant:
                 self.assistant_status.update(
                     f"{assistant.get('model').lower()} ({assistant.get('provider').lower()})"
                 )
+                return
+        self.assistant_status.update("")
 
     def _save_block_to_session(self, block: BaseBlock) -> None:
         """Save a block to the session transcript if enabled."""
@@ -335,10 +342,6 @@ class ArtificeTerminal(Widget):
 
         # Flush any remaining buffered chunks and finalize detector
         self._chunk_buf.flush_sync()
-        if not self._detector_started:
-            self._detector_started = True
-            if self._current_detector:
-                self._current_detector.start()
         if self._current_detector:
             self._current_detector.finish()
 
@@ -369,13 +372,11 @@ class ArtificeTerminal(Widget):
                 break
 
         if last_code_block is not None:
-            try:
-                idx = self.output._blocks.index(last_code_block)
+            idx = self.output.index_of(last_code_block)
+            if idx is not None:
                 self.output._highlighted_index = idx
                 self.output._update_highlight()
                 self.output.focus()
-            except ValueError:
-                pass
 
     async def _stream_assistant_response(
         self, assistant: AssistantBase, prompt: str
@@ -388,12 +389,9 @@ class ArtificeTerminal(Widget):
 
         self._current_detector = StreamingFenceDetector(
             self.output,
-            self.output.auto_scroll,
             save_callback=self._save_block_to_session,
             pause_after_code=True,
         )
-        self._detector_started = False
-
         def on_chunk(text):
             self.post_message(StreamChunk(text))
 
@@ -454,21 +452,6 @@ class ArtificeTerminal(Widget):
             )
             await self._stream_assistant_response(self._assistant, prompt)
 
-    async def on_terminal_output_pin_requested(
-        self, event: TerminalOutput.PinRequested
-    ) -> None:
-        """Handle pin request: move widget block from output to pinned area."""
-        block = event.block
-        await block.remove()
-        # await self.pinned_output.add_pinned_block(block)
-
-    async def on_pinned_output_unpin_requested(
-        self, event: PinnedOutput.UnpinRequested
-    ) -> None:
-        """Handle unpin request: remove block from pinned area."""
-        pass
-        # await self.pinned_output.remove_pinned_block(event.block)
-
     async def on_terminal_output_block_activated(
         self, event: TerminalOutput.BlockActivated
     ) -> None:
@@ -486,12 +469,20 @@ class ArtificeTerminal(Widget):
     ) -> None:
         """Handle block execution: execute code from a block and send output to assistant."""
         block = event.block
+
+        # If stream is paused and this is the paused code block, use the pause handler
+        if self._stream_paused and self._current_detector and block is self._current_detector.last_code_block:
+            self._current_task = asyncio.create_task(
+                self._run_cancellable(self._execute_paused_code_block())
+            )
+            return
+
         code = block.get_code()
         mode = block.get_mode()
         language = "bash" if mode == "shell" else "python"
 
         # Show loading indicator before execution
-        await block.show_loading()
+        block.show_loading()
 
         # Focus input immediately so user can continue working
         self.input.query_one("#code-input", InputTextArea).focus()
@@ -528,9 +519,7 @@ class ArtificeTerminal(Widget):
         """Handle streaming chunk message - buffer and batch process chunks."""
         if self._current_detector:
             # Start detector on first text chunk (deferred so thinking block comes first)
-            if not self._detector_started:
-                self._detector_started = True
-                self._current_detector.start()
+            self._current_detector.start()
             self._chunk_buf.append(event.text)
 
     def _drain_chunks(self, text: str) -> None:
@@ -538,9 +527,7 @@ class ArtificeTerminal(Widget):
         if not self._current_detector:
             return
         # Ensure detector is started before feeding text
-        if not self._detector_started:
-            self._detector_started = True
-            self._current_detector.start()
+        self._current_detector.start()
         try:
             with self.app.batch_update():
                 self._current_detector.feed(text)
@@ -554,13 +541,11 @@ class ArtificeTerminal(Widget):
                 # Highlight the code block that just completed
                 code_block = self._current_detector.last_code_block
                 if code_block is not None:
-                    try:
-                        idx = self.output._blocks.index(code_block)
+                    idx = self.output.index_of(code_block)
+                    if idx is not None:
                         self.output._highlighted_index = idx
                         self.output._update_highlight()
                         self.output.focus()
-                    except ValueError:
-                        pass
         except Exception:
             logger.exception("Error processing chunk buffer")
 
@@ -585,16 +570,7 @@ class ArtificeTerminal(Widget):
         """Resume streaming after a pause-on-code-block."""
         self._stream_paused = False
         # Restore assistant status
-        if self._config.assistants:
-            assistant = self._config.assistants.get(self._config.assistant)
-            if assistant:
-                self.assistant_status.update(
-                    f"{assistant.get('model').lower()} ({assistant.get('provider').lower()})"
-                )
-            else:
-                self.assistant_status.update("")
-        else:
-            self.assistant_status.update("")
+        self._update_assistant_status()
         # Feed detector's remainder
         if self._current_detector:
             self._current_detector.resume()
@@ -613,13 +589,15 @@ class ArtificeTerminal(Widget):
         code = code_block.get_code()
         mode = code_block.get_mode()
         language = "bash" if mode == "shell" else "python"
-        await self._execute_code(
+        result = await self._execute_code(
             code,
             language=language,
             code_input_block=code_block,
             in_context=self._auto_send_to_assistant,
         )
         self._resume_stream()
+        if self._auto_send_to_assistant:
+            await self._send_execution_result_to_assistant(code, language, result)
 
     def on_key(self, event) -> None:
         """Handle key events, including pause-state shortcuts."""
@@ -642,6 +620,7 @@ class ArtificeTerminal(Widget):
 
     def action_clear(self) -> None:
         """Clear the output."""
+        self._context_blocks.clear()
         self.output.clear()
 
     def action_focus_input(self) -> None:

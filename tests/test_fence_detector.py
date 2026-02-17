@@ -102,6 +102,11 @@ class FakeOutput:
     def append_block(self, block):
         self._blocks.append(block)
 
+    def remove_block(self, block):
+        if block in self._blocks:
+            self._blocks.remove(block)
+        block.remove()
+
     def scroll_end(self, animate=False):
         pass
 
@@ -125,7 +130,7 @@ def make_detector(save_callback=None):
     """Create a detector with fake dependencies."""
     output = FakeOutput()
     detector = StreamingFenceDetector(
-        output, auto_scroll=True, save_callback=save_callback
+        output, save_callback=save_callback
     )
     detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
     detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
@@ -733,7 +738,7 @@ class TestPauseAfterCodeBlock:
         """Create a detector with pause_after_code enabled."""
         output = FakeOutput()
         detector = StreamingFenceDetector(
-            output, auto_scroll=True, pause_after_code=True
+            output, pause_after_code=True
         )
         detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
         detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
@@ -744,9 +749,18 @@ class TestPauseAfterCodeBlock:
         """Detector pauses after a code block closes."""
         d, out = self.make_pausing_detector()
         d.start()
-        d.feed("Hello<python>x=1</python>After code")
+        d.feed("Hello<python>x=1</python>trailing junk\nAfter code")
         assert d.is_paused
+        # Trailing chars on the same line as closing tag are stripped
         assert d._remainder == "After code"
+
+    def test_pauses_strips_trailing_no_newline(self):
+        """Trailing chars with no newline are fully discarded."""
+        d, out = self.make_pausing_detector()
+        d.start()
+        d.feed("Hello<python>x=1</python>junk")
+        assert d.is_paused
+        assert d._remainder == ""
 
     def test_last_code_block_set(self):
         """last_code_block is set to the block that triggered the pause."""
@@ -761,24 +775,25 @@ class TestPauseAfterCodeBlock:
         """resume() processes the saved remainder text."""
         d, out = self.make_pausing_detector()
         d.start()
-        d.feed("Hello<python>x=1</python>After text")
+        d.feed("Hello<python>x=1</python>junk\nAfter text")
         assert d.is_paused
 
         d.resume()
         # After resume, paused should be False (no more code blocks in remainder)
         assert not d.is_paused
-        # The "After text" should now be in a prose block
+        # The "After text" should now be in a prose block (trailing "junk" is stripped)
         prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
         combined = "".join(b._text for b in prose_blocks)
         assert "After text" in combined
+        assert "junk" not in combined
 
     def test_resume_with_second_code_block(self):
         """resume() pauses again if remainder contains another code block."""
         d, out = self.make_pausing_detector()
         d.start()
-        d.feed("Hello<python>first</python>Middle<shell>ls</shell>End")
+        d.feed("Hello<python>first</python>\nMiddle<shell>ls</shell>\nEnd")
         assert d.is_paused
-        assert "Middle<shell>ls</shell>End" == d._remainder
+        assert "Middle<shell>ls</shell>\nEnd" == d._remainder
 
         d.resume()
         # Should pause again on second code block
@@ -798,6 +813,6 @@ class TestPauseAfterCodeBlock:
         d.start()
         d.feed("Hello<python>x=1</py")
         assert not d.is_paused  # Tag not complete yet
-        d.feed("thon>After")
+        d.feed("thon>\nAfter")
         assert d.is_paused
         assert d._remainder == "After"

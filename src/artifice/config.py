@@ -44,6 +44,10 @@ class ArtificeConfig:
         # Shell init script (for bash)
         self.shell_init_script: Optional[str] = None
 
+        # Tmux settings
+        self.tmux_target: Optional[str] = None
+        self.tmux_prompt_pattern: Optional[str] = None
+
         # Session settings
         self.save_sessions: bool = True
         self.sessions_dir: Optional[str] = None  # Defaults to ~/.artifice/sessions/

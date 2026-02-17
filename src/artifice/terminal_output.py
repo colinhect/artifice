@@ -76,7 +76,7 @@ class CodeInputBlock(BaseBlock):
             self._status_icon.remove_class("status-success")
             self._status_icon.add_class("status-error")
 
-    async def show_loading(self) -> None:
+    def show_loading(self) -> None:
         """Show the loading indicator (for re-execution)."""
         self._loading_indicator.styles.display = "block"
         # Clear any previous status styling
@@ -306,8 +306,6 @@ class AssistantOutputBlock(BufferedOutputBlock):
             if elapsed >= self._FLUSH_INTERVAL:
                 self._markdown.update(self._full.lstrip())
                 self._last_full_update_time = now
-            # elif self._chunk:
-            #    self._markdown.append(self._chunk)
         elif self._markdown:
             # Not streaming, just do a full update
             self._markdown.update(self._full.strip())
@@ -467,6 +465,19 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
                     block._status_icon.update("")
                 block._command_number = None
         self._next_command_number = 1
+
+    def remove_block(self, block: BaseBlock) -> None:
+        """Remove a block from the blocks list and the DOM."""
+        if block in self._blocks:
+            self._blocks.remove(block)
+        block.remove()
+
+    def index_of(self, block: BaseBlock) -> int | None:
+        """Return the index of a block, or None if not found."""
+        try:
+            return self._blocks.index(block)
+        except ValueError:
+            return None
 
     def clear(self) -> None:
         """Clear all output."""

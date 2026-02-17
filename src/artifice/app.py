@@ -83,6 +83,14 @@ def main():
     parser.add_argument(
         "--logging", action="store_true", default=None, help="Enable logging"
     )
+    parser.add_argument(
+        "--tmux", default=None, metavar="TARGET",
+        help="Use tmux shell executor with the given target (e.g. 'session:window.pane')",
+    )
+    parser.add_argument(
+        "--tmux-prompt", default=None, metavar="PATTERN",
+        help="Regex matching the shell prompt in the tmux pane",
+    )
     args = parser.parse_args()
 
     # Load configuration from ~/.config/artifice/init.yaml
@@ -97,6 +105,10 @@ def main():
         config.prompt_prefix = args.prompt_prefix
     if args.thinking_budget is not None:
         config.thinking_budget = args.thinking_budget
+    if args.tmux is not None:
+        config.tmux_target = args.tmux
+    if args.tmux_prompt is not None:
+        config.tmux_prompt_pattern = args.tmux_prompt
     if args.logging:
         import logging
 
