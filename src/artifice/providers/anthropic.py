@@ -72,6 +72,7 @@ class AnthropicProvider(ProviderBase):
             ProviderResponse with the complete response
         """
         if not self.api_key:
+            logger.error("No ANTHROPIC_API_KEY set")
             return ProviderResponse(
                 text="",
                 error="No API key found. Set ANTHROPIC_API_KEY environment variable.",
@@ -81,6 +82,7 @@ class AnthropicProvider(ProviderBase):
             client = self._get_client()
             loop = asyncio.get_running_loop()
             cancelled = threading.Event()
+            logger.info("Sending %d messages to %s", len(messages), self.model)
 
             def sync_stream():
                 """Synchronously stream from Claude."""
@@ -127,6 +129,12 @@ class AnthropicProvider(ProviderBase):
                 cancelled.set()
                 raise
             text, stop_reason, thinking_text, content_blocks, usage = result
+            logger.info(
+                "Response complete (%d chars, stop_reason=%s, %d in/%d out tokens)",
+                len(text), stop_reason,
+                usage.input_tokens if usage else 0,
+                usage.output_tokens if usage else 0,
+            )
 
             return ProviderResponse(
                 text=text,
@@ -137,9 +145,11 @@ class AnthropicProvider(ProviderBase):
             )
 
         except ImportError as e:
+            logger.error("anthropic package not available: %s", e)
             return ProviderResponse(text="", error=str(e))
         except Exception as e:
             error_msg = f"Error communicating with Claude: {e}"
+            logger.error("%s", error_msg)
             return ProviderResponse(text="", error=error_msg)
 
     @staticmethod

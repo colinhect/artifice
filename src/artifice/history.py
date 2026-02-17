@@ -186,14 +186,12 @@ class History:
                             -self._max_history_size :
                         ]
         except json.JSONDecodeError as e:
-            logger.warning(
-                f"Failed to load history from {self._history_file}: Invalid JSON - {e}"
-            )
+            logger.warning("Failed to load history from %s: invalid JSON - %s", self._history_file, e)
             self._python_history = []
             self._ai_history = []
             self._shell_history = []
         except Exception as e:
-            logger.warning(f"Failed to load history from {self._history_file}: {e}")
+            logger.warning("Failed to load history from %s: %s", self._history_file, e)
             self._python_history = []
             self._ai_history = []
             self._shell_history = []
@@ -217,6 +215,6 @@ class History:
             # Set restrictive permissions (user read/write only) for security
             self._history_file.chmod(0o600)
         except OSError as e:
-            logger.warning(f"Failed to save history to {self._history_file}: {e}")
+            logger.warning("Failed to save history to %s: %s", self._history_file, e)
         except Exception as e:
-            logger.warning(f"Unexpected error saving history: {e}")
+            logger.warning("Unexpected error saving history: %s", e)

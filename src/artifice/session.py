@@ -7,9 +7,12 @@ in ~/.artifice/sessions/
 from __future__ import annotations
 
 import datetime
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 from .config import ArtificeConfig
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .terminal_output import BaseBlock
@@ -34,6 +37,7 @@ class SessionTranscript:
 
         # Track if we've written the header
         self._header_written = False
+        logger.info("Session transcript: %s", self.session_file)
 
     def _ensure_header(self) -> None:
         """Write session header if not already written."""

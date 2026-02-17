@@ -1,10 +1,13 @@
 """Module with provider/assistant architecture."""
 
+import logging
 from typing import Callable
 
 import os
 
 from ..config import ArtificeConfig
+
+logger = logging.getLogger(__name__)
 
 # Core interfaces
 from .common import AssistantBase as AssistantBase
@@ -36,6 +39,7 @@ def create_assistant(
     provider = assistant.get("provider")
     model = assistant.get("model")
     thinking_budget = assistant.get("thinking_budget")
+    logger.info("Creating assistant %r (provider=%s, model=%s)", config.assistant, provider, model)
 
     if config.thinking_budget is not None:
         thinking_budget = config.thinking_budget

@@ -77,6 +77,7 @@ class OllamaProvider(ProviderBase):
             client = self._get_client()
             loop = asyncio.get_running_loop()
             cancelled = threading.Event()
+            logger.info("Sending %d messages to %s", len(messages), self.model)
 
             def sync_stream():
                 """Synchronously stream from Ollama with thinking support."""
@@ -135,6 +136,8 @@ class OllamaProvider(ProviderBase):
                 cancelled.set()
                 raise
 
+            logger.info("Response complete (%d chars, stop_reason=%s)", len(text), stop_reason)
+
             return ProviderResponse(
                 text=text,
                 stop_reason=stop_reason,
@@ -142,7 +145,9 @@ class OllamaProvider(ProviderBase):
             )
 
         except ImportError as e:
+            logger.error("ollama package not available: %s", e)
             return ProviderResponse(text="", error=str(e))
         except Exception as e:
             error_msg = f"Error communicating with Ollama: {e}"
+            logger.error("%s", error_msg)
             return ProviderResponse(text="", error=error_msg)

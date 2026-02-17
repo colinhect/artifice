@@ -135,7 +135,7 @@ def main():
             filename="artifice_assistant.log",
             filemode="a",  # append mode
         )
-        logging.getLogger("artifice.assistant").setLevel(logging.DEBUG)
+        logging.getLogger("artifice").setLevel(logging.DEBUG)
 
     app = ArtificeApp(config)
 

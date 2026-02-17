@@ -64,7 +64,8 @@ class Assistant(AssistantBase):
         # Add user message to history (only if non-empty)
         if prompt.strip():
             self.messages.append({"role": "user", "content": prompt})
-            logger.info(f"[Assistant] Sending prompt: {prompt[:100]}...")
+            logger.info("Sending prompt (%d chars, %d messages)", len(prompt), len(self.messages))
+            logger.debug("Prompt text: %s", prompt[:200])
 
         # Delegate to provider
         try:
@@ -82,7 +83,7 @@ class Assistant(AssistantBase):
 
         # Handle errors
         if response.error:
-            logger.error(f"[Assistant] Provider error: {response.error}")
+            logger.error("Provider error: %s", response.error)
             return AssistantResponse(text="", error=response.error)
 
         # Add assistant response to history
@@ -97,7 +98,8 @@ class Assistant(AssistantBase):
                 # Use plain text format for OpenAI-compatible providers
                 self.messages.append({"role": "assistant", "content": response.text})
             logger.info(
-                f"[Assistant] Received response ({len(response.text)} chars, stop_reason={response.stop_reason})"
+                "Received response (%d chars, stop_reason=%s)",
+                len(response.text), response.stop_reason,
             )
 
         return AssistantResponse(
@@ -111,4 +113,4 @@ class Assistant(AssistantBase):
         """Clear conversation history."""
         self.messages = []
         self.prompt_updated()
-        logger.info("[Assistant] Conversation history cleared")
+        logger.info("Conversation history cleared")

@@ -72,7 +72,7 @@ class OpenAICompatibleProvider(ProviderBase):
             client = self._get_client()
             assert client
 
-            logger.info(f"[OpenAIProvider] Messages history length: {len(messages)}")
+            logger.info("Sending %d messages to %s", len(messages), self.model)
 
             # Run synchronous streaming in executor to avoid blocking
             loop = asyncio.get_running_loop()
@@ -134,17 +134,14 @@ class OpenAICompatibleProvider(ProviderBase):
                 cancelled.set()
                 raise
 
-            if thinking_text:
-                logger.info(
-                    f"[OpenAIProvider] Received thinking content, length: {len(thinking_text)}"
-                )
             logger.info(
-                f"[OpenAIProvider] Received {chunk_count} chunks, total length: {len(text)}"
+                "Response complete (%d chars in %d chunks, %d in/%d out tokens)",
+                len(text), chunk_count,
+                usage.input_tokens if usage else 0,
+                usage.output_tokens if usage else 0,
             )
-            if usage:
-                logger.info(
-                    f"[OpenAIProvider] Token usage: {usage.input_tokens} in, {usage.output_tokens} out, {usage.total_tokens} total"
-                )
+            if thinking_text:
+                logger.debug("Received thinking content (%d chars)", len(thinking_text))
 
             return ProviderResponse(
                 text=text,
@@ -156,5 +153,5 @@ class OpenAICompatibleProvider(ProviderBase):
             import traceback
 
             error_msg = f"Error communicating with model: {traceback.format_exc()}"
-            logger.error(f"[OpenAIProvider] {error_msg}")
+            logger.error("%s", error_msg)
             return ProviderResponse(text="", error=error_msg)

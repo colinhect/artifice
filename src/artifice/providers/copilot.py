@@ -46,17 +46,17 @@ class CopilotProvider(ProviderBase):
                 if self.on_connect:
                     self.on_connect(f"Copilot ({self.model})")
 
-                logger.info("[CopilotProvider] Connected to Copilot CLI")
+                logger.info("Connected to Copilot CLI")
             except ImportError as e:
                 error_msg = (
                     "github-copilot-sdk package not installed. "
                     "Install with: pip install github-copilot-sdk"
                 )
-                logger.error(f"[CopilotProvider] {error_msg}")
+                logger.error("%s", error_msg)
                 raise ImportError(error_msg) from e
             except Exception as e:
                 error_msg = f"Failed to start Copilot client: {e}"
-                logger.error(f"[CopilotProvider] {error_msg}")
+                logger.error("%s", error_msg)
                 raise RuntimeError(error_msg) from e
 
         return self._client
@@ -82,7 +82,7 @@ class CopilotProvider(ProviderBase):
                 }
 
             self._session = await client.create_session(session_config)
-            logger.info(f"[CopilotProvider] Created session with model {self.model}")
+            logger.info("Created session with model %s", self.model)
 
         return self._session
 
@@ -91,9 +91,9 @@ class CopilotProvider(ProviderBase):
         if self._session is not None:
             try:
                 await self._session.destroy()
-                logger.info("[CopilotProvider] Session destroyed")
+                logger.info("Session destroyed")
             except Exception as e:
-                logger.error(f"[CopilotProvider] Error destroying session: {e}")
+                logger.error("Error destroying session: %s", e)
             finally:
                 self._session = None
 
@@ -152,12 +152,12 @@ class CopilotProvider(ProviderBase):
                             if delta:
                                 on_chunk(delta)
                     except Exception as e:
-                        logger.error(f"[CopilotProvider] Delta handler error: {e}")
+                        logger.error("Delta handler error: %s", e)
 
                 unsubscribe = session.on(handle_delta)
 
             try:
-                logger.info(f"[CopilotProvider] Sending prompt: {prompt[:100]}...")
+                logger.info("Sending prompt (%d chars)", len(prompt))
                 response = await session.send_and_wait({"prompt": prompt}, timeout=60.0)
             finally:
                 if unsubscribe:
@@ -174,23 +174,22 @@ class CopilotProvider(ProviderBase):
 
             if response.type.value == "assistant.message":
                 content = response.data.content or ""
+                logger.info("Response complete (%d chars)", len(content))
                 # If streaming was off or no deltas arrived, send full text
                 if content and on_chunk and not unsubscribe:
                     on_chunk(content)
                 return ProviderResponse(text=content, stop_reason="end_turn")
 
             # Unexpected response type
-            logger.warning(
-                f"[CopilotProvider] Unexpected response type: {response.type}"
-            )
+            logger.warning("Unexpected response type: %s", response.type)
             return ProviderResponse(text="", stop_reason="end_turn")
 
         except (ImportError, RuntimeError, PermissionError, FileNotFoundError) as e:
-            logger.error(f"[CopilotProvider] Setup error: {e}")
+            logger.error("Setup error: %s", e)
             return ProviderResponse(text="", error=str(e))
         except Exception as e:
             error_msg = f"Error communicating with Copilot: {e}"
-            logger.error(f"[CopilotProvider] {error_msg}")
+            logger.error("%s", error_msg)
             return ProviderResponse(text="", error=error_msg)
 
     async def cleanup(self):
@@ -198,13 +197,13 @@ class CopilotProvider(ProviderBase):
         if self._session is not None:
             try:
                 await self._session.destroy()
-                logger.info("[CopilotProvider] Session destroyed")
+                logger.info("Session destroyed")
             except Exception as e:
-                logger.error(f"[CopilotProvider] Error destroying session: {e}")
+                logger.error("Error destroying session: %s", e)
 
         if self._client is not None:
             try:
                 await self._client.stop()
-                logger.info("[CopilotProvider] Client stopped")
+                logger.info("Client stopped")
             except Exception as e:
-                logger.error(f"[CopilotProvider] Error stopping client: {e}")
+                logger.error("Error stopping client: %s", e)

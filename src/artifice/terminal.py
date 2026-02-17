@@ -134,7 +134,7 @@ class ArtificeTerminal(Widget):
                 sessions_dir = get_sessions_dir(self._config)
                 self._session_transcript = SessionTranscript(sessions_dir, self._config)
             except Exception as e:
-                logger.error(f"Failed to initialize session transcript: {e}")
+                logger.error("Failed to initialize session transcript: %s", e)
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
@@ -186,7 +186,7 @@ class ArtificeTerminal(Widget):
             try:
                 self._session_transcript.append_block(block)
             except Exception as e:
-                logger.error(f"Failed to save block to session: {e}")
+                logger.error("Failed to save block to session: %s", e)
 
     async def _run_cancellable(self, coro, *, finally_callback=None):
         """Run a coroutine with standard cancel handling.

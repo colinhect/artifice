@@ -370,7 +370,7 @@ class SimulatedProvider(ProviderBase):
                 prompt = msg.get("content", "")
                 break
 
-        logger.info(f"[SimulatedProvider] Processing prompt: {prompt}")
+        logger.debug("Processing prompt: %s", prompt[:200])
 
         # Find matching scenario
         scenario = self._find_matching_scenario(prompt)
@@ -386,17 +386,13 @@ class SimulatedProvider(ProviderBase):
         if thinking_text:
             if on_thinking_chunk and self.response_delay > 0:
                 # Stream with delay character-by-character
-                logger.info(
-                    f"[SimulatedProvider] Streaming thinking ({len(thinking_text)} chars)"
-                )
+                logger.debug("Streaming thinking (%d chars)", len(thinking_text))
                 for char in thinking_text:
                     on_thinking_chunk(char)
                     await asyncio.sleep(self.response_delay)
             elif on_thinking_chunk:
                 # No delay but callback provided - send all at once with one yield point
-                logger.info(
-                    f"[SimulatedProvider] Streaming thinking ({len(thinking_text)} chars)"
-                )
+                logger.debug("Streaming thinking (%d chars)", len(thinking_text))
                 on_thinking_chunk(thinking_text)
                 await asyncio.sleep(0)
 
@@ -414,9 +410,7 @@ class SimulatedProvider(ProviderBase):
             # No callback - just yield once to allow cancellation
             await asyncio.sleep(0)
 
-        logger.info(
-            f"[SimulatedProvider] Response complete ({len(response_text)} chars)"
-        )
+        logger.info("Response complete (%d chars)", len(response_text))
 
         return ProviderResponse(
             text=response_text,

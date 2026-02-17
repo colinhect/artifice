@@ -6,12 +6,15 @@ and provides YAML-based configuration.
 
 from __future__ import annotations
 
+import logging
 import os
 import traceback
 from pathlib import Path
 from typing import Any, Optional
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 class ArtificeConfig:
@@ -100,6 +103,7 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
 
     # If no init.yaml exists, return default config
     if not init_path.exists():
+        logger.debug("No config file at %s, using defaults", init_path)
         return config, None
 
     try:
@@ -193,6 +197,7 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
             if key not in known_keys:
                 config.set(key, value)
 
+        logger.info("Loaded config from %s", init_path)
         return config, None
 
     except yaml.YAMLError as e:

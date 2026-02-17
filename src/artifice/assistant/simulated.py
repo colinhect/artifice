@@ -238,7 +238,7 @@ class EchoAssistant(SimulatedAssistant):
         on_thinking_chunk: Callable[[str], None] | None = None,
     ) -> AssistantResponse:
         """Echo the prompt back with the configured prefix."""
-        logger.info(f"[EchoAssistant] Sending prompt: {prompt}")
+        logger.debug("Echo prompt: %s", prompt[:200])
         response_text = f"{self.prefix}{prompt}"
 
         # Stream thinking text if configured
@@ -263,7 +263,5 @@ class EchoAssistant(SimulatedAssistant):
         else:
             await asyncio.sleep(0)
 
-        logger.info(
-            f"[EchoAssistant] Received response ({len(response_text)} chars): {response_text}"
-        )
+        logger.debug("Echo response (%d chars)", len(response_text))
         return AssistantResponse(text=response_text, stop_reason="end_turn")
