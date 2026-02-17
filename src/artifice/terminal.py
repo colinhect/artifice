@@ -156,16 +156,31 @@ class ArtificeTerminal(Widget):
     def on_mount(self) -> None:
         self._update_assistant_status()
 
-    def _update_assistant_status(self) -> None:
-        """Update the assistant status line from config."""
+    def _update_assistant_status(self, usage=None) -> None:
+        """Update the assistant status line from config and optional token usage."""
         if self._config.assistants:
             assistant = self._config.assistants.get(self._config.assistant)
             if assistant:
-                self.assistant_status.update(
-                    f"{assistant.get('model').lower()} ({assistant.get('provider').lower()})"
-                )
+                status = f"{assistant.get('model').lower()} ({assistant.get('provider').lower()})"
+                if usage:
+                    context_window = assistant.get("context_window")
+                    if context_window and usage.input_tokens:
+                        pct = usage.input_tokens / context_window * 100
+                        status += f"  [{pct:.0f}% of {self._format_tokens(context_window)} · {self._format_tokens(usage.input_tokens)}in / {self._format_tokens(usage.output_tokens)}out]"
+                    else:
+                        status += f"  [{self._format_tokens(usage.input_tokens)}in / {self._format_tokens(usage.output_tokens)}out]"
+                self.assistant_status.update(status)
                 return
         self.assistant_status.update("")
+
+    @staticmethod
+    def _format_tokens(n: int) -> str:
+        """Format token count as a compact string (e.g. 1.2k, 128k)."""
+        if n >= 1_000_000:
+            return f"{n / 1_000_000:.1f}M"
+        if n >= 1_000:
+            return f"{n / 1_000:.1f}k"
+        return str(n)
 
     def _save_block_to_session(self, block: BaseBlock) -> None:
         """Save a block to the session transcript if enabled."""
@@ -422,6 +437,7 @@ class ArtificeTerminal(Widget):
             self._current_detector = None
             raise
         self._set_assistant_inactive()
+        self._update_assistant_status(usage=getattr(response, "usage", None))
 
         self._finalize_stream()
         self._apply_assistant_response(self._current_detector, response)

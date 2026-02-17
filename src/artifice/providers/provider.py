@@ -13,6 +13,23 @@ from typing import Any, Callable, Optional
 
 
 @dataclass
+class TokenUsage:
+    """Token usage statistics from a provider response.
+
+    Attributes:
+        input_tokens: Number of tokens in the prompt/input
+        output_tokens: Number of tokens in the completion/output
+        total_tokens: Total tokens used (input + output)
+        context_window: Maximum context window size for the model, if known
+    """
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    context_window: int | None = None
+
+
+@dataclass
 class ProviderResponse:
     """Raw response from a provider.
 
@@ -22,6 +39,7 @@ class ProviderResponse:
         thinking: Optional thinking/reasoning text (for models that support extended thinking)
         content_blocks: Optional structured content blocks (e.g., for Claude's multi-turn thinking)
         error: Optional error message if the request failed
+        usage: Optional token usage statistics
     """
 
     text: str
@@ -29,6 +47,7 @@ class ProviderResponse:
     thinking: str | None = None
     content_blocks: list[dict[str, Any]] | None = None
     error: str | None = None
+    usage: TokenUsage | None = None
 
 
 class ProviderBase(ABC):

@@ -9,7 +9,7 @@ from typing import Callable, Optional
 
 from openai import OpenAI
 
-from .provider import ProviderBase, ProviderResponse
+from .provider import ProviderBase, ProviderResponse, TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -84,14 +84,24 @@ class OpenAICompatibleProvider(ProviderBase):
                     model=self.model,
                     messages=messages,
                     stream=True,
+                    stream_options={"include_usage": True},
                 )
 
                 text = ""
                 thinking_text = ""
                 chunk_count = 0
+                usage = None
                 for chunk in stream:
                     if cancelled.is_set():
                         break
+
+                    # Capture usage from the final chunk
+                    if chunk.usage:
+                        usage = TokenUsage(
+                            input_tokens=chunk.usage.prompt_tokens or 0,
+                            output_tokens=chunk.usage.completion_tokens or 0,
+                            total_tokens=chunk.usage.total_tokens or 0,
+                        )
 
                     if chunk.choices and len(chunk.choices) > 0:
                         delta = chunk.choices[0].delta
@@ -114,10 +124,10 @@ class OpenAICompatibleProvider(ProviderBase):
                             if on_chunk:
                                 loop.call_soon_threadsafe(on_chunk, delta.content)
 
-                return text, thinking_text, chunk_count
+                return text, thinking_text, chunk_count, usage
 
             try:
-                text, thinking_text, chunk_count = await loop.run_in_executor(
+                text, thinking_text, chunk_count, usage = await loop.run_in_executor(
                     None, sync_stream
                 )
             except asyncio.CancelledError:
@@ -131,10 +141,15 @@ class OpenAICompatibleProvider(ProviderBase):
             logger.info(
                 f"[OpenAIProvider] Received {chunk_count} chunks, total length: {len(text)}"
             )
+            if usage:
+                logger.info(
+                    f"[OpenAIProvider] Token usage: {usage.input_tokens} in, {usage.output_tokens} out, {usage.total_tokens} total"
+                )
 
             return ProviderResponse(
                 text=text,
                 thinking=thinking_text if thinking_text else None,
+                usage=usage,
             )
 
         except Exception:

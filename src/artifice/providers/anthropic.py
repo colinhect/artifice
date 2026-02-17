@@ -8,7 +8,7 @@ import os
 import threading
 from typing import Callable, Optional
 
-from .provider import ProviderBase, ProviderResponse
+from .provider import ProviderBase, ProviderResponse, TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -120,13 +120,14 @@ class AnthropicProvider(ProviderBase):
             except asyncio.CancelledError:
                 cancelled.set()
                 raise
-            text, stop_reason, thinking_text, content_blocks = result
+            text, stop_reason, thinking_text, content_blocks, usage = result
 
             return ProviderResponse(
                 text=text,
                 stop_reason=stop_reason,
                 thinking=thinking_text,
                 content_blocks=content_blocks,
+                usage=usage,
             )
 
         except ImportError as e:
@@ -134,6 +135,20 @@ class AnthropicProvider(ProviderBase):
         except Exception as e:
             error_msg = f"Error communicating with Claude: {e}"
             return ProviderResponse(text="", error=error_msg)
+
+    @staticmethod
+    def _extract_usage(message) -> TokenUsage:
+        """Extract token usage from an Anthropic message."""
+        usage = message.usage
+        input_tokens = getattr(usage, "input_tokens", 0) or 0
+        output_tokens = getattr(usage, "output_tokens", 0) or 0
+        cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+        cache_create = getattr(usage, "cache_creation_input_tokens", 0) or 0
+        return TokenUsage(
+            input_tokens=input_tokens + cache_read + cache_create,
+            output_tokens=output_tokens,
+            total_tokens=input_tokens + cache_read + cache_create + output_tokens,
+        )
 
     def _stream_text_only(self, client, api_params, chunks, loop, on_chunk, cancelled):
         """Stream using text_stream (no thinking)."""
@@ -145,7 +160,8 @@ class AnthropicProvider(ProviderBase):
                 if on_chunk:
                     loop.call_soon_threadsafe(on_chunk, text)
             message = stream.get_final_message()
-        return "".join(chunks), message.stop_reason, None, None
+        usage = self._extract_usage(message)
+        return "".join(chunks), message.stop_reason, None, None, usage
 
     def _stream_with_thinking(
         self, client, api_params, chunks, loop, on_chunk, on_thinking_chunk, cancelled
@@ -189,9 +205,11 @@ class AnthropicProvider(ProviderBase):
                     }
                 )
 
+        usage = self._extract_usage(message)
         return (
             "".join(chunks),
             message.stop_reason,
             "".join(thinking_chunks) if thinking_chunks else None,
             content_blocks,
+            usage,
         )

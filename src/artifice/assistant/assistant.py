@@ -102,6 +102,7 @@ class Assistant(AssistantBase):
             text=response.text,
             stop_reason=response.stop_reason,
             thinking=response.thinking,
+            usage=response.usage,
         )
 
     def clear_conversation(self):

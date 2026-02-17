@@ -7,6 +7,8 @@ import asyncio
 from dataclasses import dataclass
 from typing import Callable, Optional
 
+from ..providers.provider import TokenUsage
+
 
 @dataclass
 class AssistantResponse:
@@ -16,6 +18,7 @@ class AssistantResponse:
     stop_reason: str | None = None
     error: str | None = None
     thinking: str | None = None
+    usage: TokenUsage | None = None
 
 
 class AssistantBase(ABC):
