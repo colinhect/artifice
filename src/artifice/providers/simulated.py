@@ -383,19 +383,36 @@ class SimulatedProvider(ProviderBase):
             thinking_text = self.default_thinking
 
         # Stream thinking text if available
-        if thinking_text and on_thinking_chunk:
-            logger.info(
-                f"[SimulatedProvider] Streaming thinking ({len(thinking_text)} chars)"
-            )
-            for char in thinking_text:
-                on_thinking_chunk(char)
-                await asyncio.sleep(self.response_delay)
+        if thinking_text:
+            if on_thinking_chunk and self.response_delay > 0:
+                # Stream with delay character-by-character
+                logger.info(
+                    f"[SimulatedProvider] Streaming thinking ({len(thinking_text)} chars)"
+                )
+                for char in thinking_text:
+                    on_thinking_chunk(char)
+                    await asyncio.sleep(self.response_delay)
+            elif on_thinking_chunk:
+                # No delay but callback provided - send all at once with one yield point
+                logger.info(
+                    f"[SimulatedProvider] Streaming thinking ({len(thinking_text)} chars)"
+                )
+                on_thinking_chunk(thinking_text)
+                await asyncio.sleep(0)
 
         # Stream the response text
-        if on_chunk:
+        if on_chunk and self.response_delay > 0:
+            # Stream with delay character-by-character
             for char in response_text:
                 on_chunk(char)
                 await asyncio.sleep(self.response_delay)
+        elif on_chunk:
+            # No delay but callback provided - send all at once with one yield point
+            on_chunk(response_text)
+            await asyncio.sleep(0)
+        else:
+            # No callback - just yield once to allow cancellation
+            await asyncio.sleep(0)
 
         logger.info(
             f"[SimulatedProvider] Response complete ({len(response_text)} chars)"

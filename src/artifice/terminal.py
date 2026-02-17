@@ -191,16 +191,19 @@ class ArtificeTerminal(Widget):
     async def _run_cancellable(self, coro, *, finally_callback=None):
         """Run a coroutine with standard cancel handling.
 
-        On CancelledError, shows a [Cancelled] block. Always clears _current_task
-        and calls finally_callback if provided.
+        On CancelledError, shows a [Cancelled] block unless the stream is paused
+        (which means the cancellation was intentional for code execution).
+        Always clears _current_task and calls finally_callback if provided.
         """
         try:
             await coro
         except asyncio.CancelledError:
-            block = CodeOutputBlock(render_markdown=False)
-            self.output.append_block(block)
-            block.append_error("\n[Cancelled]\n")
-            block.flush()
+            # Only show [Cancelled] if not paused for code execution
+            if not self._stream_paused:
+                block = CodeOutputBlock(render_markdown=False)
+                self.output.append_block(block)
+                block.append_error("\n[Cancelled]\n")
+                block.flush()
             raise
         finally:
             self._current_task = None
@@ -337,14 +340,10 @@ class ArtificeTerminal(Widget):
             self._save_block_to_session(self._thinking_block)
             self._thinking_block = None
 
-        # If the stream was paused (code block detected), resume the detector
-        # so any remaining text gets processed before finalization.
-        if self._stream_paused and self._current_detector:
-            self._current_detector.resume()
-            self._chunk_buf.resume()
-
-        # Clear the pause flag — streaming is over
-        self._stream_paused = False
+        # If the stream was paused (code block detected), DON'T finalize yet.
+        # The detector and buffer will be finalized when the user executes/skips the code.
+        if self._stream_paused:
+            return
 
         # Flush any remaining buffered chunks and finalize detector
         self._chunk_buf.flush_sync()
@@ -564,6 +563,9 @@ class ArtificeTerminal(Widget):
             if self._current_detector.is_paused:
                 self._chunk_buf.pause()
                 self._stream_paused = True
+                # Cancel the provider task to stop streaming
+                if self._current_task and not self._current_task.done():
+                    self._current_task.cancel()
                 # Highlight the code block that just completed
                 code_block = self._current_detector.last_code_block
                 if code_block is not None:
@@ -602,6 +604,11 @@ class ArtificeTerminal(Widget):
             self._current_detector.resume()
         # Resume chunk buffer (will flush any accumulated chunks)
         self._chunk_buf.resume()
+        # Finalize the stream since provider task was cancelled when we paused
+        self._chunk_buf.flush_sync()
+        if self._current_detector:
+            self._current_detector.finish()
+            self._current_detector = None
 
     async def _execute_paused_code_block(self) -> None:
         """Execute the code block that triggered the pause, then resume."""
@@ -642,6 +649,11 @@ class ArtificeTerminal(Widget):
             event.stop()
             self._stream_paused = False
             self.assistant_status.update("")
+            # Finalize without processing remainder (discard it)
+            if self._current_detector:
+                self._current_detector._remainder = ""
+                self._current_detector.finish()
+                self._current_detector = None
             self.action_cancel_execution()
 
     def action_clear(self) -> None:

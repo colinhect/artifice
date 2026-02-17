@@ -185,15 +185,25 @@ class ScriptedAssistant(SimulatedAssistant):
 
         # Stream thinking text if available
         if thinking_text and on_thinking_chunk:
-            for char in thinking_text:
-                on_thinking_chunk(char)
-                await asyncio.sleep(self._provider.response_delay)
+            if self._provider.response_delay > 0:
+                for char in thinking_text:
+                    on_thinking_chunk(char)
+                    await asyncio.sleep(self._provider.response_delay)
+            else:
+                on_thinking_chunk(thinking_text)
+                await asyncio.sleep(0)
 
         # Stream response text
         if on_chunk:
-            for char in response_text:
-                on_chunk(char)
-                await asyncio.sleep(self._provider.response_delay)
+            if self._provider.response_delay > 0:
+                for char in response_text:
+                    on_chunk(char)
+                    await asyncio.sleep(self._provider.response_delay)
+            else:
+                on_chunk(response_text)
+                await asyncio.sleep(0)
+        else:
+            await asyncio.sleep(0)
 
         self._assistant.messages.append({"role": "user", "content": prompt})
         self._assistant.messages.append({"role": "assistant", "content": response_text})
@@ -233,15 +243,25 @@ class EchoAssistant(SimulatedAssistant):
 
         # Stream thinking text if configured
         if self.echo_thinking and on_thinking_chunk:
-            for char in self.echo_thinking:
-                on_thinking_chunk(char)
-                await asyncio.sleep(self._provider.response_delay)
+            if self._provider.response_delay > 0:
+                for char in self.echo_thinking:
+                    on_thinking_chunk(char)
+                    await asyncio.sleep(self._provider.response_delay)
+            else:
+                on_thinking_chunk(self.echo_thinking)
+                await asyncio.sleep(0)
 
         # Stream response text
         if on_chunk:
-            for char in response_text:
-                on_chunk(char)
-                await asyncio.sleep(self._provider.response_delay)
+            if self._provider.response_delay > 0:
+                for char in response_text:
+                    on_chunk(char)
+                    await asyncio.sleep(self._provider.response_delay)
+            else:
+                on_chunk(response_text)
+                await asyncio.sleep(0)
+        else:
+            await asyncio.sleep(0)
 
         logger.info(
             f"[EchoAssistant] Received response ({len(response_text)} chars): {response_text}"

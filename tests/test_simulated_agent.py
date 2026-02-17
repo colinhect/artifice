@@ -1,5 +1,6 @@
 """Tests for simulated assistants - pattern matching, scripted sequences, echo."""
 
+import asyncio
 import pytest
 from artifice.assistant.simulated import (
     SimulatedAssistant,
@@ -306,3 +307,82 @@ class TestEchoAssistant:
         chunks = []
         await assistant.send_prompt("abc", on_chunk=lambda c: chunks.append(c))
         assert "".join(chunks) == "abc"
+
+
+class TestSimulatedAssistantCancellation:
+    @pytest.mark.asyncio
+    async def test_cancellation_stops_streaming(self):
+        """Cancelling the task should stop streaming immediately."""
+        assistant = SimulatedAssistant(response_delay=0.01)
+        # Use a long response so there's time to cancel
+        assistant.set_default_response("x" * 1000)
+
+        chunks = []
+
+        async def run_and_cancel():
+            task = asyncio.create_task(
+                assistant.send_prompt("test", on_chunk=lambda c: chunks.append(c))
+            )
+            # Let it start streaming
+            await asyncio.sleep(0.05)
+            # Cancel the task
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        await run_and_cancel()
+
+        # Should have received some chunks but not all 1000
+        assert len(chunks) > 0
+        assert len(chunks) < 1000
+
+    @pytest.mark.asyncio
+    async def test_cancellation_raises_cancelled_error(self):
+        """Cancelling should properly raise CancelledError."""
+        assistant = SimulatedAssistant(response_delay=0.01)
+        # Use a very long response to ensure we can cancel before completion
+        assistant.set_default_response("x" * 10000)
+
+        task = asyncio.create_task(
+            assistant.send_prompt("test", on_chunk=lambda c: None)
+        )
+        # Give it a tiny bit of time to start
+        await asyncio.sleep(0.05)
+        # Cancel the task
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    @pytest.mark.asyncio
+    async def test_cancellation_during_thinking(self):
+        """Cancelling during thinking should stop immediately."""
+        assistant = SimulatedAssistant(response_delay=0.01)
+        assistant.configure_scenarios([
+            {"response": "answer", "thinking": "x" * 1000}
+        ])
+
+        thinking_chunks = []
+
+        async def run_and_cancel():
+            task = asyncio.create_task(
+                assistant.send_prompt(
+                    "test",
+                    on_thinking_chunk=lambda c: thinking_chunks.append(c)
+                )
+            )
+            # Let thinking start
+            await asyncio.sleep(0.05)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        await run_and_cancel()
+
+        # Should have received some thinking but not all
+        assert len(thinking_chunks) > 0
+        assert len(thinking_chunks) < 1000
