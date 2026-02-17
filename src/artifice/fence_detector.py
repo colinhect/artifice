@@ -67,7 +67,9 @@ class StreamingFenceDetector:
         self._in_markdown_fence = False  # True if we entered CODE via markdown fence
         self._fence_backtick_count = 0  # Count backticks for fence detection
         self._fence_language_buffer = ""  # Accumulate language after ```
-        self._detecting_fence_open = False  # True when we've seen ``` and reading language
+        self._detecting_fence_open = (
+            False  # True when we've seen ``` and reading language
+        )
         self._detecting_fence_close = False  # True when we might be seeing closing ```
         self._fence_close_backtick_count = 0  # Count backticks for closing fence
         # Factory methods for block creation (can be overridden for testing)
@@ -414,9 +416,7 @@ class StreamingFenceDetector:
                 # Fall through to add current character
 
         # Check for XML closing tag (if not in markdown fence)
-        if not self._in_markdown_fence and (
-            self._tag_parser.has_buffered or ch == "<"
-        ):
+        if not self._in_markdown_fence and (self._tag_parser.has_buffered or ch == "<"):
             result = self._check_tags(ch, [self._current_close_tag])
             if isinstance(result, str):
                 # Found closing tag - flush pending code and transition

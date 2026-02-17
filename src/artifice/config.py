@@ -52,7 +52,9 @@ class ArtificeConfig:
         # Tmux settings
         self.tmux_target: Optional[str] = None
         self.tmux_prompt_pattern: Optional[str] = None
-        self.tmux_echo_exit_code: bool = False  # Whether to check exit code with echo $?
+        self.tmux_echo_exit_code: bool = (
+            False  # Whether to check exit code with echo $?
+        )
 
         # Session settings
         self.save_sessions: bool = True

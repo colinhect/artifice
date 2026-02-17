@@ -236,7 +236,10 @@ class ArtificeTerminal(Widget):
         self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
 
     def _make_output_callbacks(
-        self, markdown_enabled: bool, in_context: bool = False, use_code_block: bool = True
+        self,
+        markdown_enabled: bool,
+        in_context: bool = False,
+        use_code_block: bool = True,
     ):
         """Create on_output/on_error/flush callbacks that lazily create a CodeOutputBlock.
 

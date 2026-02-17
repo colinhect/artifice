@@ -8,7 +8,12 @@ Ensures that triple backticks don't trigger false positives when they appear:
 
 import pytest
 from unittest.mock import patch
-from tests.test_fence_detector import make_detector, FakeCodeBlock, FakeThinkingBlock, FakeAssistantBlock
+from tests.test_fence_detector import (
+    make_detector,
+    FakeCodeBlock,
+    FakeThinkingBlock,
+    FakeAssistantBlock,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -33,7 +38,9 @@ class TestBackticksInThinking:
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 0, "Backticks in thinking should not create code blocks"
+        assert len(code_blocks) == 0, (
+            "Backticks in thinking should not create code blocks"
+        )
 
         thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
         assert len(thinking_blocks) == 1
@@ -43,7 +50,9 @@ class TestBackticksInThinking:
         """Thinking block with code examples using fences should not split."""
         d, out = make_detector()
         d.start()
-        d.feed("<think>I should tell them to use:\n```python\ncode\n```\nin their response</think>Done")
+        d.feed(
+            "<think>I should tell them to use:\n```python\ncode\n```\nin their response</think>Done"
+        )
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
@@ -57,25 +66,29 @@ class TestBackticksInCodeBlocks:
         """Triple backticks in a string literal should not close the fence."""
         d, out = make_detector()
         d.start()
-        d.feed('Here is code:\n```python\ntext = "Use ```python for code blocks"\nprint(text)\n```\nDone')
+        d.feed(
+            'Here is code:\n```python\ntext = "Use ```python for code blocks"\nprint(text)\n```\nDone'
+        )
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1, "Should create exactly one code block"
         # The entire code including the string should be in one block
         assert 'text = "Use ```python' in code_blocks[0]._code
-        assert 'print(text)' in code_blocks[0]._code
+        assert "print(text)" in code_blocks[0]._code
 
     def test_triple_backticks_in_comment(self):
         """Triple backticks in a comment should not close the fence."""
         d, out = make_detector()
         d.start()
-        d.feed('```python\n# Use ```python to start a code block\nprint("hello")\n```\nDone')
+        d.feed(
+            '```python\n# Use ```python to start a code block\nprint("hello")\n```\nDone'
+        )
         d.finish()
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
-        assert '# Use ```python' in code_blocks[0]._code
+        assert "# Use ```python" in code_blocks[0]._code
         assert 'print("hello")' in code_blocks[0]._code
 
     def test_triple_backticks_in_multiline_string(self):
@@ -87,8 +100,8 @@ class TestBackticksInCodeBlocks:
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
-        assert '```python' in code_blocks[0]._code
-        assert 'help_text' in code_blocks[0]._code
+        assert "```python" in code_blocks[0]._code
+        assert "help_text" in code_blocks[0]._code
 
     def test_xml_code_block_with_backticks(self):
         """Triple backticks in XML-style code tags should be treated as code content."""
@@ -99,5 +112,5 @@ class TestBackticksInCodeBlocks:
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
-        assert '```python' in code_blocks[0]._code
-        assert 'print(text)' in code_blocks[0]._code
+        assert "```python" in code_blocks[0]._code
+        assert "print(text)" in code_blocks[0]._code

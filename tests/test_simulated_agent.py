@@ -360,17 +360,14 @@ class TestSimulatedAssistantCancellation:
     async def test_cancellation_during_thinking(self):
         """Cancelling during thinking should stop immediately."""
         assistant = SimulatedAssistant(response_delay=0.01)
-        assistant.configure_scenarios([
-            {"response": "answer", "thinking": "x" * 1000}
-        ])
+        assistant.configure_scenarios([{"response": "answer", "thinking": "x" * 1000}])
 
         thinking_chunks = []
 
         async def run_and_cancel():
             task = asyncio.create_task(
                 assistant.send_prompt(
-                    "test",
-                    on_thinking_chunk=lambda c: thinking_chunks.append(c)
+                    "test", on_thinking_chunk=lambda c: thinking_chunks.append(c)
                 )
             )
             # Let thinking start

@@ -136,9 +136,7 @@ async def test_assistant_openai_format_no_content_blocks():
 
         return ProviderResponse(
             text="This is the text response",
-            content_blocks=[
-                {"type": "text", "text": "This is the text response"}
-            ],
+            content_blocks=[{"type": "text", "text": "This is the text response"}],
         )
 
     provider.send = send_with_blocks
@@ -153,7 +151,9 @@ async def test_assistant_openai_format_no_content_blocks():
     assert isinstance(assistant_claude.messages[1]["content"], list)
 
     # Test with openai_format=True (OpenAI format)
-    assistant_openai = Assistant(provider=provider, openai_format=True, system_prompt="Test")
+    assistant_openai = Assistant(
+        provider=provider, openai_format=True, system_prompt="Test"
+    )
     await assistant_openai.send_prompt("Hello")
 
     # Should use plain text format even though provider returned content_blocks
