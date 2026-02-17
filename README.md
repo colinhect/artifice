@@ -1,28 +1,39 @@
 # Artifice
 
-A minimal Python-based terminal user interface and harness for interacting with intelligence models to write and execute code or system commands. Built with [Textual](https://github.com/Textualize/textual).
+A minimal intelligence agent harness with a terminal user interface. Provides direct, human-in-the-loop control over AI model interactions, code execution, and shell commands—without complex frameworks, protocols, or abstractions. Built with [Textual](https://github.com/Textualize/textual).
+
+## Philosophy
+
+Artifice is built on the principle that agent harnesses should be **minimal and transparent**:
+
+- **No MCP/ACP protocols** - Direct model prompting with simple tool definitions
+- **No hidden abstractions** - Every action is visible and editable before execution
+- **Minimal dependencies** - Core TUI built on Textual, minimal external requirements
+- **Tmux integration** - Execute commands in real terminal sessions, not isolated subprocesses
+- **Human-in-the-loop** - Review, edit, and approve all AI-proposed actions
+- **Session persistence** - Full conversation and execution history saved locally
 
 ## Features
 
-### Core Features
-- **Minimal Interface to AI Models** - Uses concise simple prompting without using MCP or ACP
-- **Interactive Python Console** - Full REPL with persistent session
-- **Interactive Shell** - Execute shell commands without leaving the environment
-- **Markdown Rendering** - AI responses rendered with syntax highlighting
-    - Output from Python or shell commands can be rendered as markdown
-- **Multiline Input** - Write complex code with Python auto-complete
-- **Command History** - Persistent history across sessions
-- **Textual Integration** - Python commands that result in Textual objects are mounted directly in the output, allowing on-the-fly interface generation
+### Intelligence Agent Harness
+- **Direct Model Prompting** - Simple, transparent prompting without MCP/ACP protocols
+- **Tool Calling** - AI can propose Python code or shell commands as executable tools
+- **Human Approval Loop** - Review, edit, or reject all AI-proposed actions before execution
+- **Selective Context** - Explicitly mark which blocks to include in agent context
+- **Session Transcripts** - Full conversation and execution history saved locally
 
-### Block Navigation
-- **Ctrl+Up/Down** - Navigate between previous inputs and outputs (blocks)
-- **Edit Blocks** - Modify and re-execute previous inputs
-- **Save/Restore** - Persist important blocks across sessions
+### Execution Environments
+- **Python REPL** - Full interactive Python console with persistent session state
+- **Shell Commands** - Execute bash commands with streaming output
+- **Tmux Integration** - Route shell commands to existing tmux panes for real terminal state
+- **Textual Widgets** - Python code returning Textual objects gets mounted directly in the UI
 
-### AI Assistant Integration
-- **Code/command Execution** - AI can propose Python code or shell commands
-- **Human Approval** - Review/edit actions before execution
-- **Selective Context** - Mark which blocks should be given as context to AI
+### User Interface
+- **Markdown Rendering** - AI responses and output can be rendered as formatted markdown
+- **Syntax Highlighting** - Code blocks highlighted during streaming and after execution
+- **Block Navigation** - Navigate, edit, and re-execute previous inputs (Ctrl+Up/Down)
+- **Multiline Input** - Write complex code with proper formatting
+- **Command History** - Persistent history across sessions with search (Ctrl+R)
 
 ## Installation
 
@@ -36,13 +47,58 @@ pip install -e .
 artifice
 ```
 
+## Tmux Integration
+
+Artifice can execute shell commands in existing tmux sessions instead of isolated subprocesses. This allows:
+
+- **Persistent shell state** - Environment variables, working directory, and shell history maintained
+- **Real terminal sessions** - Commands run in actual terminal panes with full terminal capabilities
+- **Visual debugging** - Watch command execution in real-time in the tmux pane
+- **Stateful workflows** - Build on previous command state (activated virtualenvs, cd'd directories, etc.)
+
+### Configuration
+
+Add to `~/.config/artifice/init.yaml`:
+
+```yaml
+# Target an existing tmux session
+tmux_target: "my-session:0"  # or "session:window.pane"
+
+# Regex pattern matching your shell prompt (used to detect command completion)
+tmux_prompt_pattern: "^\\$ "  # Match prompts like "$ "
+# or: "^user@host:\\S+\\$ "  # Match prompts like "user@host:~$ "
+```
+
+### Command Line
+
+```bash
+# Target specific tmux session
+artifice --tmux "my-session:0"
+
+# With custom prompt pattern
+artifice --tmux "dev:1.0" --tmux-prompt "^➜ "
+```
+
+### How It Works
+
+1. Commands are sent to the target tmux pane via `tmux send-keys`
+2. Output is captured via `tmux pipe-pane` streaming to a temporary file
+3. Command completion is detected by the reappearance of the shell prompt
+4. Exit code is retrieved with a follow-up `echo $?` command
+
+### Requirements
+
+- `tmux` must be installed and accessible in PATH
+- Target tmux session must exist before launching Artifice
+- Prompt pattern must reliably match your shell prompt for command completion detection
+
 ## Usage
 
 ### Mode Switching
 
 Artifice has three input modes. Switch modes by typing a special character when the input is empty:
 
-- `>` - **AI prompt mode** - Prompt the intellegence model
+- `>` - **AI prompt mode** - Prompt the intelligence model
 - `]` - **Python mode** - Execute Python code
 - `$` - **Shell mode** - Run shell commands
 
@@ -71,12 +127,58 @@ Artifice has three input modes. Switch modes by typing a special character when 
 - **Ctrl+L** - Clear output
 - **F2** - Toggle help footer
 
-## AI Assistant Integration
+## Intelligence Model Integration
 
-### Supported Assistants
+Artifice supports multiple model providers with a minimal, direct prompting approach:
 
-- **Claude** (via Anthropic API) - Streaming support with tool calling
-- **Ollama** (local models) - Run models locally with streaming support
+### Supported Providers
+
+- **Claude** (Anthropic API) - Streaming responses with native tool calling support
+- **Ollama** (local models) - Run models locally with streaming, tool use via prompt engineering
+
+### Configuration
+
+Configure your default assistant in `~/.config/artifice/init.yaml`:
+
+```yaml
+# Default assistant
+assistant: "claude"
+
+# Optional: Define multiple assistants with custom settings
+assistants:
+  claude:
+    provider: "anthropic"
+    model: "claude-sonnet-4.5-20250929"
+  local:
+    provider: "ollama"
+    model: "qwen2.5-coder:32b"
+    host: "http://localhost:11434"
+
+# Optional: Custom system prompt for agent behavior
+system_prompt: |
+  You are a helpful coding assistant. When proposing code changes,
+  always explain your reasoning clearly.
+
+# Optional: Prepend text to every user message
+prompt_prefix: "Context: working on Python project.\n\n"
+
+# Optional: Extended thinking budget for complex tasks (Claude)
+thinking_budget: 10000
+```
+
+### Tool Calling
+
+The agent harness exposes two tools to AI models:
+
+- **python** - Execute Python code in the persistent REPL session
+- **bash** - Execute shell commands (in subprocess or tmux session)
+
+Models receive:
+- Current conversation context (with selective block inclusion)
+- Execution results from previous tool calls
+- Ability to propose code/commands for human review
+
+No complex protocols or intermediate formats—just direct prompting with tool definitions.
 
 ### Running from Source
 
@@ -86,17 +188,36 @@ cd artifice/src
 python -m artifice.app
 ```
 
+## Design Principles
+
+### Minimal & Transparent
+- No complex frameworks or protocols (MCP, ACP, etc.)
+- Every AI action visible and editable before execution
+- Simple tool definitions directly in prompts
+- No hidden state or magic behavior
+
+### Human-in-the-Loop
+- Explicit approval for every execution
+- Edit proposed code before running
+- Clear separation between AI proposals and executed actions
+- Full control over context provided to models
+
+### Real Execution Environments
+- Python REPL with actual state persistence
+- Shell commands in real terminals (via tmux)
+- Not sandboxed or simulated environments
+- Direct integration with your development workflow
+
 ## Roadmap
 
-Planned features and improvements:
+Future enhancements while maintaining the minimal harness philosophy:
 
 - [ ] VIM keybinding mode for text editing
-- [ ] Additional AI provider support (OpenAI, Gemini)
-    - [ ] GitHub Copilot integration
-- [ ] Session export/import
-- [ ] LSP integration with assistant
-- [ ] Other programming languages
-- [ ] Export commands to shell history
-- [ ] Tab-completion in Python and shell mode
-- [ ] Ability to remove history entry or annotate/export
+- [ ] Additional model providers (OpenAI, Gemini, local models)
+- [ ] Session export/import in portable formats
+- [ ] Language Server Protocol (LSP) integration for code intelligence
+- [ ] Additional language REPLs (Node.js, Ruby, etc.)
+- [ ] Shell history export for executed commands
+- [ ] Tab-completion in Python and shell modes
+- [ ] Block annotations and selective history export
 
