@@ -1,10 +1,6 @@
 # Artifice
 
-A minimal intelligence agent harness with a terminal user interface. Provides control over AI model interactions, code execution, and shell commands—without complex frameworks, protocols, or abstractions. Built with [Textual](https://github.com/Textualize/textual).
-
-## Philosophy
-
-Artifice is built on the principle that agent harnesses should be **minimal and transparent**.
+A minimal and transparent intelligence agent harness with a terminal user interface. Provides control over AI model interactions, code execution, and shell commands—without complex frameworks, protocols, or abstractions. Built with [Textual](https://github.com/Textualize/textual).
 
 ### Self-Bootstrapping Design
 
