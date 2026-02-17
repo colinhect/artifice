@@ -12,10 +12,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from .config import ArtificeConfig
 
-logger = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
     from .terminal_output import BaseBlock
+
+logger = logging.getLogger(__name__)
 
 
 class SessionTranscript:
@@ -52,7 +52,7 @@ class SessionTranscript:
         header = f"""# Artifice Session
 **Started:** {timestamp}
 **Assistant:** {self.config.assistant}
-Provider:** {assistant["provider"]} ({assistant["model"]})
+**Provider:** {assistant["provider"]} ({assistant["model"]})
 **System Prompt:** {self.config.system_prompt}
 
 ---

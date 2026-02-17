@@ -47,10 +47,10 @@ class AnthropicProvider(ProviderBase):
                 self._client = Anthropic(api_key=self.api_key)
                 if self.on_connect:
                     self.on_connect("Claude")
-            except ImportError:
+            except ImportError as e:
                 raise ImportError(
                     "anthropic package not installed. Install with: pip install anthropic"
-                )
+                ) from e
         return self._client
 
     async def send(
@@ -131,7 +131,8 @@ class AnthropicProvider(ProviderBase):
             text, stop_reason, thinking_text, content_blocks, usage = result
             logger.info(
                 "Response complete (%d chars, stop_reason=%s, %d in/%d out tokens)",
-                len(text), stop_reason,
+                len(text),
+                stop_reason,
                 usage.input_tokens if usage else 0,
                 usage.output_tokens if usage else 0,
             )

@@ -1,4 +1,5 @@
 import argparse
+import logging
 import sys
 
 from textual.app import App, ComposeResult
@@ -127,8 +128,6 @@ def main():
     if args.tmux_prompt is not None:
         config.tmux_prompt_pattern = args.tmux_prompt
     if args.logging:
-        import logging
-
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",

@@ -42,10 +42,10 @@ from .status_indicator import StatusIndicatorManager
 from .output_callbacks import OutputCallbackHandler
 from .input_mode import InputMode
 
-logger = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
     from .app import ArtificeApp
+
+logger = logging.getLogger(__name__)
 
 
 class StreamChunk(Message):

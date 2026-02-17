@@ -64,7 +64,11 @@ class Assistant(AssistantBase):
         # Add user message to history (only if non-empty)
         if prompt.strip():
             self.messages.append({"role": "user", "content": prompt})
-            logger.info("Sending prompt (%d chars, %d messages)", len(prompt), len(self.messages))
+            logger.info(
+                "Sending prompt (%d chars, %d messages)",
+                len(prompt),
+                len(self.messages),
+            )
             logger.debug("Prompt text: %s", prompt[:200])
 
         # Delegate to provider
@@ -99,7 +103,8 @@ class Assistant(AssistantBase):
                 self.messages.append({"role": "assistant", "content": response.text})
             logger.info(
                 "Received response (%d chars, stop_reason=%s)",
-                len(response.text), response.stop_reason,
+                len(response.text),
+                response.stop_reason,
             )
 
         return AssistantResponse(

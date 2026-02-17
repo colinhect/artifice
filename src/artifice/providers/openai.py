@@ -136,7 +136,8 @@ class OpenAICompatibleProvider(ProviderBase):
 
             logger.info(
                 "Response complete (%d chars in %d chunks, %d in/%d out tokens)",
-                len(text), chunk_count,
+                len(text),
+                chunk_count,
                 usage.input_tokens if usage else 0,
                 usage.output_tokens if usage else 0,
             )

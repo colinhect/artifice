@@ -49,10 +49,10 @@ class OllamaProvider(ProviderBase):
                 self._client = ollama.Client(host=self.host)
                 if self.on_connect:
                     self.on_connect(f"Ollama ({self.model})")
-            except ImportError:
+            except ImportError as e:
                 raise ImportError(
                     "ollama package not installed. Install with: pip install ollama"
-                )
+                ) from e
         return self._client
 
     async def send(
@@ -136,7 +136,9 @@ class OllamaProvider(ProviderBase):
                 cancelled.set()
                 raise
 
-            logger.info("Response complete (%d chars, stop_reason=%s)", len(text), stop_reason)
+            logger.info(
+                "Response complete (%d chars, stop_reason=%s)", len(text), stop_reason
+            )
 
             return ProviderResponse(
                 text=text,

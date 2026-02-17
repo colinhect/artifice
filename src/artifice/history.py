@@ -186,7 +186,11 @@ class History:
                             -self._max_history_size :
                         ]
         except json.JSONDecodeError as e:
-            logger.warning("Failed to load history from %s: invalid JSON - %s", self._history_file, e)
+            logger.warning(
+                "Failed to load history from %s: invalid JSON - %s",
+                self._history_file,
+                e,
+            )
             self._python_history = []
             self._ai_history = []
             self._shell_history = []
