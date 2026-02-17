@@ -4,7 +4,13 @@ A minimal intelligence agent harness with a terminal user interface. Provides co
 
 ## Philosophy
 
-Artifice is built on the principle that agent harnesses should be **minimal and transparent**:
+Artifice is built on the principle that agent harnesses should be **minimal and transparent**.
+
+### Self-Bootstrapping Design
+
+Artifice is designed to bootstrap itself. Once the minimal feature set is in place, the tool itself becomes the development environment for its own evolution.
+
+This is currently aspirational.
 
 ## Features
 
