@@ -1,4 +1,4 @@
-"""Simulated AI  for testing and development (backward compatibility wrapper)."""
+"""Simulated AI  for testing and development."""
 
 from __future__ import annotations
 
@@ -15,8 +15,6 @@ logger = logging.getLogger(__name__)
 
 class SimulatedAssistant(AssistantBase):
     """A simulated AI  that can be configured with predefined responses.
-
-    This is a backward compatibility wrapper that delegates to Assistant + SimulatedProvider.
 
     This  is useful for:
     - Testing the  interaction flow without API costs
@@ -41,7 +39,6 @@ class SimulatedAssistant(AssistantBase):
             on_connect=on_connect,
             response_delay=response_delay,
         )
-        # Don't set up default scenarios by default (backward compatibility)
         self._provider.scenarios = []
         self._provider.default_response = (
             "I'm a simulated AI . I can be configured with custom responses."
@@ -125,22 +122,14 @@ class SimulatedAssistant(AssistantBase):
 
     @property
     def messages(self):
-        """Expose messages for any code that accesses .messages."""
-        return self._assistant.messages
-
-    @property
-    def conversation_history(self):
-        """Alias for messages (backward compatibility)."""
         return self._assistant.messages
 
     @property
     def current_scenario_index(self):
-        """Expose current_scenario_index for backward compatibility."""
         return self._provider.current_scenario_index
 
     @property
     def scenarios(self):
-        """Expose scenarios for backward compatibility."""
         return self._provider.scenarios
 
 

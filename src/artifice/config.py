@@ -10,11 +10,41 @@ import logging
 import os
 import traceback
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 
 logger = logging.getLogger(__name__)
+
+# Declarative mapping of YAML keys to their default values.
+# Used by ArtificeConfig.__init__ and load_config to avoid repetition.
+_FIELDS: dict[str, Any] = {
+    # Assistant settings
+    "assistant": None,
+    "assistants": None,
+    "system_prompt": None,
+    "prompt_prefix": None,
+    "thinking_budget": None,
+    # Provider-specific settings
+    "ollama_host": None,
+    # Display settings
+    "banner": False,
+    "python_markdown": False,
+    "assistant_markdown": True,
+    "shell_markdown": False,
+    # Output code block settings
+    "shell_output_code_block": True,
+    "tmux_output_code_block": False,
+    "python_output_code_block": True,
+    # Auto-send settings
+    "auto_send_to_assistant": True,
+    # Shell init script
+    "shell_init_script": None,
+    # Tmux settings
+    "tmux_target": None,
+    "tmux_prompt_pattern": None,
+    "tmux_echo_exit_code": False,
+}
 
 
 class ArtificeConfig:
@@ -24,41 +54,41 @@ class ArtificeConfig:
     All settings have sensible defaults.
     """
 
+    # Assistant settings
+    assistant: str | None
+    assistants: dict | None
+    system_prompt: str | None
+    prompt_prefix: str | None
+    thinking_budget: int | None
+
+    # Provider-specific settings
+    ollama_host: str | None
+
+    # Display settings
+    banner: bool
+    python_markdown: bool
+    assistant_markdown: bool
+    shell_markdown: bool
+
+    # Output code block settings
+    shell_output_code_block: bool
+    tmux_output_code_block: bool
+    python_output_code_block: bool
+
+    # Auto-send settings
+    auto_send_to_assistant: bool
+
+    # Shell init script
+    shell_init_script: str | None
+
+    # Tmux settings
+    tmux_target: str | None
+    tmux_prompt_pattern: str | None
+    tmux_echo_exit_code: bool
+
     def __init__(self):
-        # Assistant settings
-        self.assistant: Optional[str] = None
-        self.assistants: Optional[dict] = None
-        self.system_prompt: Optional[str] = None
-        self.prompt_prefix: Optional[str] = None
-        self.thinking_budget: Optional[int] = None
-
-        # Provider-specific settings
-        self.ollama_host: Optional[str] = None  # e.g., http://localhost:11434
-
-        # Display settings
-        self.banner: bool = False
-        self.python_markdown: bool = False
-        self.assistant_markdown: bool = True
-        self.shell_markdown: bool = False
-
-        # Output code block settings (whether to wrap output in CodeOutputBlock)
-        self.shell_output_code_block: bool = True
-        self.tmux_output_code_block: bool = False
-        self.python_output_code_block: bool = True
-
-        # Auto-send settings
-        self.auto_send_to_assistant: bool = True
-
-        # Shell init script (for bash)
-        self.shell_init_script: Optional[str] = None
-
-        # Tmux settings
-        self.tmux_target: Optional[str] = None
-        self.tmux_prompt_pattern: Optional[str] = None
-        self.tmux_echo_exit_code: bool = (
-            False  # Whether to check exit code with echo $?
-        )
-
+        for key, default in _FIELDS.items():
+            setattr(self, key, default)
         # Custom settings (user can add any additional settings)
         self._custom: dict[str, Any] = {}
 
@@ -84,7 +114,7 @@ def get_init_script_path() -> Path:
     return get_config_path() / "init.yaml"
 
 
-def load_config() -> tuple[ArtificeConfig, Optional[str]]:
+def load_config() -> tuple[ArtificeConfig, str | None]:
     """Load configuration from ~/.config/artifice/init.yaml.
 
     The init.yaml file is parsed as YAML and configuration values are loaded
@@ -111,78 +141,14 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
         if data is None:
             return config, None
 
-        # Load configuration values from the YAML data
-        # Assistant settings
-        if "assistant" in data:
-            config.assistant = data["assistant"]
-        if "assistants" in data:
-            config.assistants = data["assistants"]
-        if "tmux_target" in data:
-            config.tmux_target = data["tmux_target"]
-        if "tmux_prompt_pattern" in data:
-            config.tmux_prompt_pattern = data["tmux_prompt_pattern"]
-        if "system_prompt" in data:
-            config.system_prompt = data["system_prompt"]
-        if "prompt_prefix" in data:
-            config.prompt_prefix = data["prompt_prefix"]
-        if "thinking_budget" in data:
-            config.thinking_budget = data["thinking_budget"]
-
-        # Provider-specific settings
-        if "ollama_host" in data:
-            config.ollama_host = data["ollama_host"]
-
-        # Display settings
-        if "banner" in data:
-            config.banner = data["banner"]
-        if "python_markdown" in data:
-            config.python_markdown = data["python_markdown"]
-        if "assistant_markdown" in data:
-            config.assistant_markdown = data["assistant_markdown"]
-        if "shell_markdown" in data:
-            config.shell_markdown = data["shell_markdown"]
-
-        # Output code block settings
-        if "shell_output_code_block" in data:
-            config.shell_output_code_block = data["shell_output_code_block"]
-        if "tmux_output_code_block" in data:
-            config.tmux_output_code_block = data["tmux_output_code_block"]
-        if "python_output_code_block" in data:
-            config.python_output_code_block = data["python_output_code_block"]
-        if "tmux_echo_exit_code" in data:
-            config.tmux_echo_exit_code = data["tmux_echo_exit_code"]
-
-        # Auto-send settings
-        if "auto_send_to_assistant" in data:
-            config.auto_send_to_assistant = data["auto_send_to_assistant"]
-
-        # Shell init script
-        if "shell_init_script" in data:
-            config.shell_init_script = data["shell_init_script"]
+        # Load known fields from YAML data
+        for key in _FIELDS:
+            if key in data:
+                setattr(config, key, data[key])
 
         # Store any additional custom settings
-        known_keys = {
-            "assistant",
-            "assistants",
-            "system_prompt",
-            "prompt_prefix",
-            "thinking_budget",
-            "ollama_host",
-            "banner",
-            "python_markdown",
-            "assistant_markdown",
-            "shell_markdown",
-            "shell_output_code_block",
-            "tmux_output_code_block",
-            "python_output_code_block",
-            "auto_send_to_assistant",
-            "shell_init_script",
-            "tmux_target",
-            "tmux_prompt_pattern",
-            "tmux_echo_exit_code",
-        }
         for key, value in data.items():
-            if key not in known_keys:
+            if key not in _FIELDS:
                 config.set(key, value)
 
         logger.info("Loaded config from %s", init_path)
@@ -194,4 +160,3 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
     except Exception:
         error_msg = f"Error loading config from {init_path}:\n{traceback.format_exc()}"
         return config, error_msg
-

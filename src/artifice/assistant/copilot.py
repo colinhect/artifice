@@ -1,7 +1,4 @@
-"""Assistant for GitHub Copilot (backward compatibility wrapper).
-
-This module provides the CopilotAssistant class which delegates to the new
-provider/assistant architecture while maintaining backward compatibility.
+"""Assistant for GitHub Copilot.
 """
 
 from __future__ import annotations
@@ -16,8 +13,6 @@ from ..providers.copilot import CopilotProvider
 
 class CopilotAssistant(AssistantBase):
     """Assistant for connecting to GitHub Copilot CLI with streaming responses.
-
-    This is a backward compatibility wrapper that delegates to Assistant + CopilotProvider.
 
     Note: Copilot uses session-based conversation management, so conversation history
     is managed by the provider's session rather than the assistant.

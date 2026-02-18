@@ -131,7 +131,7 @@ class TestSimulatedAssistantHistory:
         assistant.configure_scenarios([{"response": "a"}, {"response": "b"}])
         await assistant.send_prompt("x")
         assistant.reset()
-        assert assistant.conversation_history == []
+        assert assistant.messages == []
         assert assistant.current_scenario_index == 0
 
 

@@ -11,6 +11,7 @@ from .terminal_output import (
     CodeInputBlock,
     BaseBlock,
 )
+from .block_factory import BlockFactory
 from .tag_parser import TagParser
 from .backtick_tracker import BacktickTracker
 
@@ -39,6 +40,7 @@ class StreamingFenceDetector:
         self, output: TerminalOutput, save_callback=None, pause_after_code: bool = False
     ) -> None:
         self._output = output
+        self._factory = BlockFactory(output)
         self._save_callback = save_callback  # Callback to save blocks to session
         self._pause_after_code = pause_after_code
         self._started = False
@@ -53,8 +55,6 @@ class StreamingFenceDetector:
         self._current_block: BaseBlock | None = (
             None  # The block we're currently appending to
         )
-        self.all_blocks: list[BaseBlock] = []
-        self.first_assistant_block: AssistantOutputBlock | None = None
         self._current_line_buffer = (
             ""  # Tracks current line in PROSE for blank line detection
         )
@@ -86,6 +86,18 @@ class StreamingFenceDetector:
         self._make_thinking_block = lambda: ThinkingOutputBlock(activity=True)
 
     @property
+    def all_blocks(self) -> list[BaseBlock]:
+        return self._factory.all_blocks
+
+    @property
+    def first_assistant_block(self) -> AssistantOutputBlock | None:
+        return self._factory.first_assistant_block
+
+    @first_assistant_block.setter
+    def first_assistant_block(self, value: AssistantOutputBlock | None) -> None:
+        self._factory.first_assistant_block = value
+
+    @property
     def is_paused(self) -> bool:
         """True if processing paused after a code block closed."""
         return self._paused
@@ -106,15 +118,34 @@ class StreamingFenceDetector:
     def start(self) -> None:
         """Create the initial AssistantOutputBlock for streaming prose.
 
-        Idempotent — safe to call multiple times; only the first call has effect.
+        Idempotent -- safe to call multiple times; only the first call has effect.
         """
         if self._started:
             return
         self._started = True
-        self._current_block = self._make_prose_block(activity=True)
-        self._output.append_block(self._current_block)
-        self.all_blocks.append(self._current_block)
-        self.first_assistant_block = self._current_block
+        self._current_block = self._create_and_mount_prose(activity=True)
+        self._factory.first_assistant_block = self._current_block
+
+    def _create_and_mount_prose(self, activity: bool = True) -> AssistantOutputBlock:
+        """Create a prose block using the factory or test override."""
+        block = self._make_prose_block(activity)
+        self._output.append_block(block)
+        self._factory.all_blocks.append(block)
+        return block
+
+    def _create_and_mount_code(self, code: str, lang: str) -> CodeInputBlock:
+        """Create a code block using the factory or test override."""
+        block = self._make_code_block(code, lang)
+        self._output.append_block(block)
+        self._factory.all_blocks.append(block)
+        return block
+
+    def _create_and_mount_thinking(self) -> ThinkingOutputBlock:
+        """Create a thinking block using the factory or test override."""
+        block = self._make_thinking_block()
+        self._output.append_block(block)
+        self._factory.all_blocks.append(block)
+        return block
 
     def feed(self, text: str) -> None:
         """Process a chunk of streaming text, creating blocks as needed.
@@ -184,6 +215,83 @@ class StreamingFenceDetector:
         """Track backtick spans using the backtick tracker."""
         self._backtick_tracker.feed(ch)
 
+    def _transition_to_code(self, lang: str) -> None:
+        """Handle the common transition from PROSE to CODE state."""
+        self._current_lang = lang
+        self._current_close_tag = _CODE_CLOSE_TAGS[lang]
+
+        self._flush_pending_to_chunk()
+        self._flush_and_update_chunk()
+
+        # Remove empty prose block, or mark it complete
+        current_is_empty = (
+            isinstance(self._current_block, AssistantOutputBlock)
+            and not self._current_block._full.strip()
+        )
+        if current_is_empty:
+            if self._current_block is self._factory.first_assistant_block:
+                self._factory.first_assistant_block = None
+            if self._current_block is not None:
+                self._factory.remove_block(self._current_block)
+        elif isinstance(self._current_block, AssistantOutputBlock):
+            self._current_block.mark_success()
+
+        # Create new code block
+        self._current_block = self._create_and_mount_code("", lang)
+
+        self._pending_buffer = ""
+        self._current_line_buffer = ""
+        self._state = _FenceState.CODE
+
+    def _transition_to_prose_from_code(self) -> None:
+        """Handle the common transition from CODE back to PROSE state."""
+        # Capture as the last completed code block
+        if isinstance(self._current_block, CodeInputBlock):
+            self._last_code_block = self._current_block
+            self._current_block.finish_streaming()
+
+        # Start new prose block
+        self._current_block = self._create_and_mount_prose(activity=True)
+
+        self._current_line_buffer = ""
+        self._strip_leading_whitespace = True
+        self._state = _FenceState.PROSE
+
+        # Pause after code block if enabled
+        if self._pause_after_code:
+            self._paused = True
+
+    def _transition_to_thinking(self, close_tag: str) -> None:
+        """Handle the common transition from PROSE to THINKING state."""
+        self._flush_pending_to_chunk()
+        self._flush_and_update_chunk()
+
+        # Mark current prose block as complete
+        if isinstance(self._current_block, AssistantOutputBlock):
+            self._current_block.mark_success()
+
+        self._current_thinking_close_tag = close_tag
+        self._current_block = self._create_and_mount_thinking()
+
+        self._current_line_buffer = ""
+        self._state = _FenceState.THINKING
+
+    def _transition_to_prose_from_thinking(self) -> None:
+        """Handle the common transition from THINKING back to PROSE state."""
+        self._flush_pending_to_chunk()
+        self._flush_and_update_chunk()
+
+        # Mark thinking block as complete
+        if isinstance(self._current_block, ThinkingOutputBlock):
+            self._current_block.mark_success()
+
+        # Start new prose block
+        self._current_block = self._create_and_mount_prose(activity=True)
+
+        self._current_line_buffer = ""
+        self._strip_leading_whitespace = True
+        self._state = _FenceState.PROSE
+
     def _feed_prose(self, ch: str) -> None:
         """Process prose text, looking for opening code tags, think tag, or markdown fences."""
         # Strip leading whitespace after closing tags
@@ -210,37 +318,12 @@ class StreamingFenceDetector:
                     # For other languages, default to python for syntax highlighting
                     lang = "python"
 
-                self._current_lang = lang
                 self._in_markdown_fence = True
                 self._detecting_fence_open = False
                 self._fence_language_buffer = ""
 
                 # Don't include the backticks or language in the prose
-                # (they're already been skipped via not adding to pending_buffer)
-                self._flush_pending_to_chunk()
-                self._flush_and_update_chunk()
-
-                # Remove empty prose block, or mark it complete
-                current_is_empty = (
-                    isinstance(self._current_block, AssistantOutputBlock)
-                    and not self._current_block._full.strip()
-                )
-                if current_is_empty:
-                    if self._current_block is self.first_assistant_block:
-                        self.first_assistant_block = None
-                    if self._current_block is not None:
-                        self._remove_block(self._current_block)
-                elif isinstance(self._current_block, AssistantOutputBlock):
-                    self._current_block.mark_success()
-
-                # Create new code block
-                self._current_block = self._make_code_block("", lang)
-                self._output.append_block(self._current_block)
-                self.all_blocks.append(self._current_block)
-
-                self._pending_buffer = ""
-                self._current_line_buffer = ""
-                self._state = _FenceState.CODE
+                self._transition_to_code(lang)
             else:
                 # Accumulate language name
                 self._fence_language_buffer += ch
@@ -274,56 +357,11 @@ class StreamingFenceDetector:
         ):
             result = self._check_tags(ch, _PROSE_TAG_TARGETS)
             if result in ("<think>", "<detail>"):
-                # Complete thinking/detail tag detected
-                self._flush_pending_to_chunk()
-                self._flush_and_update_chunk()
-
-                # Mark current prose block as complete
-                if isinstance(self._current_block, AssistantOutputBlock):
-                    self._current_block.mark_success()
-
-                # Track which close tag to match
-                self._current_thinking_close_tag = (
-                    "</think>" if result == "<think>" else "</detail>"
-                )
-
-                # Create new thinking block
-                self._current_block = self._make_thinking_block()
-                self._output.append_block(self._current_block)
-                self.all_blocks.append(self._current_block)
-
-                self._current_line_buffer = ""
-                self._state = _FenceState.THINKING
+                close_tag = "</think>" if result == "<think>" else "</detail>"
+                self._transition_to_thinking(close_tag)
             elif isinstance(result, str) and result in _CODE_OPEN_TAGS:
-                # Complete code opening tag detected
                 lang = _CODE_OPEN_TAGS[result]
-                self._current_lang = lang
-                self._current_close_tag = _CODE_CLOSE_TAGS[lang]
-
-                self._flush_pending_to_chunk()
-                self._flush_and_update_chunk()
-
-                # Remove empty prose block, or mark it complete
-                current_is_empty = (
-                    isinstance(self._current_block, AssistantOutputBlock)
-                    and not self._current_block._full.strip()
-                )
-                if current_is_empty:
-                    if self._current_block is self.first_assistant_block:
-                        self.first_assistant_block = None
-                    if self._current_block is not None:
-                        self._remove_block(self._current_block)
-                elif isinstance(self._current_block, AssistantOutputBlock):
-                    self._current_block.mark_success()
-
-                # Create new code block
-                self._current_block = self._make_code_block("", lang)
-                self._output.append_block(self._current_block)
-                self.all_blocks.append(self._current_block)
-
-                self._pending_buffer = ""
-                self._current_line_buffer = ""
-                self._state = _FenceState.CODE
+                self._transition_to_code(lang)
             return
 
         # Check for empty lines to split blocks
@@ -342,9 +380,7 @@ class StreamingFenceDetector:
                     self._current_block.mark_success()
 
                 # Create new prose block
-                self._current_block = self._make_prose_block(activity=True)
-                self._output.append_block(self._current_block)
-                self.all_blocks.append(self._current_block)
+                self._current_block = self._create_and_mount_prose(activity=True)
 
             # Reset line buffer for next line
             self._current_line_buffer = ""
@@ -358,8 +394,6 @@ class StreamingFenceDetector:
         if self._in_markdown_fence:
             if ch == "`":
                 # Check if we're at start of line before starting fence close detection
-                # We need to look at pending_buffer to see what's on the current line
-                # Split by newline and check if the last line (current line) is whitespace-only
                 lines = self._pending_buffer.split("\n")
                 current_line_in_pending = lines[-1] if lines else ""
 
@@ -376,32 +410,15 @@ class StreamingFenceDetector:
                         self._flush_pending_to_chunk()
                         self._flush_and_update_chunk()
 
-                        # Mark as last completed code block
-                        if isinstance(self._current_block, CodeInputBlock):
-                            self._last_code_block = self._current_block
-                            self._current_block.finish_streaming()
-
                         # Reset fence state
                         self._in_markdown_fence = False
                         self._fence_close_backtick_count = 0
 
-                        # Start new prose block
-                        self._current_block = self._make_prose_block(activity=True)
-                        self._output.append_block(self._current_block)
-                        self.all_blocks.append(self._current_block)
-
-                        self._current_line_buffer = ""
-                        self._strip_leading_whitespace = True
-                        self._state = _FenceState.PROSE
-
-                        # Pause after code block if enabled
-                        if self._pause_after_code:
-                            self._paused = True
+                        self._transition_to_prose_from_code()
                     # Don't add backtick to pending - we're accumulating them for fence detection
                     return
                 else:
                     # Backtick not at start of line - it's part of code content
-                    # First, add any accumulated fence-close backticks from start of line
                     if self._fence_close_backtick_count > 0:
                         self._pending_buffer += "`" * self._fence_close_backtick_count
                         self._fence_close_backtick_count = 0
@@ -410,7 +427,6 @@ class StreamingFenceDetector:
                     return
             elif self._fence_close_backtick_count > 0:
                 # We had some backticks at start of line but got interrupted by non-backtick
-                # Add them as code content
                 self._pending_buffer += "`" * self._fence_close_backtick_count
                 self._fence_close_backtick_count = 0
                 # Fall through to add current character
@@ -423,23 +439,7 @@ class StreamingFenceDetector:
                 self._flush_pending_to_chunk()
                 self._flush_and_update_chunk()
 
-                # Capture as the last completed code block
-                if isinstance(self._current_block, CodeInputBlock):
-                    self._last_code_block = self._current_block
-                    self._current_block.finish_streaming()
-
-                # Start new prose block
-                self._current_block = self._make_prose_block(activity=True)
-                self._output.append_block(self._current_block)
-                self.all_blocks.append(self._current_block)
-
-                self._current_line_buffer = ""
-                self._strip_leading_whitespace = True
-                self._state = _FenceState.PROSE
-
-                # Pause after code block if enabled
-                if self._pause_after_code:
-                    self._paused = True
+                self._transition_to_prose_from_code()
             return
 
         # Regular code character
@@ -451,22 +451,7 @@ class StreamingFenceDetector:
         if self._tag_parser.has_buffered or ch == "<":
             result = self._check_tags(ch, [self._current_thinking_close_tag])
             if result == self._current_thinking_close_tag:
-                # Complete </think> tag detected
-                self._flush_pending_to_chunk()
-                self._flush_and_update_chunk()
-
-                # Mark thinking block as complete
-                if isinstance(self._current_block, ThinkingOutputBlock):
-                    self._current_block.mark_success()
-
-                # Start new prose block
-                self._current_block = self._make_prose_block(activity=True)
-                self._output.append_block(self._current_block)
-                self.all_blocks.append(self._current_block)
-
-                self._current_line_buffer = ""
-                self._strip_leading_whitespace = True
-                self._state = _FenceState.PROSE
+                self._transition_to_prose_from_thinking()
             return
 
         # Check for empty lines to split thinking blocks
@@ -494,9 +479,7 @@ class StreamingFenceDetector:
                         self._current_block.mark_success()
 
                     # Create new thinking block
-                    self._current_block = self._make_thinking_block()
-                    self._output.append_block(self._current_block)
-                    self.all_blocks.append(self._current_block)
+                    self._current_block = self._create_and_mount_thinking()
 
             # Reset line buffer for next line
             self._current_line_buffer = ""
@@ -520,12 +503,6 @@ class StreamingFenceDetector:
             ):
                 self._current_block.append(self._chunk_buffer)
                 self._current_block.flush()
-
-    def _remove_block(self, block: BaseBlock) -> None:
-        """Remove a block from tracking lists and the DOM."""
-        if block in self.all_blocks:
-            self.all_blocks.remove(block)
-        self._output.remove_block(block)
 
     def finish(self) -> None:
         """Flush any remaining state at end of stream."""
@@ -552,7 +529,7 @@ class StreamingFenceDetector:
             self._current_block.mark_success()
 
         # Finalize all blocks: switch from streaming mode to final rendering
-        for block in self.all_blocks:
+        for block in self._factory.all_blocks:
             if isinstance(block, CodeInputBlock):
                 block.finish_streaming()
             elif isinstance(block, AssistantOutputBlock):
@@ -565,14 +542,14 @@ class StreamingFenceDetector:
         # Remove empty AssistantOutputBlocks (keep first_assistant_block for status indicator)
         for block in [
             b
-            for b in self.all_blocks
+            for b in self._factory.all_blocks
             if isinstance(b, AssistantOutputBlock)
-            and b is not self.first_assistant_block
+            and b is not self._factory.first_assistant_block
             and not b._full.strip()
         ]:
-            self._remove_block(block)
+            self._factory.remove_block(block)
 
         # Save all blocks to session now that they're finalized
         if self._save_callback:
-            for block in self.all_blocks:
+            for block in self._factory.all_blocks:
                 self._save_callback(block)
