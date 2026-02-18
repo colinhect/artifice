@@ -8,7 +8,7 @@ from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
 from textual.message import Message
 
-from ..terminal_input import InputTextArea
+from ..input import InputTextArea
 from .blocks import (
     AssistantInputBlock,
     AssistantOutputBlock,

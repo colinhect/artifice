@@ -14,11 +14,11 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import LoadingIndicator, Static
 
-from .assistant import AssistantBase, create_assistant
-from .execution import ExecutionResult, ExecutionStatus
-from .history import History
-from .terminal_input import TerminalInput, InputTextArea
-from .terminal_output import (
+from ..assistant import AssistantBase, create_assistant
+from ..execution import ExecutionResult, ExecutionStatus
+from ..history import History
+from .input import TerminalInput, InputTextArea
+from .output import (
     TerminalOutput,
     AssistantInputBlock,
     AssistantOutputBlock,
@@ -26,14 +26,14 @@ from .terminal_output import (
     CodeOutputBlock,
     BaseBlock,
 )
-from .fence_detector import StreamingFenceDetector
-from .status_indicator import StatusIndicatorManager
-from .execution_coordinator import ExecutionCoordinator
-from .stream_manager import StreamManager
-from .input_mode import InputMode
+from ..fence_detector import StreamingFenceDetector
+from ..status_indicator import StatusIndicatorManager
+from ..execution_coordinator import ExecutionCoordinator
+from ..stream_manager import StreamManager
+from ..input_mode import InputMode
 
 if TYPE_CHECKING:
-    from .app import ArtificeApp
+    from ..app import ArtificeApp
 
 logger = logging.getLogger(__name__)
 

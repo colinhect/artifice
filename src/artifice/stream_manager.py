@@ -5,12 +5,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable
 
-from .terminal_output import ThinkingOutputBlock
+from .terminal.output import ThinkingOutputBlock
 from .chunk_buffer import ChunkBuffer
 from .fence_detector import StreamingFenceDetector
 
 if TYPE_CHECKING:
-    from .terminal_output import TerminalOutput
+    from .terminal.output import TerminalOutput
 
 logger = logging.getLogger(__name__)
 

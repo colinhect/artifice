@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 
-from .terminal_output import (
+from .terminal.output import (
     TerminalOutput,
     AssistantOutputBlock,
     ThinkingOutputBlock,

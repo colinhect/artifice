@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from .terminal_output import TerminalOutput, CodeOutputBlock
+    from .terminal.output import TerminalOutput, CodeOutputBlock
 
 
 class OutputCallbackHandler:

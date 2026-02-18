@@ -12,12 +12,12 @@ from textual.widgets import Static, TextArea, LoadingIndicator
 from textual import events
 from textual_autocomplete import DropdownItem, TargetState
 
-from .prompts import list_prompts, load_prompt, fuzzy_match
-from .input_mode import InputMode
-from .search_mode_manager import SearchModeManager
+from ..prompts import list_prompts, load_prompt, fuzzy_match
+from ..input_mode import InputMode
+from ..search_mode_manager import SearchModeManager
 
 if TYPE_CHECKING:
-    from .history import History
+    from ..history import History
 
 
 class InputTextArea(TextArea):

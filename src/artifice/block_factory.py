@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .terminal_output import (
+from .terminal.output import (
     AssistantOutputBlock,
     CodeInputBlock,
     ThinkingOutputBlock,
@@ -12,7 +12,7 @@ from .terminal_output import (
 )
 
 if TYPE_CHECKING:
-    from .terminal_output import TerminalOutput
+    from .terminal.output import TerminalOutput
 
 
 class BlockFactory:

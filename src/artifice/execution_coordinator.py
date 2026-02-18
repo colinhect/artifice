@@ -12,7 +12,7 @@ from .execution import (
     ShellExecutor,
     TmuxShellExecutor,
 )
-from .terminal_output import (
+from .terminal.output import (
     CodeInputBlock,
     WidgetOutputBlock,
     BaseBlock,
@@ -21,7 +21,7 @@ from .output_callbacks import OutputCallbackHandler
 
 if TYPE_CHECKING:
     from .config import ArtificeConfig
-    from .terminal_output import TerminalOutput
+    from .terminal.output import TerminalOutput
 
 
 class ExecutionCoordinator:

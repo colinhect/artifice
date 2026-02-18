@@ -131,7 +131,7 @@ def main():
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            filename="artifice_assistant.log",
+            filename="artifice.log",
             filemode="a",  # append mode
         )
         logging.getLogger("artifice").setLevel(logging.DEBUG)
