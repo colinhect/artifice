@@ -20,8 +20,9 @@ agent: "minimax"
 
 agents:
   minimax:
+    api_key: "..."
     provider: "huggingface"
-    model: "MiniMaxAI/MiniMax-M2.5:novita"
+    model: "MiniMaxAI/MiniMax-M2.5"
 
 # ============================================================================
 # Display Settings

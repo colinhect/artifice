@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import LoadingIndicator, Static
 
@@ -41,21 +40,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-class StreamChunk(Message):
-    """Message posted when a chunk of streamed text arrives."""
-
-    def __init__(self, text: str) -> None:
-        super().__init__()
-        self.text = text
-
-
-class StreamThinkingChunk(Message):
-    """Message posted when a chunk of streamed thinking text arrives."""
-
-    def __init__(self, text: str) -> None:
-        super().__init__()
-        self.text = text
 
 
 class ArtificeTerminal(Widget):
@@ -256,12 +240,16 @@ class ArtificeTerminal(Widget):
         After streaming, ToolCallBlocks are created directly from response.tool_calls.
         """
         detector = self._stream.create_detector()
+        # Create the initial AgentOutputBlock here, in the Textual event context,
+        # before streaming starts. This avoids NoActiveAppError from mounting widgets
+        # inside the async streaming loop.
+        detector.start()
 
         def on_chunk(text):
-            self.post_message(StreamChunk(text))
+            self._stream.on_chunk(text)
 
         def on_thinking_chunk(text):
-            self.post_message(StreamThinkingChunk(text))
+            self._stream.on_thinking_chunk(text)
 
         if self._config.prompt_prefix:
             prompt = self._config.prompt_prefix + " " + prompt
@@ -414,14 +402,6 @@ class ArtificeTerminal(Widget):
         self._current_task = asyncio.create_task(
             self._run_cancellable(do_execute(), finally_callback=cleanup)
         )
-
-    def on_stream_chunk(self, event: StreamChunk) -> None:
-        """Handle streaming chunk message - delegate to stream manager."""
-        self._stream.on_chunk(event.text)
-
-    def on_stream_thinking_chunk(self, event: StreamThinkingChunk) -> None:
-        """Handle streaming thinking chunk message - delegate to stream manager."""
-        self._stream.on_thinking_chunk(event.text)
 
     def _resume_stream(self) -> None:
         """Resume streaming after a pause-on-code-block."""
