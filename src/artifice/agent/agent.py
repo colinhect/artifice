@@ -78,16 +78,6 @@ class AgentResponse:
     usage: TokenUsage | None = None
 
 
-def exec_shell(command: str):
-    """Executes shell command."""
-    pass
-
-
-def exec_python(code: str):
-    """Executes Python code."""
-    pass
-
-
 class Agent:
     """Manages LLM conversation history and streaming via any-llm.
 

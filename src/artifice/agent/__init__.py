@@ -4,19 +4,21 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import TYPE_CHECKING, Callable
 
-from typing import Callable
-from ..config import ArtificeConfig
 from .agent import Agent, AgentResponse, ToolCall
-from .simulated import SimulatedAgent, ScriptedAgent, EchoAgent
+from .simulated import EchoAgent, ScriptedAgent, SimulatedAgent
+
+if TYPE_CHECKING:
+    from ..config import ArtificeConfig
 
 __all__ = [
     "Agent",
     "AgentResponse",
-    "ToolCall",
-    "SimulatedAgent",
-    "ScriptedAgent",
     "EchoAgent",
+    "ScriptedAgent",
+    "SimulatedAgent",
+    "ToolCall",
 ]
 
 logger = logging.getLogger(__name__)
@@ -43,11 +45,13 @@ def create_agent(
     - ``system_prompt``: Override the global system_prompt for this agent.
     """
     if not config.agents or not config.agent:
-        raise ValueError("No agent selected in configuration")
+        error = "No agent selected in configuration"
+        raise ValueError(error)
 
     definition = config.agents.get(config.agent)
     if definition is None:
-        raise ValueError(f"Unknown agent: {config.agent!r}")
+        error = f"Unknown agent: {config.agent!r}"
+        raise ValueError(error)
 
     provider = definition.get("provider")
     model = definition.get("model")
@@ -68,9 +72,8 @@ def create_agent(
         return agent
 
     if model is None:
-        raise ValueError(
-            f"Agent {config.agent!r} requires a 'model' key in its definition"
-        )
+        error = f"Agent {config.agent!r} requires a 'model' key in its definition"
+        raise ValueError(error)
 
     # Resolve API key
     api_key: str | None = definition.get("api_key")
