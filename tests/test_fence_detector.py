@@ -415,6 +415,28 @@ class TestEmptyBlocks:
                 assert b._text.strip()  # type: ignore
 
 
+    def test_consecutive_blank_lines_no_empty_blocks(self):
+        """Multiple consecutive blank lines should not leave empty blocks after finish."""
+        d, out = make_detector()
+        d.start()
+        d.feed("Hello.\n\n\n\nWorld.")
+        d.finish()
+
+        non_removed = [b for b in d.all_blocks if not b._removed]
+        for b in non_removed:
+            if isinstance(b, FakeAgentBlock):
+                assert b._text.strip(), f"Empty AgentOutputBlock left in output: {b._text!r}"
+
+    def test_empty_first_agent_block_removed_in_finish(self):
+        """first_agent_block should be set to None if it's empty at finish()."""
+        d, out = make_detector()
+        d.start()
+        assert d.first_agent_block is not None
+        # Don't feed any text, just finish
+        d.finish()
+        assert d.first_agent_block is None
+
+
 class TestStateTransitions:
     def test_state_starts_as_prose(self):
         d, _ = make_detector()

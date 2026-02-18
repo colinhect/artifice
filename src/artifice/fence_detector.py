@@ -358,12 +358,13 @@ class StreamingFenceDetector:
                 block.flush()  # Ensure all content is rendered before finalizing
                 block.finalize_streaming()
 
-        # Remove empty AgentOutputBlocks (keep first_agent_block for status indicator)
+        # Remove empty AgentOutputBlocks (including first_agent_block)
         for block in [
             b
             for b in self._factory.all_blocks
             if isinstance(b, AgentOutputBlock)
-            and b is not self._factory.first_agent_block
             and not b._output_str.strip()
         ]:
+            if block is self._factory.first_agent_block:
+                self._factory.first_agent_block = None
             self._factory.remove_block(block)
