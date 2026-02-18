@@ -387,7 +387,8 @@ class TerminalInput(Static):
                 if len(lines) > 3:
                     truncated = "\n".join(lines[:2] + [lines[2] + "..."])
                     # Store mapping from truncated to full
-                    self._search_manager.set_truncation_mapping(truncated, item)
+                    if self._search_manager:
+                        self._search_manager.set_truncation_mapping(truncated, item)
                     return truncated
                 return item
 

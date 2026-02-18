@@ -5,9 +5,24 @@ the parsing state machine in isolation. We patch the isinstance
 targets in the terminal module so the detector recognizes our fakes.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 import pytest
 from artifice.fence_detector import StreamingFenceDetector, _FenceState
+
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    class HasText(Protocol):
+        _text: str
+
+    class HasRemoved(Protocol):
+        _removed: bool
+
+    class HasOutputStr(Protocol):
+        _output_str: str
 
 
 # --- Fakes to avoid Textual widget dependencies ---
@@ -133,10 +148,10 @@ def _patch_block_types():
 def make_detector():
     """Create a detector with fake dependencies."""
     output = FakeOutput()
-    detector = StreamingFenceDetector(output)
-    detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
-    detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
-    detector._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
+    detector = StreamingFenceDetector(output)  # type: ignore
+    detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)  # type: ignore
+    detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)  # type: ignore
+    detector._make_thinking_block = lambda: FakeThinkingBlock(activity=True)  # type: ignore
     return detector, output
 
 
@@ -197,12 +212,12 @@ class TestBasicTagDetection:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
         ]
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
-        assert any("Before" in b._text for b in prose_blocks)
-        assert any("After" in b._text for b in prose_blocks)
+        assert any("Before" in b._text for b in prose_blocks)  # type: ignore
+        assert any("After" in b._text for b in prose_blocks)  # type: ignore
 
     def test_multiline_python_block(self):
         """Code tags with newlines in code content."""
@@ -288,7 +303,7 @@ class TestIncompleteBlocks:
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 0
-        assert "x < 5" in d.all_blocks[0]._text
+        assert "x < 5" in d.all_blocks[0]._text  # type: ignore
 
     def test_backticks_create_code_blocks(self):
         """Markdown code fences should create code blocks like XML tags."""
@@ -311,7 +326,7 @@ class TestIncompleteBlocks:
 
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 0
-        assert "`<python>`" in d.all_blocks[0]._text
+        assert "`<python>`" in d.all_blocks[0]._text  # type: ignore
 
     def test_tags_inside_triple_backtick_spans_ignored(self):
         """Tags inside triple-backtick code spans should not trigger detection."""
@@ -366,12 +381,12 @@ class TestWhitespaceStripping:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
         ]
         # The prose after the code block should start with "Next", not "\n"
-        after_code = [b for b in prose_blocks if "Next text" in b._text]
+        after_code = [b for b in prose_blocks if "Next text" in b._text]  # type: ignore
         assert len(after_code) == 1
-        assert after_code[0]._text.startswith("Next")
+        assert after_code[0]._text.startswith("Next")  # type: ignore
 
     def test_multiple_whitespace_after_closing_tag_stripped(self):
         """Multiple whitespace chars after closing tag should all be stripped."""
@@ -383,11 +398,11 @@ class TestWhitespaceStripping:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
         ]
-        after_code = [b for b in prose_blocks if "After" in b._text]
+        after_code = [b for b in prose_blocks if "After" in b._text]  # type: ignore
         assert len(after_code) == 1
-        assert after_code[0]._text.startswith("After")
+        assert after_code[0]._text.startswith("After")  # type: ignore
 
     def test_whitespace_after_think_closing_tag_stripped(self):
         """Whitespace after </think> should be stripped."""
@@ -399,11 +414,11 @@ class TestWhitespaceStripping:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
         ]
-        after_think = [b for b in prose_blocks if "Visible text" in b._text]
+        after_think = [b for b in prose_blocks if "Visible text" in b._text]  # type: ignore
         assert len(after_think) == 1
-        assert after_think[0]._text.startswith("Visible")
+        assert after_think[0]._text.startswith("Visible")  # type: ignore
 
     def test_no_stripping_within_prose(self):
         """Normal whitespace within prose should not be affected."""
@@ -416,10 +431,10 @@ class TestWhitespaceStripping:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
         ]
-        assert any("Line one" in b._text for b in prose_blocks)
-        assert any("Line two" in b._text for b in prose_blocks)
+        assert any("Line one" in b._text for b in prose_blocks)  # type: ignore
+        assert any("Line two" in b._text for b in prose_blocks)  # type: ignore
 
 
 class TestRealTimeBlockFinalization:
@@ -504,11 +519,11 @@ class TestEmptyBlocks:
         d.feed("<python>x = 1</python>")
         d.finish()
 
-        non_removed = [b for b in d.all_blocks if not b._removed]
+        non_removed = [b for b in d.all_blocks if not b._removed]  # type: ignore
         # All remaining assistant blocks should have content
         for b in non_removed:
             if isinstance(b, FakeAssistantBlock):
-                assert b._text.strip()
+                assert b._text.strip()  # type: ignore  # type: ignore
 
 
 class TestStateTransitions:
@@ -620,13 +635,13 @@ class TestThinkTagDetection:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
         ]
         thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
 
         assert len(thinking_blocks) == 1
-        assert any("Before" in b._text for b in prose_blocks)
-        assert any("After" in b._text for b in prose_blocks)
+        assert any("Before" in b._text for b in prose_blocks)  # type: ignore
+        assert any("After" in b._text for b in prose_blocks)  # type: ignore
 
     def test_state_transitions_with_think(self):
         """State machine transitions correctly with think tags."""
@@ -650,7 +665,7 @@ class TestThinkTagDetection:
         thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
         assert len(thinking_blocks) == 0
         # Should be in prose block
-        assert "<thi" in d.all_blocks[0]._text
+        assert "<thi" in d.all_blocks[0]._text  # type: ignore
 
     def test_thinking_split_on_empty_lines(self):
         """Empty lines within <think> tags should split into multiple thinking blocks."""
@@ -723,7 +738,7 @@ class TestDetailTagDetection:
         thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
         assert len(thinking_blocks) >= 1
         # The </think> text should be inside the thinking block, not closing it
-        combined = "".join(b._text for b in thinking_blocks)
+        combined = "".join(b._text for b in thinking_blocks)  # type: ignore
         assert "</think>" in combined
         assert "still detail" in combined
 
@@ -736,7 +751,7 @@ class TestDetailTagDetection:
 
         thinking_blocks = [b for b in d.all_blocks if isinstance(b, FakeThinkingBlock)]
         assert len(thinking_blocks) >= 1
-        combined = "".join(b._text for b in thinking_blocks)
+        combined = "".join(b._text for b in thinking_blocks)  # type: ignore
         assert "</detail>" in combined
         assert "still thinking" in combined
 
@@ -781,14 +796,14 @@ class TestPauseAfterCodeBlock:
     def make_pausing_detector(self):
         """Create a detector with pause_after_code enabled."""
         output = FakeOutput()
-        detector = StreamingFenceDetector(output, pause_after_code=True)
-        detector._make_prose_block = lambda activity: FakeAssistantBlock(
+        detector = StreamingFenceDetector(output, pause_after_code=True)  # type: ignore
+        detector._make_prose_block = lambda activity: FakeAssistantBlock(  # type: ignore
             activity=activity
         )
-        detector._make_code_block = lambda code, lang: FakeCodeBlock(
+        detector._make_code_block = lambda code, lang: FakeCodeBlock(  # type: ignore
             code, language=lang
         )
-        detector._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
+        detector._make_thinking_block = lambda: FakeThinkingBlock(activity=True)  # type: ignore
         return detector, output
 
     def test_pauses_after_code_block(self):
@@ -829,7 +844,7 @@ class TestPauseAfterCodeBlock:
         assert not d.is_paused
         # The "After text" should now be in a prose block (trailing "junk" is stripped)
         prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
-        combined = "".join(b._text for b in prose_blocks)
+        combined = "".join(b._text for b in prose_blocks)  # type: ignore
         assert "After text" in combined
         assert "junk" not in combined
 
@@ -1018,7 +1033,7 @@ class TestLiberalTagParsing:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
         ]
         assert any("x < 5" in b._text for b in prose_blocks)
 
@@ -1035,10 +1050,10 @@ class TestLiberalTagParsing:
     def test_pause_with_tool_call(self):
         """Pause after code block works with <tool_call> tags."""
         output = FakeOutput()
-        d = StreamingFenceDetector(output, pause_after_code=True)
-        d._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
-        d._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
-        d._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
+        d = StreamingFenceDetector(output, pause_after_code=True)  # type: ignore
+        d._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)  # type: ignore
+        d._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)  # type: ignore
+        d._make_thinking_block = lambda: FakeThinkingBlock(activity=True)  # type: ignore
         d.start()
         d.feed("Hello<tool_call>ls</tool_call>\nAfter")
         assert d.is_paused
@@ -1142,12 +1157,12 @@ class TestMarkdownFences:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()
+            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
         ]
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
-        assert any("Before" in b._text for b in prose_blocks)
-        assert any("After" in b._text for b in prose_blocks)
+        assert any("Before" in b._text for b in prose_blocks)  # type: ignore
+        assert any("After" in b._text for b in prose_blocks)  # type: ignore
 
     def test_fence_split_across_chunks(self):
         """Fence split across feed() calls should work."""
@@ -1188,10 +1203,10 @@ class TestMarkdownFences:
     def test_pause_after_fence(self):
         """Pause after code block works with markdown fences."""
         output = FakeOutput()
-        d = StreamingFenceDetector(output, pause_after_code=True)
-        d._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
-        d._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
-        d._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
+        d = StreamingFenceDetector(output, pause_after_code=True)  # type: ignore
+        d._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)  # type: ignore
+        d._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)  # type: ignore
+        d._make_thinking_block = lambda: FakeThinkingBlock(activity=True)  # type: ignore
         d.start()
         d.feed("Hello\n```python\nx=1\n```\nAfter")
         assert d.is_paused

@@ -8,8 +8,13 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from any_llm.types.completion import ChatCompletionChunk
+    from typing import AsyncIterator
+
 from .config import ArtificeConfig
-from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +142,9 @@ class Agent:
 
         try:
             stream = await acompletion(**kwargs)
+            from typing import cast
+
+            stream = cast("AsyncIterator[ChatCompletionChunk]", stream)
         except Exception:
             import traceback
 
@@ -167,10 +175,15 @@ class Agent:
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
-                if hasattr(delta, "reasoning_content") and delta.reasoning_content:
-                    thinking += delta.reasoning_content
+                if hasattr(delta, "reasoning") and delta.reasoning:
+                    reasoning_content = (
+                        delta.reasoning.content
+                        if hasattr(delta.reasoning, "content")
+                        else str(delta.reasoning)
+                    )
+                    thinking += reasoning_content
                     if on_thinking_chunk:
-                        on_thinking_chunk(delta.reasoning_content)
+                        on_thinking_chunk(reasoning_content)
                 if delta.content:
                     text += delta.content
                     if on_chunk:

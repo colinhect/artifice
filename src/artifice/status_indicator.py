@@ -8,7 +8,7 @@ from .utils import format_tokens
 
 if TYPE_CHECKING:
     from textual.widgets import LoadingIndicator, Static
-    from .config import Config
+    from .config import ArtificeConfig
 
 
 class StatusIndicatorManager:
@@ -19,7 +19,7 @@ class StatusIndicatorManager:
         loading_indicator: LoadingIndicator,
         connection_status: Static,
         assistant_status: Static,
-        config: Config,
+        config: ArtificeConfig,
     ):
         self._loading = loading_indicator
         self._connection = connection_status
