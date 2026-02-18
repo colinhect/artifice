@@ -179,8 +179,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         if block is None:
             return
 
-        # Only execute CodeInputBlock
-        if isinstance(block, CodeInputBlock):
+        if isinstance(block, (CodeInputBlock, ToolCallBlock)):
             self.post_message(self.BlockExecuteRequested(block))
 
     async def action_toggle_block_markdown(self) -> None:

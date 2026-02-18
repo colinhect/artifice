@@ -226,7 +226,7 @@ class Agent:
             self.messages.append(
                 {
                     "role": "assistant",
-                    "content": text or "",
+                    "content": text if text else None,
                     "tool_calls": raw_tool_calls,
                 }
             )
@@ -240,6 +240,10 @@ class Agent:
             thinking=thinking or None,
             usage=usage,
         )
+
+    @property
+    def has_pending_tool_calls(self) -> bool:
+        return len(self._pending_tool_calls) > 0
 
     def add_tool_result(self, tool_call_id: str, content: str) -> None:
         """Add a tool execution result to conversation history."""
@@ -672,6 +676,10 @@ class SimulatedAgent:
             tool_calls=tool_calls,
             thinking=thinking_text,
         )
+
+    @property
+    def has_pending_tool_calls(self) -> bool:
+        return len(self._pending_tool_calls) > 0
 
     def add_tool_result(self, tool_call_id: str, content: str) -> None:
         self.messages.append(

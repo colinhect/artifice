@@ -251,7 +251,7 @@ class ArtificeTerminal(Widget):
         def on_thinking_chunk(text):
             self._stream.on_thinking_chunk(text)
 
-        if self._config.prompt_prefix:
+        if self._config.prompt_prefix and prompt.strip():
             prompt = self._config.prompt_prefix + " " + prompt
 
         self._status_manager.set_active()
@@ -386,7 +386,8 @@ class ArtificeTerminal(Widget):
                 if tool_call_id is not None:
                     # Structured tool result — agent knows which call this answers
                     self._agent.add_tool_result(tool_call_id, output)
-                    await self._stream_agent_response(self._agent, "")
+                    if not self._agent.has_pending_tool_calls:
+                        await self._stream_agent_response(self._agent, "")
                 else:
                     await self._send_execution_result_to_agent(
                         code, language, state["result"]
