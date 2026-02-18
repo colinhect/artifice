@@ -63,7 +63,7 @@ class StreamManager:
         self._output.clear_command_numbers()
         self._current_detector = StreamingFenceDetector(
             self._output,
-            pause_after_code=True,
+            pause_after_code=False,
         )
         return self._current_detector
 
