@@ -362,8 +362,7 @@ class StreamingFenceDetector:
         for block in [
             b
             for b in self._factory.all_blocks
-            if isinstance(b, AgentOutputBlock)
-            and not b._output_str.strip()
+            if isinstance(b, AgentOutputBlock) and not b._output_str.strip()
         ]:
             if block is self._factory.first_agent_block:
                 self._factory.first_agent_block = None
