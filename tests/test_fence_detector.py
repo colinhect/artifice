@@ -18,7 +18,7 @@ class FakeBlock:
 
     def __init__(self):
         self._text = ""
-        self._full = ""
+        self._output_str = ""
         self._finished = False
         self._success = False
         self._removed = False
@@ -32,10 +32,11 @@ class FakeAssistantBlock(FakeBlock):
 
     def __init__(self, activity=False):
         super().__init__()
+        self._streaming = True
 
     def append(self, text):
         self._text += text
-        self._full += text
+        self._output_str += text
 
     def flush(self):
         pass
@@ -47,6 +48,9 @@ class FakeAssistantBlock(FakeBlock):
         pass
 
     def finalize_streaming(self):
+        if not self._streaming:
+            return
+        self._streaming = False
         self._finished = True
 
 
@@ -74,10 +78,11 @@ class FakeThinkingBlock(FakeBlock):
 
     def __init__(self, activity=False):
         super().__init__()
+        self._streaming = True
 
     def append(self, text):
         self._text += text
-        self._full += text
+        self._output_str += text
 
     def flush(self):
         pass
@@ -89,6 +94,9 @@ class FakeThinkingBlock(FakeBlock):
         pass
 
     def finalize_streaming(self):
+        if not self._streaming:
+            return
+        self._streaming = False
         self._finished = True
 
 
@@ -416,6 +424,54 @@ class TestWhitespaceStripping:
         ]
         assert any("Line one" in b._text for b in prose_blocks)
         assert any("Line two" in b._text for b in prose_blocks)
+
+
+class TestRealTimeBlockFinalization:
+    def test_empty_line_finalizes_block_immediately(self):
+        """Block completed by empty line is finalized (not just marked success) mid-stream."""
+        d, _ = make_detector()
+        d.start()
+        # Feed first paragraph plus empty line - this should finalize block 1 mid-stream
+        d.feed("Paragraph one.\n\n")
+        # At this point, the first block should be finalized before finish() is called
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
+        assert len(prose_blocks) >= 1
+        first_block = prose_blocks[0]
+        assert first_block._finished, "Block split by empty line should be finalized immediately"
+        assert first_block._success
+
+    def test_second_block_still_streaming_after_split(self):
+        """After an empty-line split, the new block is still streaming."""
+        d, _ = make_detector()
+        d.start()
+        d.feed("Para one.\n\nPara two.")
+        # Second block should not be finalized yet (stream not done)
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
+        assert len(prose_blocks) >= 2
+        second_block = prose_blocks[-1]
+        assert not second_block._finished, "Current streaming block should not be finalized yet"
+
+    def test_finalize_streaming_idempotent(self):
+        """Calling finalize_streaming() twice on the same block is safe."""
+        d, _ = make_detector()
+        d.start()
+        d.feed("Para one.\n\nPara two.")
+        d.finish()
+        # After finish(), all blocks should be finalized exactly once
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
+        assert all(b._finished for b in prose_blocks)
+
+    def test_multiple_empty_lines_finalize_each_block(self):
+        """Each paragraph split creates a new finalized block in real-time."""
+        d, _ = make_detector()
+        d.start()
+        d.feed("Para one.\n\nPara two.\n\nPara three.")
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
+        # First two should be finalized, last one still streaming
+        finalized = [b for b in prose_blocks if b._finished]
+        assert len(finalized) == 2
+        assert "Para one." in finalized[0]._text
+        assert "Para two." in finalized[1]._text
 
     def test_tag_immediately_after_closing_tag(self):
         """A new tag immediately after a closing tag (no whitespace) works."""

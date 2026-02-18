@@ -226,7 +226,7 @@ class StreamingFenceDetector:
         # Remove empty prose block, or mark it complete
         current_is_empty = (
             isinstance(self._current_block, AssistantOutputBlock)
-            and not self._current_block._full.strip()
+            and not self._current_block._output_str.strip()
         )
         if current_is_empty:
             if self._current_block is self._factory.first_assistant_block:
@@ -371,12 +371,13 @@ class StreamingFenceDetector:
 
             # Check if the line we just completed was empty/whitespace-only
             if self._current_line_buffer.strip() == "":
-                # Empty line detected - split to new block
+                # Empty line detected - finalize current block and start new one
                 self._flush_pending_to_chunk()
                 self._flush_and_update_chunk()
 
-                # Mark current prose block as complete
+                # Finalize current prose block (renders as Markdown immediately)
                 if isinstance(self._current_block, AssistantOutputBlock):
+                    self._current_block.finalize_streaming()
                     self._current_block.mark_success()
 
                 # Create new prose block
@@ -466,7 +467,7 @@ class StreamingFenceDetector:
                 current_has_content = isinstance(
                     self._current_block, ThinkingOutputBlock
                 ) and (
-                    self._current_block._full.strip() or self._pending_buffer.strip()
+                    self._current_block._output_str.strip() or self._pending_buffer.strip()
                 )
 
                 if current_has_content:
@@ -545,7 +546,7 @@ class StreamingFenceDetector:
             for b in self._factory.all_blocks
             if isinstance(b, AssistantOutputBlock)
             and b is not self._factory.first_assistant_block
-            and not b._full.strip()
+            and not b._output_str.strip()
         ]:
             self._factory.remove_block(block)
 

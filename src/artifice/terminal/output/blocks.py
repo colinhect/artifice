@@ -271,6 +271,8 @@ class AssistantOutputBlock(BufferedOutputBlock):
 
     def finalize_streaming(self) -> None:
         """End streaming: flush any remaining text, then swap to Markdown if enabled."""
+        if not self._streaming:
+            return  # Already finalized (e.g. split mid-stream on empty line)
         self._streaming = False
         if self._dirty:
             self.flush()
