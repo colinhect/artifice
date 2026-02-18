@@ -36,6 +36,7 @@ from ..input_mode import InputMode
 if TYPE_CHECKING:
     from ..app import ArtificeApp
     from typing import Union
+
     AnyAgent = Union[Agent, SimulatedAgent]
 
 logger = logging.getLogger(__name__)

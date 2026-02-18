@@ -2,7 +2,7 @@
 
 import pytest
 
-from artifice.agent import Agent, SimulatedAgent
+from artifice.agent import SimulatedAgent
 
 
 @pytest.mark.asyncio
@@ -84,7 +84,6 @@ async def test_agent_error_handling():
     agent = SimulatedAgent(response_delay=0.001)
 
     # Patch send to simulate an error
-    original_send = agent.send
 
     async def erroring_send(*args, **kwargs):
         return AgentResponse(text="", error="Test error")

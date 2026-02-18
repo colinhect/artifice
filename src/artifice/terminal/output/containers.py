@@ -109,11 +109,11 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         Binding("enter", "execute_block", "Execute", show=True),
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown", show=True),
         # Binding("ctrl+u", "pin_block", "Pin Block", show=True),
-        #Binding("insert", "cycle_language", "Mode", show=True),
-        #*[
+        # Binding("insert", "cycle_language", "Mode", show=True),
+        # *[
         #    Binding(str(n), f"run_numbered('{n}')", f"Run #{n}", show=False)
         #    for n in range(1, 10)
-        #],
+        # ],
     ]
 
     def __init__(
@@ -192,7 +192,11 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     def action_cycle_language(self) -> None:
         """Cycle the language of the highlighted CodeInputBlock (not ToolCallBlocks)."""
         block = self.get_highlighted_block()
-        if block and isinstance(block, CodeInputBlock) and not isinstance(block, ToolCallBlock):
+        if (
+            block
+            and isinstance(block, CodeInputBlock)
+            and not isinstance(block, ToolCallBlock)
+        ):
             block.cycle_language()
 
     def action_pin_block(self) -> None:

@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass, field
+from .config import ArtificeConfig
 from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
@@ -506,9 +508,7 @@ _DEFAULT_THINKING = (
     "I should offer some guidance on what I can help with."
 )
 
-_TOOL_TAG_RE = re.compile(
-    r"<(python|shell)>(.*?)</(python|shell)>", re.DOTALL
-)
+_TOOL_TAG_RE = re.compile(r"<(python|shell)>(.*?)</(python|shell)>", re.DOTALL)
 
 
 def _parse_tool_calls(text: str, start_id: int = 0) -> tuple[str, list[ToolCall]]:
@@ -796,6 +796,7 @@ class EchoAgent(SimulatedAgent):
 
         return AgentResponse(text=response_text)
 
+
 def create_agent(
     config: ArtificeConfig, on_connect: Callable | None = None
 ) -> Agent | SimulatedAgent | None:
@@ -861,7 +862,9 @@ def create_agent(
     use_tools = bool(definition.get("use_tools", False))
     base_url: str | None = definition.get("base_url")
     # provider here is the any-llm provider override (not "simulated")
-    llm_provider: str | None = provider if provider and provider.lower() != "simulated" else None
+    llm_provider: str | None = (
+        provider if provider and provider.lower() != "simulated" else None
+    )
 
     return Agent(
         model=model,

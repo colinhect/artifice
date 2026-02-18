@@ -37,10 +37,7 @@ class BlockFactory:
     def create_code_block(self, code: str, language: str) -> CodeInputBlock:
         """Create a new code input block, mount it, and track it."""
         block = CodeInputBlock(
-            code,
-            language=language,
-            show_loading=False,
-            in_context=True
+            code, language=language, show_loading=False, in_context=True
         )
         self._output.append_block(block)
         self.all_blocks.append(block)
