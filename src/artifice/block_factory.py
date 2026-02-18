@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from .terminal.output import (
     AssistantOutputBlock,
     CodeInputBlock,
-    ThinkingOutputBlock,
     BaseBlock,
 )
 
@@ -19,7 +18,7 @@ class BlockFactory:
     """Creates, mounts, and tracks blocks for the streaming fence detector.
 
     Centralizes the repeated create-mount-track pattern that was previously
-    duplicated across _feed_prose, _feed_code, and _feed_thinking.
+    duplicated across _feed_prose and _feed_code.
     """
 
     def __init__(self, output: TerminalOutput) -> None:
@@ -39,13 +38,6 @@ class BlockFactory:
         block = CodeInputBlock(
             code, language=language, show_loading=False, in_context=True
         )
-        self._output.append_block(block)
-        self.all_blocks.append(block)
-        return block
-
-    def create_thinking_block(self) -> ThinkingOutputBlock:
-        """Create a new thinking block, mount it, and track it."""
-        block = ThinkingOutputBlock(activity=True)
         self._output.append_block(block)
         self.all_blocks.append(block)
         return block
