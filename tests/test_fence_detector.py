@@ -437,7 +437,9 @@ class TestRealTimeBlockFinalization:
         prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
         assert len(prose_blocks) >= 1
         first_block = prose_blocks[0]
-        assert first_block._finished, "Block split by empty line should be finalized immediately"
+        assert first_block._finished, (
+            "Block split by empty line should be finalized immediately"
+        )
         assert first_block._success
 
     def test_second_block_still_streaming_after_split(self):
@@ -449,7 +451,9 @@ class TestRealTimeBlockFinalization:
         prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
         assert len(prose_blocks) >= 2
         second_block = prose_blocks[-1]
-        assert not second_block._finished, "Current streaming block should not be finalized yet"
+        assert not second_block._finished, (
+            "Current streaming block should not be finalized yet"
+        )
 
     def test_finalize_streaming_idempotent(self):
         """Calling finalize_streaming() twice on the same block is safe."""

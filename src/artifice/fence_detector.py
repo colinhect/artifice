@@ -36,9 +36,7 @@ class StreamingFenceDetector:
     Creates blocks as tags are detected, accumulating text to update once per chunk.
     """
 
-    def __init__(
-        self, output: TerminalOutput, pause_after_code: bool = False
-    ) -> None:
+    def __init__(self, output: TerminalOutput, pause_after_code: bool = False) -> None:
         self._output = output
         self._factory = BlockFactory(output)
         self._pause_after_code = pause_after_code
@@ -466,7 +464,8 @@ class StreamingFenceDetector:
                 current_has_content = isinstance(
                     self._current_block, ThinkingOutputBlock
                 ) and (
-                    self._current_block._output_str.strip() or self._pending_buffer.strip()
+                    self._current_block._output_str.strip()
+                    or self._pending_buffer.strip()
                 )
 
                 if current_has_content:
@@ -548,4 +547,3 @@ class StreamingFenceDetector:
             and not b._output_str.strip()
         ]:
             self._factory.remove_block(block)
-

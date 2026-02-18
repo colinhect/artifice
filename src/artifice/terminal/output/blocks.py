@@ -266,7 +266,9 @@ class AssistantOutputBlock(BufferedOutputBlock):
         if self._output:
             self._output.remove()
             self._output = None
-        self._markdown = Markdown(self._output_str.strip(), classes=self._MARKDOWN_CSS_CLASS)
+        self._markdown = Markdown(
+            self._output_str.strip(), classes=self._MARKDOWN_CSS_CLASS
+        )
         self._contents.mount(self._markdown)
 
     def finalize_streaming(self) -> None:

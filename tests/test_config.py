@@ -64,7 +64,7 @@ def test_load_models_dict(tmp_path, monkeypatch):
         "assistant": "llama",
         "assistants": {
             "llama": {"provider": "ollama", "model": "llama3.2:1b"},
-            "haiku": {"provider": "anthropic", "model": "claude-haiku-4-5"},
+            "what": {"provider": "ollama", "model": "what-model"},
         },
     }
     init_file.write_text(yaml.dump(yaml_content))
@@ -76,7 +76,7 @@ def test_load_models_dict(tmp_path, monkeypatch):
     assert config.assistants is not None
     assert "llama" in config.assistants
     assert config.assistants["llama"]["provider"] == "ollama"
-    assert config.assistants["haiku"]["model"] == "claude-haiku-4-5"
+    assert config.assistants["what"]["model"] == "what-model"
 
 
 def test_load_all_display_settings(tmp_path, monkeypatch):

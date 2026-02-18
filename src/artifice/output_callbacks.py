@@ -6,6 +6,7 @@ from typing import Callable
 
 from .terminal.output import TerminalOutput, CodeOutputBlock
 
+
 class OutputCallbackHandler:
     """Manages output callbacks for code execution with lazy block creation."""
 

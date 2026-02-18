@@ -16,39 +16,12 @@ tmux_prompt_pattern: '^\S+@\S+:\S+\$ '
 # ============================================================================
 # Assistant Configuration
 # ============================================================================
-assistant: "llama"
+assistant: "minimax"
 
 assistants:
-  llama:
-    provider: "ollama"
-    model: "llama3.2:1b"
-  
-  qwen2:
-    provider: "ollama"
-    model: "qwen2.5:3b"
-  
-  deepseek:
-    provider: "ollama"
-    model: "deepseek-r1:1.5b"
-    thinking_budget: 1024
-
   minimax:
     provider: "huggingface"
     model: "MiniMaxAI/MiniMax-M2.5:novita"
-  
-  haiku:
-    provider: "anthropic"
-    model: "claude-haiku-4-5"
-    thinking_budget: 1024
-  
-  sonnet:
-    provider: "anthropic"
-    model: "claude-sonnet-4-5"
-    thinking_budget: 1024
-  
-  gpt-5:
-    provider: "copilot"
-    model: "gpt-5"
 
 # ============================================================================
 # Display Settings

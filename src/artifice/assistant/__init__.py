@@ -14,11 +14,7 @@ from .common import AssistantBase as AssistantBase
 from .assistant import Assistant as Assistant
 
 # Provider implementations
-from ..providers.anthropic import AnthropicProvider as AnthropicProvider
-from ..providers.ollama import OllamaProvider as OllamaProvider
-from ..providers.openai import OpenAICompatibleProvider as OpenAICompatibleProvider
-
-from .copilot import CopilotAssistant as CopilotAssistant
+from ..providers.anyllm import AnyLLMProvider as AnyLLMProvider
 from .simulated import (
     SimulatedAssistant as SimulatedAssistant,
 )
@@ -38,7 +34,6 @@ def create_assistant(
 
     provider = assistant.get("provider")
     model = assistant.get("model")
-    thinking_budget = assistant.get("thinking_budget")
     logger.info(
         "Creating assistant %r (provider=%s, model=%s)",
         config.assistant,
@@ -46,25 +41,13 @@ def create_assistant(
         model,
     )
 
-    if config.thinking_budget is not None:
-        thinking_budget = config.thinking_budget
-
     if provider is None:
         return None
-    if provider.lower() == "ollama":
-        return Assistant(
-            provider=OllamaProvider(
-                model=model,
-                thinking_budget=thinking_budget,
-                on_connect=on_connect,
-            ),
-            system_prompt=config.system_prompt,
-        )
     elif provider.lower() == "huggingface":
         use_tools = bool(assistant.get("use_tools", False))
         assistant = Assistant(
-            provider=OpenAICompatibleProvider(
-                base_url="https://router.huggingface.co/v1",
+            provider=AnyLLMProvider(
+                provider="huggingface",
                 api_key=os.environ["HF_TOKEN"],
                 model=model,
                 on_connect=on_connect,
@@ -74,19 +57,6 @@ def create_assistant(
             openai_format=True,
         )
         return assistant
-    elif provider.lower() == "anthropic":
-        return Assistant(
-            provider=AnthropicProvider(
-                model=model,
-                thinking_budget=thinking_budget,
-                on_connect=on_connect,
-            ),
-            system_prompt=config.system_prompt,
-        )
-    elif provider.lower() == "copilot":
-        return CopilotAssistant(
-            model=model, system_prompt=config.system_prompt, on_connect=on_connect
-        )
     elif provider.lower() == "simulated":
         assistant = SimulatedAssistant(response_delay=0.0005, on_connect=on_connect)
         assistant.default_scenarios_and_response()

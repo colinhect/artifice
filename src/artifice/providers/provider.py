@@ -1,7 +1,7 @@
 """Base classes for AI providers.
 
 Providers handle the low-level API communication and streaming for different
-AI services (Anthropic, Ollama, OpenAI, etc.). They are stateless and receive
+AI services (Ollama, OpenAI, etc.). They are stateless and receive
 the full conversation history as a parameter.
 """
 

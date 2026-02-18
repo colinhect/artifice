@@ -25,8 +25,6 @@ _FIELDS: dict[str, Any] = {
     "system_prompt": None,
     "prompt_prefix": None,
     "thinking_budget": None,
-    # Provider-specific settings
-    "ollama_host": None,
     # Display settings
     "banner": False,
     "python_markdown": False,
@@ -60,9 +58,6 @@ class ArtificeConfig:
     system_prompt: str | None
     prompt_prefix: str | None
     thinking_budget: int | None
-
-    # Provider-specific settings
-    ollama_host: str | None
 
     # Display settings
     banner: bool
