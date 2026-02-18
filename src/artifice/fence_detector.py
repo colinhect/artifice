@@ -54,9 +54,7 @@ class StreamingFenceDetector:
         )
         self._fence_close_backtick_count = 0  # Count backticks for closing fence
         # Factory methods for block creation (can be overridden for testing)
-        self._make_prose_block = lambda activity: AgentOutputBlock(
-            activity=activity
-        )
+        self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
         self._make_code_block = lambda code, lang: CodeInputBlock(
             code,
             language=lang,

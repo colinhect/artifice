@@ -41,7 +41,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-
 class ArtificeTerminal(Widget):
     """Primary widget for interacting with Artifice."""
 
@@ -50,9 +49,7 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+l", "clear", "Clear", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
-        Binding(
-            "ctrl+g", "toggle_auto_send_to_agent", "Toggle Agent", show=True
-        ),
+        Binding("ctrl+g", "toggle_auto_send_to_agent", "Toggle Agent", show=True),
         Binding("ctrl+n", "clear_agent_context", "Clear Context", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
@@ -194,9 +191,7 @@ class ArtificeTerminal(Widget):
                     code, language="python", in_context=self._auto_send_to_agent
                 )
                 if self._auto_send_to_agent:
-                    await self._send_execution_result_to_agent(
-                        code, "python", result
-                    )
+                    await self._send_execution_result_to_agent(code, "python", result)
 
         self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
 
@@ -212,9 +207,7 @@ class ArtificeTerminal(Widget):
             block.remove_class("in-context")
         self._context_blocks.clear()
 
-    def _apply_agent_response(
-        self, detector: StreamingFenceDetector, response
-    ) -> None:
+    def _apply_agent_response(self, detector: StreamingFenceDetector, response) -> None:
         """Mark context, handle errors, and auto-highlight the first code block."""
         with self.app.batch_update():
             for block in detector.all_blocks:
@@ -265,9 +258,7 @@ class ArtificeTerminal(Widget):
             self._stream.current_detector = None
             raise
         self._status_manager.set_inactive()
-        self._status_manager.update_agent_info(
-            usage=getattr(response, "usage", None)
-        )
+        self._status_manager.update_agent_info(usage=getattr(response, "usage", None))
 
         self._stream.finalize()
         self._apply_agent_response(detector, response)
