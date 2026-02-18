@@ -44,136 +44,6 @@ _SHELL_TOOL: dict = {
 _ALL_TOOLS = [_PYTHON_TOOL, _SHELL_TOOL]
 
 
-# ── MiniMax tool calling helpers ──────────────────────────────────────────────
-
-
-def _is_minimax_model(model: str) -> bool:
-    """Return True if the model string indicates a MiniMax model."""
-    return "minimax" in model.lower() or model.lower().startswith("abab")
-
-
-def _minimax_tool_prompt(tools: list[dict]) -> str:
-    """Build the MiniMax system-prompt section that defines available tools.
-
-    Follows the format from the MiniMax-M2.5 tool calling guide:
-    https://huggingface.co/unsloth/MiniMax-M2.5/blob/main/docs/tool_calling_guide.md
-    """
-    tool_entries: list[str] = []
-    for tool_def in tools:
-        func = tool_def.get("function", tool_def)
-        entry = json.dumps(
-            {
-                "name": func["name"],
-                "description": func.get("description", ""),
-                "parameters": func.get("parameters", {}),
-            },
-            ensure_ascii=False,
-        )
-        tool_entries.append(f"<tool>{entry}</tool>")
-
-    tools_block = "\n".join(tool_entries)
-    return (
-        "\n\n# Tools\n"
-        "You may call one or more tools to assist with the user query.\n"
-        "Here are the tools available in JSONSchema format:\n\n"
-        f"<tools>\n{tools_block}\n</tools>\n\n"
-        "When making tool calls, use XML format to invoke tools and pass parameters:\n\n"
-        "<minimax:tool_call>\n"
-        '<invoke name="tool-name">\n'
-        '<parameter name="param-key">param-value</parameter>\n'
-        "</invoke>\n"
-        "</minimax:tool_call>"
-    )
-
-
-_MINIMAX_TOOL_CALL_RE = re.compile(
-    r"<minimax:tool_call>(.*?)</minimax:tool_call>", re.DOTALL
-)
-_MINIMAX_INVOKE_RE = re.compile(r"<invoke name=(.*?)</invoke>", re.DOTALL)
-_MINIMAX_PARAM_RE = re.compile(r"<parameter name=(.*?)</parameter>", re.DOTALL)
-
-
-def _parse_minimax_tool_calls(
-    text: str, tools: list[dict] | None = None, start_id: int = 0
-) -> tuple[str, list[ToolCall]]:
-    """Parse ``<minimax:tool_call>`` XML blocks from *text*.
-
-    Returns ``(prose, tool_calls)`` where *prose* is the text with tool call
-    blocks removed and *tool_calls* is the list of parsed ``ToolCall`` objects.
-    """
-    if "<minimax:tool_call>" not in text:
-        return text, []
-
-    # Build param-type lookup from tool definitions
-    param_config: dict[str, dict[str, str]] = {}
-    for tool_def in tools or []:
-        func = tool_def.get("function", tool_def)
-        name = func.get("name", "")
-        props = func.get("parameters", {}).get("properties", {})
-        param_config[name] = {k: v.get("type", "string") for k, v in props.items()}
-
-    tool_calls: list[ToolCall] = []
-    tc_id = start_id
-
-    for tc_block in _MINIMAX_TOOL_CALL_RE.findall(text):
-        for invoke_match in _MINIMAX_INVOKE_RE.findall(tc_block):
-            # Extract function name (first attribute value before ">")
-            name_match = re.search(r"^([^>]+)", invoke_match)
-            if not name_match:
-                continue
-            raw_name = name_match.group(1).strip().strip("\"'")
-
-            # Extract parameters
-            args: dict[str, Any] = {}
-            types = param_config.get(raw_name, {})
-            for param_match in _MINIMAX_PARAM_RE.findall(invoke_match):
-                pm = re.search(r"^([^>]+)>(.*)", param_match, re.DOTALL)
-                if not pm:
-                    continue
-                param_name = pm.group(1).strip().strip("\"'")
-                param_value = pm.group(2).strip()
-                # Strip leading/trailing newlines inside param value
-                param_value = param_value.strip("\n")
-
-                ptype = types.get(param_name, "string")
-                args[param_name] = _convert_param_value(param_value, ptype)
-
-            tool_calls.append(ToolCall(id=f"minimax_{tc_id}", name=raw_name, args=args))
-            tc_id += 1
-
-    # Remove tool call blocks from prose
-    prose = _MINIMAX_TOOL_CALL_RE.sub("", text)
-    prose = re.sub(r"\n{3,}", "\n\n", prose).strip()
-    return prose, tool_calls
-
-
-def _convert_param_value(value: str, param_type: str) -> Any:
-    """Convert a string parameter value based on the declared JSON Schema type."""
-    if value.lower() == "null":
-        return None
-    ptype = param_type.lower()
-    if ptype in ("string", "str", "text"):
-        return value
-    if ptype in ("integer", "int"):
-        try:
-            return int(value)
-        except (ValueError, TypeError):
-            return value
-    if ptype in ("number", "float"):
-        try:
-            v = float(value)
-            return int(v) if v == int(v) else v
-        except (ValueError, TypeError):
-            return value
-    if ptype in ("boolean", "bool"):
-        return value.lower() in ("true", "1")
-    # object, array, or unknown — try JSON parse
-    try:
-        return json.loads(value)
-    except (json.JSONDecodeError, ValueError):
-        return value
-
-
 @dataclass
 class ToolCall:
     """A tool call requested by the model."""
@@ -209,6 +79,16 @@ class AgentResponse:
     usage: TokenUsage | None = None
 
 
+def exec_shell(command: str):
+    """Executes shell command."""
+    pass
+
+
+def exec_python(code: str):
+    """Executes Python code."""
+    pass
+
+
 class Agent:
     """Manages LLM conversation history and streaming via any-llm.
 
@@ -241,7 +121,6 @@ class Agent:
         self._connected = False
         self.messages: list[dict] = []
         self._pending_tool_calls: list[ToolCall] = []
-        self._minimax_tc_counter: int = 0
 
     async def send(
         self,
@@ -255,13 +134,8 @@ class Agent:
         if prompt.strip():
             self.messages.append({"role": "user", "content": prompt})
 
-        is_minimax = _is_minimax_model(self.model)
-
         messages = self.messages.copy()
         sys_content = self.system_prompt or ""
-        # For MiniMax models, embed tool definitions in the system prompt
-        if self.use_tools and is_minimax:
-            sys_content += _minimax_tool_prompt(_ALL_TOOLS)
         if sys_content and (not messages or messages[0].get("role") != "system"):
             messages = [{"role": "system", "content": sys_content}] + messages
 
@@ -272,7 +146,7 @@ class Agent:
             kwargs["provider"] = self._provider
         if self._base_url is not None:
             kwargs["base_url"] = self._base_url
-        if self.use_tools and not is_minimax:
+        if self.use_tools:
             kwargs["tools"] = _ALL_TOOLS
             kwargs["tool_choice"] = "auto"
 
@@ -349,52 +223,23 @@ class Agent:
 
         # Parse raw tool calls into ToolCall objects
         tool_calls: list[ToolCall] = []
-        if is_minimax and self.use_tools:
-            # MiniMax: tool calls are XML in the response text
-            text, tool_calls = _parse_minimax_tool_calls(
-                text, _ALL_TOOLS, start_id=self._minimax_tc_counter
-            )
-            self._minimax_tc_counter += len(tool_calls)
-        else:
-            for rtc in raw_tool_calls:
-                name = rtc["function"]["name"]
-                try:
-                    args = json.loads(rtc["function"]["arguments"])
-                except json.JSONDecodeError:
-                    args = {}
-                tool_calls.append(ToolCall(id=rtc["id"], name=name, args=args))
+        for rtc in raw_tool_calls:
+            name = rtc["function"]["name"]
+            try:
+                args = json.loads(rtc["function"]["arguments"])
+            except json.JSONDecodeError:
+                args = {}
+            tool_calls.append(ToolCall(id=rtc["id"], name=name, args=args))
 
         # Update conversation history
         if tool_calls:
-            if is_minimax:
-                # MiniMax: store the full original text (with tool XML stripped)
-                # plus tool calls as standard format for result tracking
-                raw_tc = [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.name,
-                            "arguments": json.dumps(tc.args),
-                        },
-                    }
-                    for tc in tool_calls
-                ]
-                self.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": text if text else None,
-                        "tool_calls": raw_tc,
-                    }
-                )
-            else:
-                self.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": text if text else None,
-                        "tool_calls": raw_tool_calls,
-                    }
-                )
+            self.messages.append(
+                {
+                    "role": "assistant",
+                    "content": text if text else None,
+                    "tool_calls": raw_tool_calls,
+                }
+            )
             self._pending_tool_calls = list(tool_calls)
         elif text:
             self.messages.append({"role": "assistant", "content": text})
