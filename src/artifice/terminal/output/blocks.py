@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 from textual import highlight
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -128,22 +126,16 @@ class BufferedOutputBlock(BaseBlock):
         self._render_markdown = render_markdown
         self._dirty = False
         self._contents = Horizontal()
-
-        if render_markdown:
-            self._output = None
-            self._markdown = Markdown(output, classes=self._MARKDOWN_CSS_CLASS)
-        else:
-            self._output = Static(output, markup=False, classes=self._STATIC_CSS_CLASS)
-            self._markdown = None
+        # Always start as Static during streaming; subclasses swap to Markdown on finalization
+        self._output = Static(output, markup=False, classes=self._STATIC_CSS_CLASS)
+        self._markdown = None
 
     def flush(self) -> None:
         """Push accumulated text to the widget. Call after batching appends."""
         if not self._dirty:
             return
         self._dirty = False
-        if self._markdown:
-            self._markdown.update(self._output_str.strip())
-        elif self._output:
+        if self._output:
             self._output.update(self._output_str.strip())
 
     def toggle_markdown(self) -> None:
@@ -178,12 +170,10 @@ class CodeOutputBlock(BufferedOutputBlock):
             self.add_class("in-context")
 
     def compose(self) -> ComposeResult:
+        assert self._output is not None
         with self._contents:
             yield self._status_indicator
-            if self._markdown:
-                yield self._markdown
-            elif self._output is not None:
-                yield self._output
+            yield self._output
 
     def append_output(self, output) -> None:
         self._output_str += output
@@ -247,73 +237,45 @@ class AssistantOutputBlock(BufferedOutputBlock):
     _STATIC_CSS_CLASS = "text-output"
     _MARKDOWN_CSS_CLASS = "assistant-output"
 
-    _FLUSH_INTERVAL = (
-        0.1  # Minimum seconds between full Markdown re-renders during streaming
-    )
-
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__(output=output, render_markdown=render_markdown)
         self._status_indicator = Static("", classes="status-indicator")
         self._streaming = activity
-        self._last_full_update_time: float = 0.0
-        self._chunk: str = ""
         self.add_class("in-context")
 
         if not activity:
             self.mark_success()
 
+    def on_mount(self) -> None:
+        """Switch to Markdown immediately for already-finished blocks (e.g. context)."""
+        if not self._streaming and self._render_markdown:
+            self._switch_to_markdown()
+
     def compose(self) -> ComposeResult:
+        assert self._output is not None
         with self._contents:
             yield self._status_indicator
-            if self._markdown:
-                yield self._markdown
-            elif self._output is not None:
-                yield self._output
+            yield self._output
 
     def append(self, response) -> None:
         self._output_str += response
-        self._chunk += response
         self._dirty = True
 
-    def flush(self) -> None:
-        """Push accumulated text to the widget.
-
-        Uses markdown.append() for incremental updates most of the time,
-        but performs a full update() every _FLUSH_INTERVAL to re-render everything.
-        """
-        if not self._dirty:
-            return
-
-        self._dirty = False
-
-        # For non-markdown output, always do a simple update
+    def _switch_to_markdown(self) -> None:
+        """Replace the Static widget with a Markdown widget (called once on finalization)."""
         if self._output:
-            self._output.update(self._output_str.strip())
-            return
-
-        # For markdown output during streaming, decide between append and full update
-        if self._markdown and self._streaming:
-            now = time.monotonic()
-            elapsed = now - self._last_full_update_time
-
-            # Do a full update every _FLUSH_INTERVAL
-            if elapsed >= self._FLUSH_INTERVAL:
-                self._markdown.update(self._output_str.lstrip())
-                self._last_full_update_time = now
-        elif self._markdown:
-            # Not streaming, just do a full update
-            self._markdown.update(self._output_str.strip())
-
-        self._chunk = ""
+            self._output.remove()
+            self._output = None
+        self._markdown = Markdown(self._output_str.strip(), classes=self._MARKDOWN_CSS_CLASS)
+        self._contents.mount(self._markdown)
 
     def finalize_streaming(self) -> None:
-        """End streaming mode -- force final flush to ensure content is current."""
+        """End streaming: flush any remaining text, then swap to Markdown if enabled."""
         self._streaming = False
         if self._dirty:
             self.flush()
-        # Ensure final content is fully rendered
-        if self._markdown:
-            self._markdown.update(self._output_str.strip())
+        if self._render_markdown:
+            self._switch_to_markdown()
 
     def mark_success(self) -> None:
         self._status_indicator.styles.display = "block"
