@@ -21,8 +21,11 @@ agent: "minimax"
 agents:
   minimax:
     api_key: "..."
-    provider: "huggingface"
+    provider: "openai"
     model: "MiniMaxAI/MiniMax-M2.5"
+    base_url: "https://router.huggingface.co/v1"
+    context_window: 200000
+    use_tools: true
 
 # ============================================================================
 # Display Settings

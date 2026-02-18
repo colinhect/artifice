@@ -145,7 +145,7 @@ class Agent:
         if self._provider is not None:
             kwargs["provider"] = self._provider
         if self._base_url is not None:
-            kwargs["base_url"] = self._base_url
+            kwargs["api_base"] = self._base_url
         if self.use_tools:
             kwargs["tools"] = _ALL_TOOLS
             kwargs["tool_choice"] = "auto"
