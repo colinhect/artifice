@@ -109,11 +109,11 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         Binding("enter", "execute_block", "Execute", show=True),
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown", show=True),
         # Binding("ctrl+u", "pin_block", "Pin Block", show=True),
-        Binding("insert", "cycle_language", "Mode", show=True),
-        *[
-            Binding(str(n), f"run_numbered('{n}')", f"Run #{n}", show=False)
-            for n in range(1, 10)
-        ],
+        #Binding("insert", "cycle_language", "Mode", show=True),
+        #*[
+        #    Binding(str(n), f"run_numbered('{n}')", f"Run #{n}", show=False)
+        #    for n in range(1, 10)
+        #],
     ]
 
     def __init__(
@@ -124,37 +124,16 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         classes: str | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self._next_command_number: int = 1
-        self._numbered_blocks: dict[int, CodeInputBlock] = {}
 
     def append_block(self, block: BaseBlock):
         self._blocks.append(block)
-        # Index numbered code blocks for fast lookup
-        if isinstance(block, CodeInputBlock) and block._command_number is not None:
-            self._numbered_blocks[block._command_number] = block
         self.mount(block)
         self.scroll_end(animate=False)
         return block
 
-    def next_command_number(self) -> int:
-        """Return the next command number and increment the counter."""
-        n = self._next_command_number
-        self._next_command_number += 1
-        return n
-
     def auto_scroll(self) -> None:
         """Scroll to the bottom without animation."""
         self.scroll_end(animate=False)
-
-    def clear_command_numbers(self) -> None:
-        """Remove command numbers from all CodeInputBlocks and reset the counter."""
-        for block in self._blocks:
-            if isinstance(block, CodeInputBlock) and block._command_number is not None:
-                if block._status_icon.content == str(block._command_number):
-                    block._status_icon.update("")
-                block._command_number = None
-        self._next_command_number = 1
-        self._numbered_blocks.clear()
 
     def remove_block(self, block: BaseBlock) -> None:
         """Remove a block from the blocks list and the DOM."""
@@ -175,8 +154,6 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
             block.remove()
         self._blocks.clear()
         self._highlighted_index = None
-        self._next_command_number = 1
-        self._numbered_blocks.clear()
 
     def action_activate_block(self) -> None:
         """Copy the highlighted block's code to the input with the correct mode."""
@@ -272,16 +249,6 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
                 return
         # No more code blocks forward -- move focus to input
         self.app.query_one("#code-input", InputTextArea).focus()
-
-    def action_run_numbered(self, n: str) -> None:
-        """Execute the CodeInputBlock with the given command number."""
-        block = self._find_numbered_block(int(n))
-        if block is not None:
-            self.post_message(self.BlockExecuteRequested(block))
-
-    def _find_numbered_block(self, number: int) -> CodeInputBlock | None:
-        """Find a CodeInputBlock with the given command number."""
-        return self._numbered_blocks.get(number)
 
     def on_focus(self) -> None:
         """When focusing on TerminalOutput, highlight the last CodeInputBlock."""

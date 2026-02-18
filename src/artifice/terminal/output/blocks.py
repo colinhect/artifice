@@ -22,7 +22,6 @@ class CodeInputBlock(BaseBlock):
         language: str,
         show_loading: bool = True,
         in_context=False,
-        command_number: int | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -33,7 +32,6 @@ class CodeInputBlock(BaseBlock):
             self._loading_indicator.styles.display = "none"
         self._streaming = show_loading
         self._language = language
-        self._command_number = command_number
         # Status icon appears before the prompt
         self._status_icon = Static(self._status_text(), classes="status-indicator")
         self._status_icon.add_class("status-unexecuted")
@@ -47,9 +45,6 @@ class CodeInputBlock(BaseBlock):
             self.add_class("in-context")
 
     def _status_text(self) -> str:
-        """Return the status icon text: the command number if set, else empty."""
-        if self._command_number is not None:
-            return str(self._command_number)
         return ""
 
     def compose(self) -> ComposeResult:

@@ -246,20 +246,6 @@ class ArtificeTerminal(Widget):
                     detector.first_assistant_block.flush()
                     detector.first_assistant_block.mark_success()
 
-        # Auto-highlight the first CodeInputBlock (command #1) from this response
-        last_code_block = None
-        for block in reversed(detector.all_blocks):
-            if isinstance(block, CodeInputBlock) and block._command_number == 1:
-                last_code_block = block
-                break
-
-        if last_code_block is not None:
-            idx = self.output.index_of(last_code_block)
-            if idx is not None:
-                self.output._highlighted_index = idx
-                self.output._update_highlight()
-                self.output.focus()
-
     async def _stream_assistant_response(
         self, agent: AnyAgent, prompt: str
     ) -> tuple[StreamingFenceDetector, object]:

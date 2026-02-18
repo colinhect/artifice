@@ -40,8 +40,7 @@ class BlockFactory:
             code,
             language=language,
             show_loading=False,
-            in_context=True,
-            command_number=self._output.next_command_number(),
+            in_context=True
         )
         self._output.append_block(block)
         self.all_blocks.append(block)

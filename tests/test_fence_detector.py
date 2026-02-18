@@ -118,10 +118,6 @@ class FakeOutput:
     def scroll_end(self, animate=False):
         pass
 
-    def next_command_number(self):
-        self._command_counter += 1
-        return self._command_counter
-
 
 @pytest.fixture(autouse=True)
 def _patch_block_types():

@@ -60,7 +60,6 @@ class StreamManager:
 
     def create_detector(self) -> StreamingFenceDetector:
         """Create a new fence detector for an assistant response."""
-        self._output.clear_command_numbers()
         self._current_detector = StreamingFenceDetector(
             self._output,
             pause_after_code=False,

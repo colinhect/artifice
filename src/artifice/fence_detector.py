@@ -78,7 +78,6 @@ class StreamingFenceDetector:
             language=lang,
             show_loading=False,
             in_context=True,
-            command_number=self._output.next_command_number(),
         )
         self._make_thinking_block = lambda: ThinkingOutputBlock(activity=True)
 
