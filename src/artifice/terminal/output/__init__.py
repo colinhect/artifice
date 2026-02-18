@@ -1,8 +1,8 @@
 """Terminal output package - re-exports all public names for backward compatibility."""
 
 from .blocks import (
-    AssistantInputBlock,
-    AssistantOutputBlock,
+    AgentInputBlock,
+    AgentOutputBlock,
     BaseBlock,
     BufferedOutputBlock,
     CodeInputBlock,
@@ -18,8 +18,8 @@ from .containers import (
 )
 
 __all__ = [
-    "AssistantInputBlock",
-    "AssistantOutputBlock",
+    "AgentInputBlock",
+    "AgentOutputBlock",
     "BaseBlock",
     "BufferedOutputBlock",
     "CodeInputBlock",

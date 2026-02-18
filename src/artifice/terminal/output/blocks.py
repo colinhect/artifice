@@ -204,7 +204,7 @@ class WidgetOutputBlock(BaseBlock):
                 yield self._widget
 
 
-class AssistantInputBlock(BaseBlock):
+class AgentInputBlock(BaseBlock):
     def __init__(self, prompt: str, in_context=False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._status_indicator = Static(">", classes="status-indicator status-pending")
@@ -228,9 +228,9 @@ class AssistantInputBlock(BaseBlock):
         return "ai"
 
 
-class AssistantOutputBlock(BufferedOutputBlock):
+class AgentOutputBlock(BufferedOutputBlock):
     _STATIC_CSS_CLASS = "text-output"
-    _MARKDOWN_CSS_CLASS = "assistant-output"
+    _MARKDOWN_CSS_CLASS = "agent-output"
 
     def __init__(self, output="", activity=True, render_markdown=True) -> None:
         super().__init__(output=output, render_markdown=render_markdown)
@@ -283,7 +283,7 @@ class AssistantOutputBlock(BufferedOutputBlock):
         self._status_indicator.styles.display = "block"
 
 
-class ThinkingOutputBlock(AssistantOutputBlock):
+class ThinkingOutputBlock(AgentOutputBlock):
     """Block for AI thinking content. Styled distinctly via CSS."""
 
     def __init__(self, output="", activity=True) -> None:

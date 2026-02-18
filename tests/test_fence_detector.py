@@ -42,8 +42,8 @@ class FakeBlock:
         self._removed = True
 
 
-class FakeAssistantBlock(FakeBlock):
-    """Fake AssistantOutputBlock that just accumulates text."""
+class FakeAgentBlock(FakeBlock):
+    """Fake AgentOutputBlock that just accumulates text."""
 
     def __init__(self, activity=False):
         super().__init__()
@@ -111,7 +111,7 @@ class FakeOutput:
 def _patch_block_types():
     """Patch isinstance targets so the detector recognizes our fakes."""
     with (
-        patch("artifice.fence_detector.AssistantOutputBlock", FakeAssistantBlock),
+        patch("artifice.fence_detector.AgentOutputBlock", FakeAgentBlock),
         patch("artifice.fence_detector.CodeInputBlock", FakeCodeBlock),
     ):
         yield
@@ -121,7 +121,7 @@ def make_detector():
     """Create a detector with fake dependencies."""
     output = FakeOutput()
     detector = StreamingFenceDetector(output)  # type: ignore
-    detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)  # type: ignore
+    detector._make_prose_block = lambda activity: FakeAgentBlock(activity=activity)  # type: ignore
     detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)  # type: ignore
     return detector, output
 
@@ -134,7 +134,7 @@ class TestProseOnly:
         d.feed("Hello world, no code here.")
         d.finish()
         assert len(d.all_blocks) == 1
-        assert isinstance(d.all_blocks[0], FakeAssistantBlock)
+        assert isinstance(d.all_blocks[0], FakeAgentBlock)
         assert "Hello world" in d.all_blocks[0]._text
 
     def test_angle_bracket_in_prose(self):
@@ -234,7 +234,7 @@ class TestMarkdownFences:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
+            if isinstance(b, FakeAgentBlock) and b._text.strip()  # type: ignore
         ]
         code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
         assert len(code_blocks) == 1
@@ -322,7 +322,7 @@ class TestWhitespaceStripping:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
+            if isinstance(b, FakeAgentBlock) and b._text.strip()  # type: ignore
         ]
         after_code = [b for b in prose_blocks if "Next text" in b._text]  # type: ignore
         assert len(after_code) == 1
@@ -339,7 +339,7 @@ class TestWhitespaceStripping:
         prose_blocks = [
             b
             for b in d.all_blocks
-            if isinstance(b, FakeAssistantBlock) and b._text.strip()  # type: ignore
+            if isinstance(b, FakeAgentBlock) and b._text.strip()  # type: ignore
         ]
         assert any("Line one" in b._text for b in prose_blocks)  # type: ignore
         assert any("Line two" in b._text for b in prose_blocks)  # type: ignore
@@ -351,7 +351,7 @@ class TestRealTimeBlockFinalization:
         d, _ = make_detector()
         d.start()
         d.feed("Paragraph one.\n\n")
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock)]
         assert len(prose_blocks) >= 1
         first_block = prose_blocks[0]
         assert first_block._finished, (
@@ -364,7 +364,7 @@ class TestRealTimeBlockFinalization:
         d, _ = make_detector()
         d.start()
         d.feed("Para one.\n\nPara two.")
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock)]
         assert len(prose_blocks) >= 2
         second_block = prose_blocks[-1]
         assert not second_block._finished, (
@@ -377,7 +377,7 @@ class TestRealTimeBlockFinalization:
         d.start()
         d.feed("Para one.\n\nPara two.")
         d.finish()
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock)]
         assert all(b._finished for b in prose_blocks)
 
     def test_multiple_empty_lines_finalize_each_block(self):
@@ -385,7 +385,7 @@ class TestRealTimeBlockFinalization:
         d, _ = make_detector()
         d.start()
         d.feed("Para one.\n\nPara two.\n\nPara three.")
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock)]
         finalized = [b for b in prose_blocks if b._finished]
         assert len(finalized) == 2
         assert "Para one." in finalized[0]._text
@@ -400,7 +400,7 @@ class TestEmptyBlocks:
         d.feed("```python\nx = 1\n```")
         d.finish()
 
-        assert d.first_assistant_block is None  # Was removed since it was empty
+        assert d.first_agent_block is None  # Was removed since it was empty
 
     def test_empty_trailing_prose_removed(self):
         """Empty prose block after last code fence should be removed."""
@@ -411,7 +411,7 @@ class TestEmptyBlocks:
 
         non_removed = [b for b in d.all_blocks if not b._removed]  # type: ignore
         for b in non_removed:
-            if isinstance(b, FakeAssistantBlock):
+            if isinstance(b, FakeAgentBlock):
                 assert b._text.strip()  # type: ignore
 
 
@@ -438,7 +438,7 @@ class TestPauseAfterCodeBlock:
         """Create a detector with pause_after_code enabled."""
         output = FakeOutput()
         detector = StreamingFenceDetector(output, pause_after_code=True)  # type: ignore
-        detector._make_prose_block = lambda activity: FakeAssistantBlock(  # type: ignore
+        detector._make_prose_block = lambda activity: FakeAgentBlock(  # type: ignore
             activity=activity
         )
         detector._make_code_block = lambda code, lang: FakeCodeBlock(  # type: ignore
@@ -472,7 +472,7 @@ class TestPauseAfterCodeBlock:
 
         d.resume()
         assert not d.is_paused
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAssistantBlock)]
+        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock)]
         combined = "".join(b._text for b in prose_blocks)  # type: ignore
         assert "After text" in combined
 

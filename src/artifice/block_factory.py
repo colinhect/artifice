@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .terminal.output import (
-    AssistantOutputBlock,
+    AgentOutputBlock,
     CodeInputBlock,
     BaseBlock,
 )
@@ -24,11 +24,11 @@ class BlockFactory:
     def __init__(self, output: TerminalOutput) -> None:
         self._output = output
         self.all_blocks: list[BaseBlock] = []
-        self.first_assistant_block: AssistantOutputBlock | None = None
+        self.first_agent_block: AgentOutputBlock | None = None
 
-    def create_prose_block(self, activity: bool = True) -> AssistantOutputBlock:
-        """Create a new prose (assistant output) block, mount it, and track it."""
-        block = AssistantOutputBlock(activity=activity)
+    def create_prose_block(self, activity: bool = True) -> AgentOutputBlock:
+        """Create a new prose (agent output) block, mount it, and track it."""
+        block = AgentOutputBlock(activity=activity)
         self._output.append_block(block)
         self.all_blocks.append(block)
         return block

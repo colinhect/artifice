@@ -216,11 +216,11 @@ class TerminalInput(Static):
         def __init__(
             self,
             code: str,
-            is_assistant_prompt: bool = False,
+            is_agent_prompt: bool = False,
             is_shell_command: bool = False,
         ) -> None:
             self.code = code
-            self.is_assistant_prompt = is_assistant_prompt
+            self.is_agent_prompt = is_agent_prompt
             self.is_shell_command = is_shell_command
             super().__init__()
 
@@ -322,7 +322,7 @@ class TerminalInput(Static):
             self.post_message(
                 self.Submitted(
                     code,
-                    is_assistant_prompt=self.mode.is_ai,
+                    is_agent_prompt=self.mode.is_ai,
                     is_shell_command=self.mode.is_shell,
                 )
             )

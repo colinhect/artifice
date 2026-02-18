@@ -10,8 +10,8 @@ from textual.message import Message
 
 from ..input import InputTextArea
 from .blocks import (
-    AssistantInputBlock,
-    AssistantOutputBlock,
+    AgentInputBlock,
+    AgentOutputBlock,
     BaseBlock,
     CodeInputBlock,
     CodeOutputBlock,
@@ -167,7 +167,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
             pyperclip.copy(code)
             mode = block.get_mode()
             self.post_message(self.BlockActivated(code, mode))
-        elif isinstance(block, AssistantInputBlock):
+        elif isinstance(block, AgentInputBlock):
             code = block.get_prompt()
             pyperclip.copy(code)
             mode = block.get_mode()
@@ -186,7 +186,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     async def action_toggle_block_markdown(self) -> None:
         """Toggle markdown rendering for the currently highlighted block."""
         block = self.get_highlighted_block()
-        if block and isinstance(block, (CodeOutputBlock, AssistantOutputBlock)):
+        if block and isinstance(block, (CodeOutputBlock, AgentOutputBlock)):
             block.toggle_markdown()
 
     def action_cycle_language(self) -> None:

@@ -11,8 +11,8 @@
 
 ### Running Tests
 - **Run all tests**: `pytest tests`
-- **Run single test file**: `pytest tests/test_assistant.py`
-- **Run single test function**: `pytest tests/test_assistant.py::test_assistant_manages_history`
+- **Run single test file**: `pytest tests/test_agent.py`
+- **Run single test function**: `pytest tests/test_agent.py::test_agent_manages_history`
 - **Run with verbose output**: `pytest -v`
 
 ### Linting & Type Checking
@@ -74,10 +74,10 @@
 - Return `ProviderResponse` with streaming support
 - Implement `ProviderBase` interface
 
-### Assistant Pattern
-- Assistants manage conversation history
+### Agent Pattern
+- Agents manage conversation history
 - Delegate to providers for API calls
-- Support multiple assistants sharing same provider
+- Support multiple agents sharing same provider
 - Handle `openai_format` for compatibility
 
 ## Configuration

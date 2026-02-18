@@ -60,7 +60,7 @@ class ExecutionCoordinator:
 
         # Markdown settings
         self.python_markdown_enabled: bool = config.python_markdown
-        self.assistant_markdown_enabled: bool = config.assistant_markdown
+        self.agent_markdown_enabled: bool = config.agent_markdown
         self.shell_markdown_enabled: bool = config.shell_markdown
 
     def reset(self) -> None:
@@ -113,7 +113,7 @@ class ExecutionCoordinator:
             code: The code/command to execute.
             language: "python" or "bash".
             code_input_block: Existing block to update status on. If None, one is created.
-            in_context: Whether the output should be marked as in assistant context.
+            in_context: Whether the output should be marked as in agent context.
         """
         if code_input_block is None:
             code_input_block = CodeInputBlock(

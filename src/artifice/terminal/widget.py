@@ -20,8 +20,8 @@ from ..history import History
 from .input import TerminalInput, InputTextArea
 from .output import (
     TerminalOutput,
-    AssistantInputBlock,
-    AssistantOutputBlock,
+    AgentInputBlock,
+    AgentOutputBlock,
     CodeInputBlock,
     CodeOutputBlock,
     ToolCallBlock,
@@ -67,15 +67,15 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
         Binding(
-            "ctrl+g", "toggle_auto_send_to_assistant", "Toggle Assistant", show=True
+            "ctrl+g", "toggle_auto_send_to_agent", "Toggle Agent", show=True
         ),
-        Binding("ctrl+n", "clear_assistant_context", "Clear Context", show=True),
+        Binding("ctrl+n", "clear_agent_context", "Clear Context", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
     ]
 
     _MARKDOWN_SETTINGS = {
-        "ai": ("assistant_markdown_enabled", "AI assistant output"),
+        "ai": ("agent_markdown_enabled", "AI agent output"),
         "shell": ("shell_markdown_enabled", "shell command output"),
         "python": ("python_markdown_enabled", "Python code output"),
     }
@@ -92,7 +92,7 @@ class ArtificeTerminal(Widget):
         super().__init__(name=name, id=id, classes=classes)
 
         self._config = app.config
-        self._auto_send_to_assistant: bool = self._config.auto_send_to_assistant
+        self._auto_send_to_agent: bool = self._config.auto_send_to_agent
 
         # Create history manager
         self._history = History(
@@ -101,9 +101,9 @@ class ArtificeTerminal(Widget):
 
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
-        self.assistant_loading = LoadingIndicator()
+        self.agent_loading = LoadingIndicator()
         self.connection_status = Static("\u25c9", id="connection-status")
-        self.assistant_status = Static("", id="assistant-status")
+        self.agent_status = Static("", id="agent-status")
 
         # Context tracking
         self._context_blocks: list[BaseBlock] = []
@@ -118,9 +118,9 @@ class ArtificeTerminal(Widget):
 
         # Status indicator manager
         self._status_manager = StatusIndicatorManager(
-            self.assistant_loading,
+            self.agent_loading,
             self.connection_status,
-            self.assistant_status,
+            self.agent_status,
             self._config,
         )
 
@@ -168,12 +168,12 @@ class ArtificeTerminal(Widget):
             yield self.output
             yield self.input
             with Horizontal(id="status-line"):
-                yield self.assistant_loading
+                yield self.agent_loading
                 yield self.connection_status
-                yield self.assistant_status
+                yield self.agent_status
 
     def on_mount(self) -> None:
-        self._status_manager.update_assistant_info()
+        self._status_manager.update_agent_info()
 
     async def _run_cancellable(self, coro, *, finally_callback=None):
         """Run a coroutine with standard cancel handling."""
@@ -197,27 +197,27 @@ class ArtificeTerminal(Widget):
         self.input.clear()
 
         async def do_execute():
-            if event.is_assistant_prompt:
-                await self._handle_assistant_prompt(code)
+            if event.is_agent_prompt:
+                await self._handle_agent_prompt(code)
             elif event.is_shell_command:
                 result = await self._exec.execute(
-                    code, language="bash", in_context=self._auto_send_to_assistant
+                    code, language="bash", in_context=self._auto_send_to_agent
                 )
-                if self._auto_send_to_assistant:
-                    await self._send_execution_result_to_assistant(code, "bash", result)
+                if self._auto_send_to_agent:
+                    await self._send_execution_result_to_agent(code, "bash", result)
             else:
                 result = await self._exec.execute(
-                    code, language="python", in_context=self._auto_send_to_assistant
+                    code, language="python", in_context=self._auto_send_to_agent
                 )
-                if self._auto_send_to_assistant:
-                    await self._send_execution_result_to_assistant(
+                if self._auto_send_to_agent:
+                    await self._send_execution_result_to_agent(
                         code, "python", result
                     )
 
         self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
 
     def _mark_block_in_context(self, block: BaseBlock) -> None:
-        """Mark a block as being in the assistant's context."""
+        """Mark a block as being in the agent's context."""
         if block not in self._context_blocks:
             self._context_blocks.append(block)
             block.add_class("in-context")
@@ -228,7 +228,7 @@ class ArtificeTerminal(Widget):
             block.remove_class("in-context")
         self._context_blocks.clear()
 
-    def _apply_assistant_response(
+    def _apply_agent_response(
         self, detector: StreamingFenceDetector, response
     ) -> None:
         """Mark context, handle errors, and auto-highlight the first code block."""
@@ -236,23 +236,23 @@ class ArtificeTerminal(Widget):
             for block in detector.all_blocks:
                 self._mark_block_in_context(block)
 
-            if detector.first_assistant_block:
+            if detector.first_agent_block:
                 if response.error:
-                    detector.first_assistant_block.append(
+                    detector.first_agent_block.append(
                         f"\n**Error:** {response.error}\n"
                     )
-                    detector.first_assistant_block.flush()
-                    detector.first_assistant_block.mark_failed()
+                    detector.first_agent_block.flush()
+                    detector.first_agent_block.mark_failed()
                 else:
-                    detector.first_assistant_block.flush()
-                    detector.first_assistant_block.mark_success()
+                    detector.first_agent_block.flush()
+                    detector.first_agent_block.mark_success()
 
-    async def _stream_assistant_response(
+    async def _stream_agent_response(
         self, agent: AnyAgent, prompt: str
     ) -> tuple[StreamingFenceDetector, object]:
-        """Stream an assistant response, splitting into prose and code blocks.
+        """Stream an agent response, splitting into prose and code blocks.
 
-        Returns the detector (with all_blocks, first_assistant_block) and AgentResponse.
+        Returns the detector (with all_blocks, first_agent_block) and AgentResponse.
         After streaming, ToolCallBlocks are created directly from response.tool_calls.
         """
         detector = self._stream.create_detector()
@@ -277,12 +277,12 @@ class ArtificeTerminal(Widget):
             self._stream.current_detector = None
             raise
         self._status_manager.set_inactive()
-        self._status_manager.update_assistant_info(
+        self._status_manager.update_agent_info(
             usage=getattr(response, "usage", None)
         )
 
         self._stream.finalize()
-        self._apply_assistant_response(detector, response)
+        self._apply_agent_response(detector, response)
         self._stream.current_detector = None
 
         # Create ToolCallBlocks directly for native tool calls
@@ -311,29 +311,29 @@ class ArtificeTerminal(Widget):
 
         return detector, response
 
-    async def _handle_assistant_prompt(self, prompt: str) -> None:
-        """Handle AI assistant prompt with code block detection."""
-        assistant_input_block = AssistantInputBlock(prompt)
-        self.output.append_block(assistant_input_block)
-        self._mark_block_in_context(assistant_input_block)
+    async def _handle_agent_prompt(self, prompt: str) -> None:
+        """Handle AI agent prompt with code block detection."""
+        agent_input_block = AgentInputBlock(prompt)
+        self.output.append_block(agent_input_block)
+        self._mark_block_in_context(agent_input_block)
 
         if self._agent is None:
-            assistant_output_block = AssistantOutputBlock("No AI assistant configured.")
-            self.output.append_block(assistant_output_block)
-            assistant_output_block.mark_failed()
+            agent_output_block = AgentOutputBlock("No AI agent configured.")
+            self.output.append_block(agent_output_block)
+            agent_output_block.mark_failed()
             return
 
-        await self._stream_assistant_response(self._agent, prompt)
+        await self._stream_agent_response(self._agent, prompt)
 
-        # After first assistant interaction, enable auto-send mode
-        if not self._auto_send_to_assistant:
-            self._auto_send_to_assistant = True
+        # After first agent interaction, enable auto-send mode
+        if not self._auto_send_to_agent:
+            self._auto_send_to_agent = True
             self.input.add_class("in-context")
 
-    async def _send_execution_result_to_assistant(
+    async def _send_execution_result_to_agent(
         self, code: str, language: str, result: ExecutionResult
     ) -> None:
-        """Send execution results back to the assistant and get its response."""
+        """Send execution results back to the agent and get its response."""
         if self._agent is None:
             return
         output = result.output + result.error
@@ -343,7 +343,7 @@ class ArtificeTerminal(Widget):
             + output
             + "\n"
         )
-        await self._stream_assistant_response(self._agent, prompt)
+        await self._stream_agent_response(self._agent, prompt)
 
     async def on_terminal_output_block_activated(
         self, event: TerminalOutput.BlockActivated
@@ -381,7 +381,7 @@ class ArtificeTerminal(Widget):
         tool_call_id = block.tool_call_id if isinstance(block, ToolCallBlock) else None
         state = {
             "result": ExecutionResult(code=code, status=ExecutionStatus.ERROR),
-            "sent_to_assistant": False,
+            "sent_to_agent": False,
         }
 
         async def do_execute():
@@ -389,18 +389,18 @@ class ArtificeTerminal(Widget):
                 code,
                 language=language,
                 code_input_block=block,
-                in_context=self._auto_send_to_assistant,
+                in_context=self._auto_send_to_agent,
             )
             block.update_status(state["result"])
-            if self._auto_send_to_assistant and self._agent is not None:
-                state["sent_to_assistant"] = True
+            if self._auto_send_to_agent and self._agent is not None:
+                state["sent_to_agent"] = True
                 output = state["result"].output + state["result"].error
                 if tool_call_id is not None:
                     # Structured tool result — agent knows which call this answers
                     self._agent.add_tool_result(tool_call_id, output)
-                    await self._stream_assistant_response(self._agent, "")
+                    await self._stream_agent_response(self._agent, "")
                 else:
-                    await self._send_execution_result_to_assistant(
+                    await self._send_execution_result_to_agent(
                         code, language, state["result"]
                     )
 
@@ -408,7 +408,7 @@ class ArtificeTerminal(Widget):
             if state["result"]:
                 block.update_status(state["result"])
             block.finish_streaming()
-            if not state["sent_to_assistant"]:
+            if not state["sent_to_agent"]:
                 self.input.focus_input()
 
         self._current_task = asyncio.create_task(
@@ -426,7 +426,7 @@ class ArtificeTerminal(Widget):
     def _resume_stream(self) -> None:
         """Resume streaming after a pause-on-code-block."""
         self._stream.resume()
-        self._status_manager.update_assistant_info()
+        self._status_manager.update_agent_info()
 
     async def _execute_paused_code_block(self) -> None:
         """Execute the code block that triggered the pause, then resume."""
@@ -445,11 +445,11 @@ class ArtificeTerminal(Widget):
             code,
             language=language,
             code_input_block=code_block,
-            in_context=self._auto_send_to_assistant,
+            in_context=self._auto_send_to_agent,
         )
         self._resume_stream()
-        if self._auto_send_to_assistant:
-            await self._send_execution_result_to_assistant(code, language, result)
+        if self._auto_send_to_agent:
+            await self._send_execution_result_to_agent(code, language, result)
 
     def on_key(self, event) -> None:
         """Handle key events, including pause-state shortcuts."""
@@ -467,7 +467,7 @@ class ArtificeTerminal(Widget):
             event.prevent_default()
             event.stop()
             self._stream.is_paused = False
-            self.assistant_status.update("")
+            self.agent_status.update("")
             detector = self._stream.current_detector
             if detector:
                 detector._remainder = ""
@@ -519,11 +519,11 @@ class ArtificeTerminal(Widget):
             if not self.output.highlight_next():
                 self.input.query_one("#code-input", InputTextArea).focus()
 
-    def action_toggle_auto_send_to_assistant(self) -> None:
+    def action_toggle_auto_send_to_agent(self) -> None:
         """Toggle auto-send mode."""
-        self._auto_send_to_assistant = not self._auto_send_to_assistant
+        self._auto_send_to_agent = not self._auto_send_to_agent
 
-        if self._auto_send_to_assistant:
+        if self._auto_send_to_agent:
             self.input.add_class("in-context")
         else:
             self.input.remove_class("in-context")
@@ -539,7 +539,7 @@ class ArtificeTerminal(Widget):
                 self._agent.system_prompt = event.content
             self.app.notify(f"Loaded prompt: {event.name}")
 
-    def action_clear_assistant_context(self) -> None:
+    def action_clear_agent_context(self) -> None:
         """Clear the agent's conversation context."""
         if self._agent is not None:
             self._agent.clear()

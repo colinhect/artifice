@@ -1,4 +1,4 @@
-"""Status indicator management for assistant state."""
+"""Status indicator management for agent state."""
 
 from __future__ import annotations
 
@@ -12,45 +12,45 @@ if TYPE_CHECKING:
 
 
 class StatusIndicatorManager:
-    """Manages visual status indicators for assistant state."""
+    """Manages visual status indicators for agent state."""
 
     def __init__(
         self,
         loading_indicator: LoadingIndicator,
         connection_status: Static,
-        assistant_status: Static,
+        agent_status: Static,
         config: ArtificeConfig,
     ):
         self._loading = loading_indicator
         self._connection = connection_status
-        self._assistant = assistant_status
+        self._agent = agent_status
         self._config = config
 
     def set_active(self) -> None:
-        """Update status indicators to show assistant is processing."""
-        self._loading.classes = "assistant-active"
-        self._connection.remove_class("assistant-inactive")
-        self._connection.add_class("assistant-active")
+        """Update status indicators to show agent is processing."""
+        self._loading.classes = "agent-active"
+        self._connection.remove_class("agent-inactive")
+        self._connection.add_class("agent-active")
 
     def set_inactive(self) -> None:
-        """Update status indicators to show assistant is idle."""
-        self._connection.add_class("assistant-inactive")
-        self._connection.remove_class("assistant-active")
-        self._loading.classes = "assistant-inactive"
+        """Update status indicators to show agent is idle."""
+        self._connection.add_class("agent-inactive")
+        self._connection.remove_class("agent-active")
+        self._loading.classes = "agent-inactive"
 
-    def update_assistant_info(self, usage=None) -> None:
-        """Update the assistant status line from config and optional token usage."""
-        if self._config.assistants:
-            assistant = self._config.assistants.get(self._config.assistant)
-            if assistant:
-                status = f"{assistant.get('model').lower()} ({assistant.get('provider').lower()})"
+    def update_agent_info(self, usage=None) -> None:
+        """Update the agent status line from config and optional token usage."""
+        if self._config.agents:
+            agent = self._config.agents.get(self._config.agent)
+            if agent:
+                status = f"{agent.get('model').lower()} ({agent.get('provider').lower()})"
                 if usage:
-                    context_window = assistant.get("context_window")
+                    context_window = agent.get("context_window")
                     if context_window and usage.input_tokens:
                         pct = usage.input_tokens / context_window * 100
                         status += f"  [{pct:.0f}% of {format_tokens(context_window)} · {format_tokens(usage.input_tokens)}in / {format_tokens(usage.output_tokens)}out]"
                     else:
                         status += f"  [{format_tokens(usage.input_tokens)}in / {format_tokens(usage.output_tokens)}out]"
-                self._assistant.update(status)
+                self._agent.update(status)
                 return
-        self._assistant.update("")
+        self._agent.update("")

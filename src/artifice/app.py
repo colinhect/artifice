@@ -69,9 +69,9 @@ class ArtificeApp(App):
 def main():
     """Main entry point for the artifice command."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("assistant", nargs="?", default=None, help="Assistant to use")
+    parser.add_argument("agent", nargs="?", default=None, help="Agent to use")
     parser.add_argument(
-        "--system-prompt", default=None, help="System prompt to use for the assistant"
+        "--system-prompt", default=None, help="System prompt to use for the agent"
     )
     parser.add_argument("--prompt-prefix", default=None, help="Prefix to user prompts")
     parser.add_argument(
@@ -115,8 +115,8 @@ def main():
             config.system_prompt = system_prompt_content
 
     # Command-line arguments override config
-    if args.assistant is not None:
-        config.assistant = args.assistant
+    if args.agent is not None:
+        config.agent = args.agent
     if args.system_prompt is not None:
         config.system_prompt = args.system_prompt
     if args.prompt_prefix:

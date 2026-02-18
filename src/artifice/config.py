@@ -19,23 +19,23 @@ logger = logging.getLogger(__name__)
 # Declarative mapping of YAML keys to their default values.
 # Used by ArtificeConfig.__init__ and load_config to avoid repetition.
 _FIELDS: dict[str, Any] = {
-    # Assistant settings
-    "assistant": None,
-    "assistants": None,
+    # Agent settings
+    "agent": None,
+    "agents": None,
     "system_prompt": None,
     "prompt_prefix": None,
     "thinking_budget": None,
     # Display settings
     "banner": False,
     "python_markdown": False,
-    "assistant_markdown": True,
+    "agent_markdown": True,
     "shell_markdown": False,
     # Output code block settings
     "shell_output_code_block": True,
     "tmux_output_code_block": False,
     "python_output_code_block": True,
     # Auto-send settings
-    "auto_send_to_assistant": True,
+    "auto_send_to_agent": True,
     # Shell init script
     "shell_init_script": None,
     # Tmux settings
@@ -52,9 +52,9 @@ class ArtificeConfig:
     All settings have sensible defaults.
     """
 
-    # Assistant settings
-    assistant: str | None
-    assistants: dict | None
+    # Agent settings
+    agent: str | None
+    agents: dict | None
     system_prompt: str | None
     prompt_prefix: str | None
     thinking_budget: int | None
@@ -62,7 +62,7 @@ class ArtificeConfig:
     # Display settings
     banner: bool
     python_markdown: bool
-    assistant_markdown: bool
+    agent_markdown: bool
     shell_markdown: bool
 
     # Output code block settings
@@ -71,7 +71,7 @@ class ArtificeConfig:
     python_output_code_block: bool
 
     # Auto-send settings
-    auto_send_to_assistant: bool
+    auto_send_to_agent: bool
 
     # Shell init script
     shell_init_script: str | None

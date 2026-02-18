@@ -29,7 +29,7 @@ def list_prompts() -> dict[str, Path]:
     # Process in reverse priority so local overrides home
     for prompt_dir in reversed(get_prompt_dirs()):
         for md_file in prompt_dir.rglob("*.md"):
-            # Name is relative path without .md, e.g. "system/cli-python-assistant"
+            # Name is relative path without .md, e.g. "system/cli-python-agent"
             name = str(md_file.relative_to(prompt_dir).with_suffix(""))
             prompts[name] = md_file
     return prompts

@@ -815,8 +815,8 @@ def create_agent(
 ) -> Agent | SimulatedAgent | None:
     """Instantiate an agent from the user's configuration.
 
-    Reads ``config.assistant`` (the selected assistant name) and
-    ``config.assistants`` (the dict of assistant definitions). Each definition
+    Reads ``config.agent`` (the selected agent name) and
+    ``config.agents`` (the dict of agent definitions). Each definition
     supports the following keys:
 
     - ``provider``: ``"simulated"`` or any string understood by any-llm
@@ -828,21 +828,21 @@ def create_agent(
     - ``api_key_env``: Name of the environment variable holding the API key.
     - ``base_url``: Custom base URL for self-hosted or proxy endpoints.
     - ``use_tools``: Whether to register python/shell as native tools.
-    - ``system_prompt``: Override the global system_prompt for this assistant.
+    - ``system_prompt``: Override the global system_prompt for this agent.
     """
-    if not config.assistants or not config.assistant:
-        raise ValueError("No assistant selected in configuration")
+    if not config.agents or not config.agent:
+        raise ValueError("No agent selected in configuration")
 
-    definition = config.assistants.get(config.assistant)
+    definition = config.agents.get(config.agent)
     if definition is None:
-        raise ValueError(f"Unknown assistant: {config.assistant!r}")
+        raise ValueError(f"Unknown agent: {config.agent!r}")
 
     provider = definition.get("provider")
     model = definition.get("model")
 
     logger.info(
         "Creating agent %r (provider=%s, model=%s)",
-        config.assistant,
+        config.agent,
         provider,
         model,
     )
@@ -861,7 +861,7 @@ def create_agent(
 
     if model is None:
         raise ValueError(
-            f"Assistant {config.assistant!r} requires a 'model' key in its definition"
+            f"Agent {config.agent!r} requires a 'model' key in its definition"
         )
 
     # Resolve API key

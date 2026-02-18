@@ -11,7 +11,7 @@ async def test_agent_manages_history():
     agent = SimulatedAgent(response_delay=0.001)
 
     await agent.send("First message")
-    assert len(agent.messages) == 2  # user + assistant
+    assert len(agent.messages) == 2  # user + agent
     assert agent.messages[0]["role"] == "user"
     assert agent.messages[1]["role"] == "assistant"
 

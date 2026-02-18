@@ -83,19 +83,19 @@ ArtificeTerminal LoadingIndicator {
     margin: 0 1 0 0;
 }
 
-ArtificeTerminal LoadingIndicator.assistant-inactive {
+ArtificeTerminal LoadingIndicator.agent-inactive {
     display: none;
 }
 
-ArtificeTerminal LoadingIndicator.assistant-active {
+ArtificeTerminal LoadingIndicator.agent-active {
     display: block;
 }
 
-ArtificeTerminal #connection-status.assistant-inactive {
+ArtificeTerminal #connection-status.agent-inactive {
     display: block;
 }
 
-ArtificeTerminal #connection-status.assistant-active {
+ArtificeTerminal #connection-status.agent-active {
     display: none;
 }
 
@@ -109,7 +109,7 @@ ArtificeTerminal #connection-status {
     color: $primary 20%;
 }
 
-ArtificeTerminal #assistant-status {
+ArtificeTerminal #agent-status {
     height: 1;
     color: $primary 33%;
 }
@@ -304,24 +304,24 @@ WidgetOutputBlock .widget-container {
     width: 1fr;
 }
 
-AssistantInputBlock .prompt {
+AgentInputBlock .prompt {
     /*background: $primary-background-darken-2;*/
     padding: 0;
     border: none;
 }
 
-AssistantOutputBlock .assistant-output {
+AgentOutputBlock .agent-output {
     padding-left: 0;
     padding-right: 0;
     layout: stream;
 }
 
-AssistantOutputBlock .loading-indicator {
+AgentOutputBlock .loading-indicator {
     width: 2;
     height: 1;
 }
 
-AssistantOutputBlock .text-output {
+AgentOutputBlock .text-output {
     padding: 0;
     margin: 0;
 }

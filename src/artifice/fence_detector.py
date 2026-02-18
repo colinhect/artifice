@@ -6,7 +6,7 @@ import enum
 
 from .terminal.output import (
     TerminalOutput,
-    AssistantOutputBlock,
+    AgentOutputBlock,
     CodeInputBlock,
     BaseBlock,
 )
@@ -24,7 +24,7 @@ class StreamingFenceDetector:
     Processes chunks character-by-character using a state machine:
     PROSE -> CODE (on ```language) -> PROSE (on ```)
 
-    Empty lines in prose split into separate AssistantOutputBlocks.
+    Empty lines in prose split into separate AgentOutputBlocks.
     """
 
     def __init__(self, output: TerminalOutput, pause_after_code: bool = False) -> None:
@@ -54,7 +54,7 @@ class StreamingFenceDetector:
         )
         self._fence_close_backtick_count = 0  # Count backticks for closing fence
         # Factory methods for block creation (can be overridden for testing)
-        self._make_prose_block = lambda activity: AssistantOutputBlock(
+        self._make_prose_block = lambda activity: AgentOutputBlock(
             activity=activity
         )
         self._make_code_block = lambda code, lang: CodeInputBlock(
@@ -69,12 +69,12 @@ class StreamingFenceDetector:
         return self._factory.all_blocks
 
     @property
-    def first_assistant_block(self) -> AssistantOutputBlock | None:
-        return self._factory.first_assistant_block
+    def first_agent_block(self) -> AgentOutputBlock | None:
+        return self._factory.first_agent_block
 
-    @first_assistant_block.setter
-    def first_assistant_block(self, value: AssistantOutputBlock | None) -> None:
-        self._factory.first_assistant_block = value
+    @first_agent_block.setter
+    def first_agent_block(self, value: AgentOutputBlock | None) -> None:
+        self._factory.first_agent_block = value
 
     @property
     def is_paused(self) -> bool:
@@ -95,7 +95,7 @@ class StreamingFenceDetector:
             self.feed(remainder)
 
     def start(self) -> None:
-        """Create the initial AssistantOutputBlock for streaming prose.
+        """Create the initial AgentOutputBlock for streaming prose.
 
         Idempotent -- safe to call multiple times; only the first call has effect.
         """
@@ -103,9 +103,9 @@ class StreamingFenceDetector:
             return
         self._started = True
         self._current_block = self._create_and_mount_prose(activity=True)
-        self._factory.first_assistant_block = self._current_block
+        self._factory.first_agent_block = self._current_block
 
-    def _create_and_mount_prose(self, activity: bool = True) -> AssistantOutputBlock:
+    def _create_and_mount_prose(self, activity: bool = True) -> AgentOutputBlock:
         """Create a prose block using the factory or test override."""
         block = self._make_prose_block(activity)
         self._output.append_block(block)
@@ -166,15 +166,15 @@ class StreamingFenceDetector:
 
         # Remove empty prose block, or mark it complete
         current_is_empty = (
-            isinstance(self._current_block, AssistantOutputBlock)
+            isinstance(self._current_block, AgentOutputBlock)
             and not self._current_block._output_str.strip()
         )
         if current_is_empty:
-            if self._current_block is self._factory.first_assistant_block:
-                self._factory.first_assistant_block = None
+            if self._current_block is self._factory.first_agent_block:
+                self._factory.first_agent_block = None
             if self._current_block is not None:
                 self._factory.remove_block(self._current_block)
-        elif isinstance(self._current_block, AssistantOutputBlock):
+        elif isinstance(self._current_block, AgentOutputBlock):
             self._current_block.mark_success()
 
         # Create new code block
@@ -264,7 +264,7 @@ class StreamingFenceDetector:
                 self._flush_and_update_chunk()
 
                 # Finalize current prose block (renders as Markdown immediately)
-                if isinstance(self._current_block, AssistantOutputBlock):
+                if isinstance(self._current_block, AgentOutputBlock):
                     self._current_block.finalize_streaming()
                     self._current_block.mark_success()
 
@@ -331,7 +331,7 @@ class StreamingFenceDetector:
             if isinstance(self._current_block, CodeInputBlock):
                 existing = self._current_block.get_code()
                 self._current_block.update_code(existing + self._chunk_buffer)
-            elif isinstance(self._current_block, AssistantOutputBlock):
+            elif isinstance(self._current_block, AgentOutputBlock):
                 self._current_block.append(self._chunk_buffer)
                 self._current_block.flush()
 
@@ -348,7 +348,7 @@ class StreamingFenceDetector:
                 self._chunk_buffer = ""  # Clear to avoid double-processing
 
         # Mark the last block as complete
-        if isinstance(self._current_block, AssistantOutputBlock):
+        if isinstance(self._current_block, AgentOutputBlock):
             self._current_block.flush()  # Ensure final content is rendered
             self._current_block.mark_success()
 
@@ -356,16 +356,16 @@ class StreamingFenceDetector:
         for block in self._factory.all_blocks:
             if isinstance(block, CodeInputBlock):
                 block.finish_streaming()
-            elif isinstance(block, AssistantOutputBlock):
+            elif isinstance(block, AgentOutputBlock):
                 block.flush()  # Ensure all content is rendered before finalizing
                 block.finalize_streaming()
 
-        # Remove empty AssistantOutputBlocks (keep first_assistant_block for status indicator)
+        # Remove empty AgentOutputBlocks (keep first_agent_block for status indicator)
         for block in [
             b
             for b in self._factory.all_blocks
-            if isinstance(b, AssistantOutputBlock)
-            and b is not self._factory.first_assistant_block
+            if isinstance(b, AgentOutputBlock)
+            and b is not self._factory.first_agent_block
             and not b._output_str.strip()
         ]:
             self._factory.remove_block(block)

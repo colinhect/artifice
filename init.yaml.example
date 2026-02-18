@@ -14,11 +14,11 @@ tmux_target: "session:window.pane"
 tmux_prompt_pattern: '^\S+@\S+:\S+\$ '
 
 # ============================================================================
-# Assistant Configuration
+# Agent Configuration
 # ============================================================================
-assistant: "minimax"
+agent: "minimax"
 
-assistants:
+agents:
   minimax:
     provider: "huggingface"
     model: "MiniMaxAI/MiniMax-M2.5:novita"
@@ -31,7 +31,7 @@ assistants:
 banner: false
 
 # Enable/disable markdown rendering for different output types
-assistant_markdown: true    # AI assistant responses
+agent_markdown: true    # AI agent responses
 python_markdown: false  # Python code output
 shell_markdown: false   # Shell command output
 
@@ -39,9 +39,9 @@ shell_markdown: false   # Shell command output
 # Behavior Settings
 # ============================================================================
 
-# Auto-send execution results to the assistant
-# When True, code execution results are automatically sent to the AI assistant
-auto_send_to_assistant: true
+# Auto-send execution results to the agent
+# When True, code execution results are automatically sent to the AI agent
+auto_send_to_agent: true
 
 # ============================================================================
 # Shell Initialization
