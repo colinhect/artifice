@@ -66,26 +66,6 @@
 - Document parameters, return values, and exceptions
 - Add inline comments for complex logic
 
-## Project Structure
-
-```
-src/artifice/
-├── app.py              # Textual app entry point
-├── terminal.py         # Main terminal widget
-├── config.py           # Configuration management
-├── prompts.py          # Prompt template loading
-├── theme.py            # Textual theme definitions
-├── assistant/          # AI assistant implementations
-├── providers/          # AI provider implementations
-├── execution/          # Code execution (Python/shell)
-├── terminal_input.py   # Input widget
-├── terminal_output.py  # Output widget
-├── history.py          # Command history
-└── utils.py            # Utility functions
-
-tests/                  # pytest test suite
-```
-
 ## Key Patterns
 
 ### Provider Pattern
@@ -99,19 +79,6 @@ tests/                  # pytest test suite
 - Delegate to providers for API calls
 - Support multiple assistants sharing same provider
 - Handle `openai_format` for compatibility
-
-### Streaming Pattern
-- Use `ChunkBuffer` for batching streamed chunks
-- Post messages for UI updates
-- Handle thinking chunks separately
-- Finalize streams properly on completion/cancellation
-
-## Testing Guidelines
-- Test each module in isolation
-- Use pytest fixtures for common setup
-- Test async functions with `@pytest.mark.asyncio`
-- Mock external dependencies
-- Test edge cases: empty inputs, errors, cancellations
 
 ## Configuration
 - User config at `~/.config/artifice/init.yaml`

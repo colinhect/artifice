@@ -110,6 +110,26 @@ class StreamManager:
         except Exception:
             logger.exception("Error processing thinking buffer")
 
+    def feed_tool_calls(self, xml: str) -> None:
+        """Feed tool-call XML directly into the detector before finalization.
+
+        Called from the terminal widget after ``send_prompt`` returns and
+        ``tool_calls_xml`` is present.  Bypasses the async chunk buffer so the
+        XML is synchronously processed by the fence detector before
+        ``finalize()`` is called.
+
+        Args:
+            xml: XML string such as ``<python>\\ncode\\n</python>\\n``.
+        """
+        if not xml or not self._current_detector:
+            return
+        self._current_detector.start()
+        try:
+            with self._batch_update():
+                self._current_detector.feed(xml)
+        except Exception:
+            logger.exception("Error feeding tool calls to detector")
+
     def finalize(self) -> None:
         """Flush buffers and finalize thinking block and detector after streaming ends."""
         # Flush any remaining buffered thinking chunks

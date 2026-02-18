@@ -19,6 +19,8 @@ class AssistantResponse:
     error: str | None = None
     thinking: str | None = None
     usage: TokenUsage | None = None
+    tool_calls_xml: str | None = None
+    tool_calls: list[dict] | None = None
 
 
 class AssistantBase(ABC):
@@ -52,6 +54,14 @@ class AssistantBase(ABC):
     @abstractmethod
     def clear_conversation(self):
         pass
+
+    def add_tool_result(self, code: str, language: str, content: str) -> bool:  # noqa: ARG002
+        """Add a tool result message to conversation history.
+
+        Returns True if a pending tool call matched and the result was added,
+        False if there are no pending tool calls (fall back to user message).
+        """
+        return False
 
     def send_prompt_and_wait_full_response(self, prompt):
         response: str = ""

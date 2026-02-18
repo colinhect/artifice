@@ -40,6 +40,8 @@ class ProviderResponse:
         content_blocks: Optional structured content blocks (e.g., for Claude's multi-turn thinking)
         error: Optional error message if the request failed
         usage: Optional token usage statistics
+        tool_calls_xml: Optional XML representation of tool calls (e.g., <python>...</python>)
+            generated when the model responds with native tool calls instead of XML text.
     """
 
     text: str
@@ -48,6 +50,8 @@ class ProviderResponse:
     content_blocks: list[dict[str, Any]] | None = None
     error: str | None = None
     usage: TokenUsage | None = None
+    tool_calls_xml: str | None = None
+    tool_calls: list[dict] | None = None
 
 
 class ProviderBase(ABC):

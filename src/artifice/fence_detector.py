@@ -37,11 +37,10 @@ class StreamingFenceDetector:
     """
 
     def __init__(
-        self, output: TerminalOutput, save_callback=None, pause_after_code: bool = False
+        self, output: TerminalOutput, pause_after_code: bool = False
     ) -> None:
         self._output = output
         self._factory = BlockFactory(output)
-        self._save_callback = save_callback  # Callback to save blocks to session
         self._pause_after_code = pause_after_code
         self._started = False
         self._paused = False
@@ -550,7 +549,3 @@ class StreamingFenceDetector:
         ]:
             self._factory.remove_block(block)
 
-        # Save all blocks to session now that they're finalized
-        if self._save_callback:
-            for block in self._factory.all_blocks:
-                self._save_callback(block)

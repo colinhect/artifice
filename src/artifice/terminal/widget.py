@@ -296,6 +296,11 @@ class ArtificeTerminal(Widget):
             usage=getattr(response, "usage", None)
         )
 
+        # If the model returned native tool calls, inject their XML into the
+        # fence detector now (before finalize) so they appear as CodeInputBlocks.
+        if response.tool_calls_xml:
+            self._stream.feed_tool_calls(response.tool_calls_xml)
+
         self._stream.finalize()
         self._apply_assistant_response(detector, response)
 
@@ -328,13 +333,18 @@ class ArtificeTerminal(Widget):
     async def _send_execution_result_to_assistant(
         self, code: str, language: str, result: ExecutionResult
     ) -> None:
-        """Send execution results back to the assistant and split the response."""
-        if self._assistant is not None:
+        """Send execution results back to the assistant and get its response."""
+        if self._assistant is None:
+            return
+        output = result.output + result.error
+        # Use structured tool result when possible (OpenAI tool-call flow)
+        if self._assistant.add_tool_result(code, language, output):
+            await self._stream_assistant_response(self._assistant, "")
+        else:
             prompt = (
                 f"Executed: <{language}>{code}</{language}>"
                 + "\n\nOutput:\n"
-                + result.output
-                + result.error
+                + output
                 + "\n"
             )
             await self._stream_assistant_response(self._assistant, prompt)

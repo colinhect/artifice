@@ -134,10 +134,10 @@ def _patch_block_types():
         yield
 
 
-def make_detector(save_callback=None):
+def make_detector():
     """Create a detector with fake dependencies."""
     output = FakeOutput()
-    detector = StreamingFenceDetector(output, save_callback=save_callback)
+    detector = StreamingFenceDetector(output)
     detector._make_prose_block = lambda activity: FakeAssistantBlock(activity=activity)
     detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)
     detector._make_thinking_block = lambda: FakeThinkingBlock(activity=True)
@@ -533,26 +533,6 @@ class TestStateTransitions:
         d.start()
         d.feed("<python>code</python>")
         assert d._state == _FenceState.PROSE
-
-
-class TestSaveCallback:
-    def test_save_callback_called_on_finish(self):
-        saved = []
-        d, _ = make_detector(save_callback=lambda b: saved.append(b))
-        d.start()
-        d.feed("Hi<python>x=1</python>Bye")
-        d.finish()
-        assert len(saved) > 0
-
-    def test_save_callback_gets_all_block_types(self):
-        saved = []
-        d, _ = make_detector(save_callback=lambda b: saved.append(b))
-        d.start()
-        d.feed("Prose<python>code</python>More prose")
-        d.finish()
-        types = {type(b) for b in saved}
-        assert FakeAssistantBlock in types
-        assert FakeCodeBlock in types
 
 
 class TestThinkTagDetection:

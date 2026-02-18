@@ -61,12 +61,14 @@ def create_assistant(
             system_prompt=config.system_prompt,
         )
     elif provider.lower() == "huggingface":
+        use_tools = bool(assistant.get("use_tools", False))
         assistant = Assistant(
             provider=OpenAICompatibleProvider(
                 base_url="https://router.huggingface.co/v1",
                 api_key=os.environ["HF_TOKEN"],
                 model=model,
                 on_connect=on_connect,
+                use_tools=use_tools,
             ),
             system_prompt=config.system_prompt,
             openai_format=True,

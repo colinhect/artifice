@@ -81,7 +81,6 @@ class ExecutionCoordinator:
             output=self._output,
             markdown_enabled=markdown_enabled,
             in_context=in_context,
-            save_callback=None,
             schedule_fn=self._schedule_fn,
             use_code_block=use_code_block,
         )

@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
-if TYPE_CHECKING:
-    from .terminal.output import TerminalOutput, CodeOutputBlock
-
+from .terminal.output import TerminalOutput, CodeOutputBlock
 
 class OutputCallbackHandler:
     """Manages output callbacks for code execution with lazy block creation."""
@@ -32,8 +30,6 @@ class OutputCallbackHandler:
         if not self._use_code_block:
             return None
         if self._block is None:
-            from .terminal_output import CodeOutputBlock
-
             self._block = CodeOutputBlock(
                 render_markdown=self._markdown_enabled, in_context=self._in_context
             )
