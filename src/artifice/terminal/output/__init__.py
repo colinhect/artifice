@@ -8,6 +8,7 @@ from .blocks import (
     CodeInputBlock,
     CodeOutputBlock,
     ThinkingOutputBlock,
+    ToolCallBlock,
     WidgetOutputBlock,
 )
 from .containers import (
@@ -27,5 +28,6 @@ __all__ = [
     "PinnedOutput",
     "TerminalOutput",
     "ThinkingOutputBlock",
+    "ToolCallBlock",
     "WidgetOutputBlock",
 ]

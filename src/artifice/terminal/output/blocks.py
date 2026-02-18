@@ -293,3 +293,39 @@ class ThinkingOutputBlock(AssistantOutputBlock):
 
     def __init__(self, output="", activity=True) -> None:
         super().__init__(output=output, activity=activity, render_markdown=False)
+
+
+class ToolCallBlock(CodeInputBlock):
+    """Block for an AI-requested tool call (python or shell).
+
+    Created directly from AgentResponse.tool_calls — bypasses the fence
+    detector XML hack used previously. Displays a tool-name label above
+    the syntax-highlighted code so the user can inspect and execute it.
+    """
+
+    def __init__(
+        self,
+        tool_call_id: str,
+        name: str,
+        code: str,
+        language: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            code=code,
+            language=language,
+            show_loading=False,
+            in_context=True,
+            **kwargs,
+        )
+        self.tool_call_id = tool_call_id
+        self._tool_name = name
+        self._label = Static(name, classes="tool-name")
+
+    def compose(self) -> ComposeResult:
+        yield self._label
+        with Horizontal():
+            with self._status_container:
+                yield self._loading_indicator
+                yield self._status_icon
+            yield self._code

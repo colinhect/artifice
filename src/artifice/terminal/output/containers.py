@@ -15,6 +15,7 @@ from .blocks import (
     BaseBlock,
     CodeInputBlock,
     CodeOutputBlock,
+    ToolCallBlock,
     WidgetOutputBlock,
 )
 
@@ -96,7 +97,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     class BlockExecuteRequested(Message):
         """Posted when the user wants to execute a code block."""
 
-        def __init__(self, block: CodeInputBlock) -> None:
+        def __init__(self, block: CodeInputBlock | ToolCallBlock) -> None:
             super().__init__()
             self.block = block
 
@@ -212,9 +213,9 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
             block.toggle_markdown()
 
     def action_cycle_language(self) -> None:
-        """Cycle the language of the highlighted CodeInputBlock."""
+        """Cycle the language of the highlighted CodeInputBlock (not ToolCallBlocks)."""
         block = self.get_highlighted_block()
-        if block and isinstance(block, CodeInputBlock):
+        if block and isinstance(block, CodeInputBlock) and not isinstance(block, ToolCallBlock):
             block.cycle_language()
 
     def action_pin_block(self) -> None:

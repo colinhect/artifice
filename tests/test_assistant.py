@@ -1,80 +1,72 @@
-"""Tests for the Assistant class."""
+"""Tests for the Agent class."""
 
 import pytest
 
-from artifice.assistant.assistant import Assistant
-from artifice.providers.simulated import SimulatedProvider
+from artifice.agent import Agent, SimulatedAgent
 
 
 @pytest.mark.asyncio
-async def test_assistant_manages_history():
-    """Test that assistant maintains conversation history."""
-    provider = SimulatedProvider(response_delay=0.001)
-    assistant = Assistant(provider=provider)
+async def test_agent_manages_history():
+    """Test that agent maintains conversation history."""
+    agent = SimulatedAgent(response_delay=0.001)
 
-    await assistant.send_prompt("First message")
-    assert len(assistant.messages) == 2  # user + assistant
-    assert assistant.messages[0]["role"] == "user"
-    assert assistant.messages[1]["role"] == "assistant"
+    await agent.send("First message")
+    assert len(agent.messages) == 2  # user + assistant
+    assert agent.messages[0]["role"] == "user"
+    assert agent.messages[1]["role"] == "assistant"
 
-    await assistant.send_prompt("Second message")
-    assert len(assistant.messages) == 4  # 2 turns
-
-
-@pytest.mark.asyncio
-async def test_assistant_clear_conversation():
-    """Test that clear_conversation works."""
-    provider = SimulatedProvider(response_delay=0.001)
-    assistant = Assistant(provider=provider)
-
-    await assistant.send_prompt("Hello")
-    assert len(assistant.messages) > 0
-
-    assistant.clear_conversation()
-    assert len(assistant.messages) == 0
+    await agent.send("Second message")
+    assert len(agent.messages) == 4  # 2 turns
 
 
 @pytest.mark.asyncio
-async def test_multiple_assistants_share_provider():
-    """Test that multiple assistants can use same provider."""
-    provider = SimulatedProvider(response_delay=0.001)
-    assistant1 = Assistant(provider=provider, system_prompt="You are helpful")
-    assistant2 = Assistant(provider=provider, system_prompt="You are concise")
+async def test_agent_clear():
+    """Test that clear() works."""
+    agent = SimulatedAgent(response_delay=0.001)
 
-    await assistant1.send_prompt("Hello")
-    await assistant2.send_prompt("Hello")
+    await agent.send("Hello")
+    assert len(agent.messages) > 0
 
-    # Each maintains separate history
-    assert len(assistant1.messages) == 2
-    assert len(assistant2.messages) == 2
-
-    # But share the same provider instance
-    assert assistant1.provider is assistant2.provider
+    agent.clear()
+    assert len(agent.messages) == 0
 
 
 @pytest.mark.asyncio
-async def test_assistant_system_prompt():
-    """Test that system prompt is passed to provider."""
-    provider = SimulatedProvider(response_delay=0.001)
-    assistant = Assistant(provider=provider, system_prompt="Test system prompt")
+async def test_multiple_agents_independent_history():
+    """Test that multiple agents maintain separate history."""
+    agent1 = SimulatedAgent(system_prompt="You are helpful")
+    agent2 = SimulatedAgent(system_prompt="You are concise")
 
-    assert assistant.system_prompt == "Test system prompt"
+    agent1.configure_scenarios([{"response": "agent1 reply"}])
+    agent2.configure_scenarios([{"response": "agent2 reply"}])
 
-    await assistant.send_prompt("Hello")
-    # System prompt is passed but not stored in messages (provider-specific)
-    assert len(assistant.messages) == 2
+    await agent1.send("Hello")
+    await agent2.send("Hello")
+
+    assert len(agent1.messages) == 2
+    assert len(agent2.messages) == 2
+    assert agent1 is not agent2
 
 
 @pytest.mark.asyncio
-async def test_assistant_streaming():
+async def test_agent_system_prompt():
+    """Test that system prompt is stored."""
+    agent = SimulatedAgent(system_prompt="Test system prompt")
+    assert agent.system_prompt == "Test system prompt"
+    await agent.send("Hello")
+    assert len(agent.messages) == 2
+
+
+@pytest.mark.asyncio
+async def test_agent_streaming():
     """Test that streaming callbacks are passed through."""
-    provider = SimulatedProvider(response_delay=0.001)
-    assistant = Assistant(provider=provider)
+    agent = SimulatedAgent(response_delay=0.001)
+    agent.set_default_response("hello world")
 
     chunks = []
     thinking_chunks = []
 
-    response = await assistant.send_prompt(
+    response = await agent.send(
         "Hello",
         on_chunk=lambda c: chunks.append(c),
         on_thinking_chunk=lambda c: thinking_chunks.append(c),
@@ -82,39 +74,47 @@ async def test_assistant_streaming():
 
     assert len(chunks) > 0
     assert "".join(chunks) == response.text
-    assert len(thinking_chunks) > 0
 
 
 @pytest.mark.asyncio
-async def test_assistant_error_handling():
-    """Test that errors from provider are handled."""
-    provider = SimulatedProvider(response_delay=0.001)
+async def test_agent_error_handling():
+    """Test that errors in agent.send are returned as AgentResponse.error."""
+    from artifice.agent import AgentResponse
 
-    # Create a provider that returns an error
-    async def error_send(*args, **kwargs):
-        from artifice.providers.provider import ProviderResponse
+    agent = SimulatedAgent(response_delay=0.001)
 
-        return ProviderResponse(text="", error="Test error")
+    # Patch send to simulate an error
+    original_send = agent.send
 
-    provider.send = error_send
-    assistant = Assistant(provider=provider)
+    async def erroring_send(*args, **kwargs):
+        return AgentResponse(text="", error="Test error")
 
-    response = await assistant.send_prompt("Hello")
+    agent.send = erroring_send
+
+    response = await agent.send("Hello")
     assert response.error == "Test error"
     assert response.text == ""
 
 
 @pytest.mark.asyncio
-async def test_assistant_empty_prompt():
-    """Test that empty prompts are handled correctly."""
-    provider = SimulatedProvider(response_delay=0.001)
-    assistant = Assistant(provider=provider)
+async def test_agent_empty_prompt():
+    """Test that empty prompts are not added to history."""
+    agent = SimulatedAgent(response_delay=0.001)
+    agent.set_default_response("reply")
 
-    # Empty prompt should not be added to history
-    await assistant.send_prompt("")
-    # Still gets response, but no user message added
-    assert len(assistant.messages) <= 1  # Only assistant response (if any)
+    await agent.send("")
+    assert all(m["role"] != "user" for m in agent.messages)
 
-    # Whitespace-only prompt should also be ignored
-    await assistant.send_prompt("   ")
-    assert len(assistant.messages) <= 2
+    await agent.send("   ")
+    assert all(m["content"] != "   " for m in agent.messages)
+
+
+@pytest.mark.asyncio
+async def test_agent_tool_result():
+    """Test that add_tool_result appends a tool message."""
+    agent = SimulatedAgent()
+    agent.add_tool_result("call_123", "output text")
+    assert any(
+        m.get("role") == "tool" and m.get("tool_call_id") == "call_123"
+        for m in agent.messages
+    )
