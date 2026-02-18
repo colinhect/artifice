@@ -359,11 +359,7 @@ class ArtificeTerminal(Widget):
 
         # If stream is paused and this is the paused code block, use the pause handler
         detector = self._stream.current_detector
-        if (
-            self._stream.is_paused
-            and detector
-            and block is detector.last_code_block
-        ):
+        if self._stream.is_paused and detector and block is detector.last_code_block:
             self._current_task = asyncio.create_task(
                 self._run_cancellable(self._execute_paused_code_block())
             )

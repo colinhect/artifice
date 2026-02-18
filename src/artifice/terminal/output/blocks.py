@@ -152,7 +152,9 @@ class BufferedOutputBlock(BaseBlock):
             if self._output:
                 self._output.remove()
                 self._output = None
-            self._markdown = Markdown(self._output_str, classes=self._MARKDOWN_CSS_CLASS)
+            self._markdown = Markdown(
+                self._output_str, classes=self._MARKDOWN_CSS_CLASS
+            )
             self._contents.mount(self._markdown)
         else:
             if self._markdown:
@@ -162,6 +164,7 @@ class BufferedOutputBlock(BaseBlock):
                 self._output_str, markup=False, classes=self._STATIC_CSS_CLASS
             )
             self._contents.mount(self._output)
+
 
 class CodeOutputBlock(BufferedOutputBlock):
     _STATIC_CSS_CLASS = "code-output"

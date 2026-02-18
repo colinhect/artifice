@@ -1,5 +1,4 @@
-"""Assistant for GitHub Copilot.
-"""
+"""Assistant for GitHub Copilot."""
 
 from __future__ import annotations
 

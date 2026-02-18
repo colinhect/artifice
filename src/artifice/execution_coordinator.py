@@ -46,20 +46,16 @@ class ExecutionCoordinator:
         self._executor = CodeExecutor()
         if config.tmux_target:
             prompt_pattern = config.tmux_prompt_pattern or r"^\$ "
-            self._shell_executor: ShellExecutor | TmuxShellExecutor = (
-                TmuxShellExecutor(
-                    config.tmux_target,
-                    prompt_pattern=prompt_pattern,
-                    check_exit_code=config.tmux_echo_exit_code,
-                )
+            self._shell_executor: ShellExecutor | TmuxShellExecutor = TmuxShellExecutor(
+                config.tmux_target,
+                prompt_pattern=prompt_pattern,
+                check_exit_code=config.tmux_echo_exit_code,
             )
         else:
             self._shell_executor = ShellExecutor()
 
         # Set shell init script from config (only applicable to ShellExecutor)
-        if config.shell_init_script and isinstance(
-            self._shell_executor, ShellExecutor
-        ):
+        if config.shell_init_script and isinstance(self._shell_executor, ShellExecutor):
             self._shell_executor.init_script = config.shell_init_script
 
         # Markdown settings
