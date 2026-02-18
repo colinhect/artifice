@@ -34,8 +34,6 @@ from .terminal_output import (
     WidgetOutputBlock,
     BaseBlock,
 )
-from .config import get_sessions_dir, ensure_sessions_dir
-from .session import SessionTranscript
 from .chunk_buffer import ChunkBuffer
 from .fence_detector import StreamingFenceDetector
 from .status_indicator import StatusIndicatorManager
@@ -126,16 +124,6 @@ class ArtificeTerminal(Widget):
         self._shell_markdown_enabled = self._config.shell_markdown
         self._auto_send_to_assistant: bool = self._config.auto_send_to_assistant
 
-        # Initialize session transcript if enabled
-        self._session_transcript: SessionTranscript | None = None
-        if self._config.save_sessions:
-            try:
-                ensure_sessions_dir(self._config)
-                sessions_dir = get_sessions_dir(self._config)
-                self._session_transcript = SessionTranscript(sessions_dir, self._config)
-            except Exception as e:
-                logger.error("Failed to initialize session transcript: %s", e)
-
         self.output = TerminalOutput(id="output")
         self.input = TerminalInput(history=self._history, id="input")
         self.assistant_loading = LoadingIndicator()
@@ -179,14 +167,6 @@ class ArtificeTerminal(Widget):
 
     def on_mount(self) -> None:
         self._status_manager.update_assistant_info()
-
-    def _save_block_to_session(self, block: BaseBlock) -> None:
-        """Save a block to the session transcript if enabled."""
-        if self._session_transcript:
-            try:
-                self._session_transcript.append_block(block)
-            except Exception as e:
-                logger.error("Failed to save block to session: %s", e)
 
     async def _run_cancellable(self, coro, *, finally_callback=None):
         """Run a coroutine with standard cancel handling.
@@ -250,7 +230,7 @@ class ArtificeTerminal(Widget):
             output=self.output,
             markdown_enabled=markdown_enabled,
             in_context=in_context,
-            save_callback=self._save_block_to_session,
+            save_callback=None,
             schedule_fn=self.call_later,
             use_code_block=use_code_block,
         )
@@ -290,7 +270,6 @@ class ArtificeTerminal(Widget):
                 code, language=language, show_loading=True, in_context=in_context
             )
             self.output.append_block(code_input_block)
-            self._save_block_to_session(code_input_block)
 
         # Determine markdown and code block settings
         if language == "bash":
@@ -340,7 +319,6 @@ class ArtificeTerminal(Widget):
         if self._thinking_block:
             self._thinking_block.finalize_streaming()
             self._thinking_block.mark_success()
-            self._save_block_to_session(self._thinking_block)
             self._thinking_block = None
 
         # If the stream was paused (code block detected), DON'T finalize yet.
@@ -397,7 +375,6 @@ class ArtificeTerminal(Widget):
 
         self._current_detector = StreamingFenceDetector(
             self.output,
-            save_callback=self._save_block_to_session,
             pause_after_code=True,
         )
 
@@ -437,7 +414,6 @@ class ArtificeTerminal(Widget):
         # Create a block showing the prompt
         assistant_input_block = AssistantInputBlock(prompt)
         self.output.append_block(assistant_input_block)
-        self._save_block_to_session(assistant_input_block)
 
         # Mark the prompt as in context
         self._mark_block_in_context(assistant_input_block)

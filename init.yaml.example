@@ -71,16 +71,6 @@ shell_markdown: false   # Shell command output
 auto_send_to_assistant: true
 
 # ============================================================================
-# Session Settings
-# ============================================================================
-
-# Save session transcripts to markdown files
-save_sessions: true
-
-# Directory for session transcripts (default: ~/.artifice/sessions/)
-# sessions_dir: "~/.artifice/sessions/"
-
-# ============================================================================
 # Shell Initialization
 # ============================================================================
 

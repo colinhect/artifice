@@ -59,10 +59,6 @@ class ArtificeConfig:
             False  # Whether to check exit code with echo $?
         )
 
-        # Session settings
-        self.save_sessions: bool = True
-        self.sessions_dir: Optional[str] = None  # Defaults to ~/.artifice/sessions/
-
         # Custom settings (user can add any additional settings)
         self._custom: dict[str, Any] = {}
 
@@ -164,12 +160,6 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
         if "shell_init_script" in data:
             config.shell_init_script = data["shell_init_script"]
 
-        # Session settings
-        if "save_sessions" in data:
-            config.save_sessions = data["save_sessions"]
-        if "sessions_dir" in data:
-            config.sessions_dir = data["sessions_dir"]
-
         # Store any additional custom settings
         known_keys = {
             "assistant",
@@ -187,8 +177,6 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
             "python_output_code_block",
             "auto_send_to_assistant",
             "shell_init_script",
-            "save_sessions",
-            "sessions_dir",
             "tmux_target",
             "tmux_prompt_pattern",
             "tmux_echo_exit_code",
@@ -207,19 +195,3 @@ def load_config() -> tuple[ArtificeConfig, Optional[str]]:
         error_msg = f"Error loading config from {init_path}:\n{traceback.format_exc()}"
         return config, error_msg
 
-
-def get_sessions_dir(config: ArtificeConfig) -> Path:
-    """Get the directory for storing session transcripts.
-
-    Returns the configured sessions directory, or the default ~/.artifice/sessions/
-    """
-    if config.sessions_dir:
-        return Path(config.sessions_dir).expanduser()
-
-    return Path.home() / ".artifice" / "sessions"
-
-
-def ensure_sessions_dir(config: ArtificeConfig) -> None:
-    """Ensure the sessions directory exists."""
-    sessions_dir = get_sessions_dir(config)
-    sessions_dir.mkdir(parents=True, exist_ok=True)

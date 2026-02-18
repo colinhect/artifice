@@ -12,7 +12,6 @@ def test_default_config():
     assert config.assistants is None
     assert config.banner is False
     assert config.auto_send_to_assistant is True
-    assert config.save_sessions is True
     assert config.assistant_markdown is True
 
 
@@ -102,26 +101,6 @@ def test_load_all_display_settings(tmp_path, monkeypatch):
     assert config.python_markdown is True
     assert config.assistant_markdown is False
     assert config.shell_markdown is True
-
-
-def test_load_session_settings(tmp_path, monkeypatch):
-    """Test loading session settings."""
-    config_dir = tmp_path / "artifice"
-    config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
-
-    yaml_content = {
-        "save_sessions": False,
-        "sessions_dir": "~/.custom/sessions",
-    }
-    init_file.write_text(yaml.dump(yaml_content))
-
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    config, error = load_config()
-
-    assert error is None
-    assert config.save_sessions is False
-    assert config.sessions_dir == "~/.custom/sessions"
 
 
 def test_load_shell_init_script(tmp_path, monkeypatch):
