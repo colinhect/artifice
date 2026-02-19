@@ -1,37 +1,29 @@
 # Artifice
 
-A minimal and transparent intelligence agent harness with a terminal user interface. Provides control over intelligence model interactions, code execution, and shell commands—without complex frameworks, protocols, or abstractions. Built with [Textual](https://github.com/Textualize/textual).
+A minimal and transparent AI agent harness with a terminal user interface. Provides direct control over model interactions, code execution, and shell commands—without complex frameworks or abstractions. Built with [Textual](https://github.com/Textualize/textual).
 
-The intention is to provide a unified interface for both building and experimenting with precise prompts as well as full agentic flows.
+Artifice provides a unified interface for both building precise prompts and running full agentic flows, with support for any LLM provider through [any-llm](https://github.com/mlamina/any-llm).
 
 ## Features
 
 ### Execution Environments
 
-- **Python** - Full interactive Python console
+- **Python** - Full interactive Python console with persistent state
 - **Shell Commands** - Execute bash commands with streaming output
-- **Tmux Integration** - Route shell commands to existing tmux panes for real terminal state
+- **Tmux Integration** - Route shell commands to existing tmux panes, preserving shell state, environment variables, and working directory across commands
 - **Textual Widgets** - Python code returning Textual objects gets mounted directly in the UI
 
 ### User Interface
 
-- **Markdown Rendering** - AI responses and output can be rendered as formatted markdown
+- **Markdown Rendering** - AI responses rendered as formatted markdown
 - **Syntax Highlighting** - Code blocks highlighted during streaming and after execution
-- **Block Navigation** - Navigate, edit, and re-execute previous inputs (Ctrl+Up/Down)
+- **Block Navigation** - Navigate, edit, and re-execute previous inputs
 - **Multiline Input** - Write complex code with proper formatting
-- **Command History** - Persistent history across sessions with search (Ctrl+R)
-
-### Tmux Integration
-
-Artifice can execute shell commands in existing tmux sessions instead of isolated subprocesses. This allows:
-
-- **Persistent shell state** - Environment variables, working directory, and shell history maintained
-- **Real terminal sessions** - Commands run in actual terminal panes with full terminal capabilities
-- **Visual debugging** - Watch command execution in real-time in the tmux pane
-- **Stateful workflows** - Build on previous command state (activated virtualenvs, cd'd directories, etc.)
-- **SSH sessions** - Target an active SSH session
+- **Command History** - Persistent history across sessions with search
 
 ## Installation
+
+Requires Python 3.9+.
 
 ```bash
 pip install -e .
@@ -78,24 +70,28 @@ Artifice has three input modes. Switch modes by typing a special character when 
 - **Ctrl+L** - Clear output
 - **F2** - Toggle help footer
 
+## Configuration
+
+Copy `init.yaml.example` to `~/.config/artifice/init.yaml` and customize. Key settings:
+
+- **agent** - Select which LLM agent to use
+- **agents** - Define agents with provider, model, API key, and tool access
+- **system_prompt** - Custom system prompt for the AI agent
+- **tmux_target** - Target tmux pane for shell command execution (e.g. `session:window.pane`)
+- **auto_send_to_agent** - Automatically send execution results back to the agent
+
+See `init.yaml.example` for the full list of options.
+
 ### Running from Source
 
 ```bash
-git clone <repository-url>
-cd artifice/src
-python -m artifice.app
+git clone https://github.com/colinhill/artifice.git
+cd artifice
+pip install -e .
+artifice
 ```
 
-## Roadmap
+## License
 
-Future enhancements while maintaining the minimal harness philosophy:
-
-- [ ] Additional model providers (OpenAI, Gemini, local models)
-- [ ] Session export/import in portable formats
-- [ ] Language Server Protocol (LSP) integration for code intelligence
-- [ ] Additional language REPLs (Node.js, Ruby, etc.)
-- [ ] Shell history export for executed commands
-- [ ] Tab-completion in Python and shell modes
-- [ ] Block annotations and selective history export
-- [ ] VIM keybinding mode for text editing
+MIT
 
