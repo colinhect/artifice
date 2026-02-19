@@ -226,3 +226,17 @@ _register(ToolDef(
 def get_all_schemas() -> list[dict]:
     """Return OpenAI function-call schemas for all registered tools."""
     return [tool.to_schema() for tool in TOOLS.values()]
+
+
+def get_schemas_for(patterns: list[str]) -> list[dict]:
+    """Return schemas for tools whose names match any of the given patterns.
+
+    Supports fnmatch-style wildcards (e.g. ``"*"``, ``"web_*"``).
+    """
+    from fnmatch import fnmatch
+
+    return [
+        tool.to_schema()
+        for tool in TOOLS.values()
+        if any(fnmatch(tool.name, pat) for pat in patterns)
+    ]

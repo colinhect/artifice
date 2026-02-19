@@ -25,7 +25,8 @@ agents:
     model: "MiniMaxAI/MiniMax-M2.5"
     base_url: "https://router.huggingface.co/v1"
     context_window: 200000
-    use_tools: true
+    tools:
+      - "*"  # Enable all tools (supports fnmatch wildcards: "web_*", "python", etc.)
 
 # ============================================================================
 # Display Settings
@@ -46,6 +47,10 @@ shell_markdown: false   # Shell command output
 # Auto-send execution results to the agent
 # When True, code execution results are automatically sent to the AI agent
 auto_send_to_agent: true
+
+# Show/hide tool call output (the result blocks after tool execution)
+# When false, output is still sent to the agent but hidden from the UI
+show_tool_output: true
 
 # ============================================================================
 # Shell Initialization

@@ -45,7 +45,9 @@ def create_agent(
       from an environment variable.
     - ``api_key_env``: Name of the environment variable holding the API key.
     - ``base_url``: Custom base URL for self-hosted or proxy endpoints.
-    - ``use_tools``: Whether to register python/shell as native tools.
+    - ``tools``: List of tool name patterns to enable (e.g. ``["*"]``,
+      ``["python", "shell"]``, ``["web_*"]``).  Supports fnmatch wildcards.
+    - ``use_tools``: (deprecated) Boolean; treated as ``tools: ["*"]`` when true.
     - ``system_prompt``: Override the global system_prompt for this agent.
     """
     if not config.agents or not config.agent:
@@ -87,7 +89,12 @@ def create_agent(
             api_key = os.environ.get(env_var)
 
     system_prompt = definition.get("system_prompt", config.system_prompt)
-    use_tools = bool(definition.get("use_tools", False))
+
+    # Parse tools list (new format) with backward compat for use_tools bool
+    tools: list[str] | None = definition.get("tools")
+    if tools is None and definition.get("use_tools"):
+        tools = ["*"]
+
     base_url: str | None = definition.get("base_url")
     # provider here is the any-llm provider override (not "simulated")
     llm_provider: str | None = (
@@ -97,7 +104,7 @@ def create_agent(
     return Agent(
         model=model,
         system_prompt=system_prompt,
-        use_tools=use_tools,
+        tools=tools,
         api_key=api_key,
         provider=llm_provider,
         base_url=base_url,

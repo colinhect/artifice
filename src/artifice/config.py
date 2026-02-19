@@ -36,6 +36,8 @@ _FIELDS: dict[str, Any] = {
     "python_output_code_block": True,
     # Auto-send settings
     "auto_send_to_agent": True,
+    # Tool output visibility
+    "show_tool_output": True,
     # Shell init script
     "shell_init_script": None,
     # Tmux settings
@@ -72,6 +74,9 @@ class ArtificeConfig:
 
     # Auto-send settings
     auto_send_to_agent: bool
+
+    # Tool output visibility
+    show_tool_output: bool
 
     # Shell init script
     shell_init_script: str | None

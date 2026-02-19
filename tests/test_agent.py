@@ -3,7 +3,7 @@
 import pytest
 
 from artifice.agent import SimulatedAgent, ToolCall, ToolDef, TOOLS, execute_tool_call
-from artifice.agent.tools import get_all_schemas
+from artifice.agent.tools import get_all_schemas, get_schemas_for
 
 
 @pytest.mark.asyncio
@@ -160,6 +160,39 @@ def test_get_all_schemas_returns_valid_list():
         assert "name" in schema["function"]
         assert "description" in schema["function"]
         assert "parameters" in schema["function"]
+
+
+def test_get_schemas_for_wildcard():
+    """Test that get_schemas_for(['*']) returns all tools."""
+    schemas = get_schemas_for(["*"])
+    assert len(schemas) == len(TOOLS)
+
+
+def test_get_schemas_for_exact_names():
+    """Test that get_schemas_for with exact names returns only those tools."""
+    schemas = get_schemas_for(["python", "shell"])
+    names = {s["function"]["name"] for s in schemas}
+    assert names == {"python", "shell"}
+
+
+def test_get_schemas_for_glob_pattern():
+    """Test that get_schemas_for supports fnmatch wildcards."""
+    schemas = get_schemas_for(["web_*"])
+    names = {s["function"]["name"] for s in schemas}
+    assert names == {"web_search", "web_fetch"}
+
+
+def test_get_schemas_for_no_match():
+    """Test that get_schemas_for returns empty list for no matches."""
+    schemas = get_schemas_for(["nonexistent_*"])
+    assert schemas == []
+
+
+def test_get_schemas_for_mixed_patterns():
+    """Test get_schemas_for with a mix of exact names and wildcards."""
+    schemas = get_schemas_for(["python", "web_*"])
+    names = {s["function"]["name"] for s in schemas}
+    assert names == {"python", "web_search", "web_fetch"}
 
 
 def test_toolcall_display_text_python():

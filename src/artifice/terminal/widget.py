@@ -442,6 +442,8 @@ class ArtificeTerminal(Widget):
                 result_text,
                 in_context=self._auto_send_to_agent,
             )
+            if not self._config.show_tool_output:
+                output_block.add_class("hide-tool-output")
             self.output.append_block(output_block)
             self._mark_block_in_context(output_block)
 

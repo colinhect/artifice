@@ -8,7 +8,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable
 
-from .tools import ToolCall, get_all_schemas
+from .tools import ToolCall, get_schemas_for
 
 if TYPE_CHECKING:
     from any_llm.types.completion import ChatCompletionChunk
@@ -50,7 +50,7 @@ class Agent:
         self,
         model: str,
         system_prompt: str | None = None,
-        use_tools: bool = False,
+        tools: list[str] | None = None,
         api_key: str | None = None,
         provider: str | None = None,
         base_url: str | None = None,
@@ -58,7 +58,7 @@ class Agent:
     ):
         self.model = model
         self.system_prompt = system_prompt
-        self.use_tools = use_tools
+        self.tools = tools
         self._api_key = api_key
         self._provider = provider
         self._base_url = base_url
@@ -91,8 +91,8 @@ class Agent:
             kwargs["provider"] = self._provider
         if self._base_url is not None:
             kwargs["api_base"] = self._base_url
-        if self.use_tools:
-            kwargs["tools"] = get_all_schemas()
+        if self.tools is not None:
+            kwargs["tools"] = get_schemas_for(self.tools)
             kwargs["tool_choice"] = "auto"
 
         try:

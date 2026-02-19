@@ -13,6 +13,7 @@ def test_default_config():
     assert config.banner is False
     assert config.auto_send_to_agent is True
     assert config.agent_markdown is True
+    assert config.show_tool_output is True
 
 
 def test_load_empty_yaml(tmp_path, monkeypatch):
@@ -170,6 +171,22 @@ def test_load_nonexistent_file(tmp_path, monkeypatch):
     assert error is None
     assert config.agent is None
     assert config.banner is False
+
+
+def test_show_tool_output_config(tmp_path, monkeypatch):
+    """Test loading show_tool_output setting."""
+    config_dir = tmp_path / "artifice"
+    config_dir.mkdir()
+    init_file = config_dir / "init.yaml"
+
+    yaml_content = {"show_tool_output": False}
+    init_file.write_text(yaml.dump(yaml_content))
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    config, error = load_config()
+
+    assert error is None
+    assert config.show_tool_output is False
 
 
 def test_multiline_yaml_strings(tmp_path, monkeypatch):
