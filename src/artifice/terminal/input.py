@@ -27,6 +27,8 @@ class InputTextArea(TextArea):
         Binding("ctrl+s", "submit_code", "Submit", show=True, priority=True),
         Binding("ctrl+j", "insert_newline", "New Line", show=False, priority=True),
         Binding("ctrl+k", "clear_input", "Clear Input", show=True, priority=True),
+        Binding("pageup", "scroll_output_up", "Page Up", show=False),
+        Binding("pagedown", "scroll_output_down", "Page Down", show=False),
     ]
 
     def __init__(self, **kwargs) -> None:
@@ -43,6 +45,14 @@ class InputTextArea(TextArea):
     def action_clear_input(self) -> None:
         """Clear the input text area."""
         self.text = ""
+
+    def action_scroll_output_up(self) -> None:
+        """Scroll the output window up by one page."""
+        self.screen.query_one("#output").scroll_page_up(animate=True)
+
+    def action_scroll_output_down(self) -> None:
+        """Scroll the output window down by one page."""
+        self.screen.query_one("#output").scroll_page_down(animate=True)
 
     def set_syntax_highlighting(self, language: str | None) -> None:
         """Set syntax highlighting language."""

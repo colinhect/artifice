@@ -522,11 +522,11 @@ class ArtificeTerminal(Widget):
 
     def action_scroll_output_up(self) -> None:
         """Scroll the output window up by one page."""
-        self.output.scroll_page_up(animate=False)
+        self.output.scroll_page_up(animate=True)
 
     def action_scroll_output_down(self) -> None:
         """Scroll the output window down by one page."""
-        self.output.scroll_page_down(animate=False)
+        self.output.scroll_page_down(animate=True)
 
     def action_clear_agent_context(self) -> None:
         """Clear the agent's conversation context."""
