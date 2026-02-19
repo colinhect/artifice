@@ -93,7 +93,7 @@ async def test_simulated_agent_tool_calls():
     """Test that XML tool calls in responses are extracted as ToolCall objects."""
     agent = SimulatedAgent()
     agent.configure_scenarios(
-        [{"response": "Let me run this.\n\n<python>\nprint('hi')\n</python>\n\nDone."}]
+        [{"response": "Let me run this.\n\n<python>code=print('hi')</python>\n\nDone."}]
     )
 
     response = await agent.send("run something")

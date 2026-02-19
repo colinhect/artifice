@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 _RESP_PROJECT_STRUCTURE = """\
 Let me take a look at the project layout.
 
-<shell>find . -type f -name "*.py" | head -20</shell>
+<shell>command=find . -type f -name "*.py" | head -20</shell>
 
 That will give us an overview of the Python files. While we wait, here's what I'd typically expect in a well-structured project:
 
@@ -25,7 +25,7 @@ That will give us an overview of the Python files. While we wait, here's what I'
 
 Let me also check if there's a config file:
 
-<shell>cat pyproject.toml</shell>
+<shell>command=cat pyproject.toml</shell>
 
 Once we see the output, I can give you a more detailed breakdown of the architecture.\
 """
@@ -33,8 +33,7 @@ Once we see the output, I can give you a more detailed breakdown of the architec
 _RESP_DATA_ANALYSIS = """\
 Sure, let me write a quick analysis of that CSV data.
 
-<python>
-import pandas as pd
+<python>code=import pandas as pd
 
 df = pd.read_csv("data.csv")
 print(f"Shape: {df.shape}")
@@ -57,7 +56,7 @@ Let me know what you'd like to explore further.\
 _RESP_REFACTOR = """\
 I see a few things we can improve here. Let me first check the current test coverage:
 
-<shell>python -m pytest tests/ --co -q</shell>
+<shell>command=python -m pytest tests/ --co -q</shell>
 
 Now, the main issues I notice:
 
@@ -65,8 +64,7 @@ Now, the main issues I notice:
 
 The `process_item()` function has duplicated validation. We can pull that out:
 
-<python>
-def validate_item(item: dict) -> bool:
+<python>code=def validate_item(item: dict) -> bool:
     \"\"\"Check that item has required fields and valid types.\"\"\"
     required = ("name", "value", "timestamp")
     if not all(k in item for k in required):
@@ -98,12 +96,11 @@ Let me know if you want me to apply these changes, or if you'd like to discuss t
 _RESP_DEBUG = """\
 Alright, let's track this down. First, let me reproduce the error:
 
-<shell>python -m pytest tests/test_parser.py -x -v 2>&1 | tail -30</shell>
+<shell>command=python -m pytest tests/test_parser.py -x -v 2>&1 | tail -30</shell>
 
 Now let me check what the function is actually receiving:
 
-<python>
-import json
+<python>code=import json
 
 # Reproduce the failing case
 test_input = {"entries": [{"id": 1, "value": None}, {"id": 2, "value": 42}]}
@@ -134,8 +131,7 @@ Want me to apply the fix and add a test case for this edge case?\
 _RESP_CALCULATE = """\
 Let me calculate that for you.
 
-<python>
-result = 2 + 2
+<python>code=result = 2 + 2
 print(f"2 + 2 = {result}")
 </python>
 
@@ -147,7 +143,7 @@ Let me check a few things about the system state.
 
 <system_info>categories=os,disk</system_info>
 
-<shell>ps aux --sort=-%mem | head -10</shell>
+<shell>command=ps aux --sort=-%mem | head -10</shell>
 
 | Resource | Warning Threshold | Critical Threshold |
 |----------|------------------|--------------------|
@@ -216,7 +212,7 @@ That covers the basics. Markdown is expressive enough for most documentation nee
 _RESP_READ_FILE = """\
 Let me read the file and see what we're working with.
 
-<read_file>src/main.py</read_file>
+<read_file>path=src/main.py</read_file>
 
 I'll take a look at the contents and walk you through the key parts once it loads.\
 """
@@ -235,7 +231,7 @@ Summary of findings:
 
 The file has been written. Let me verify it looks correct:
 
-<read_file>output/results.txt</read_file>
+<read_file>path=output/results.txt</read_file>
 
 Everything looks good. Let me know if you need any changes.\
 """
@@ -243,11 +239,11 @@ Everything looks good. Let me know if you need any changes.\
 _RESP_FILE_SEARCH = """\
 Let me find those files for you.
 
-<file_search>**/*.py</file_search>
+<file_search>pattern=**/*.py</file_search>
 
 That will locate all Python files in the project. If you need to narrow it down, I can also search for specific patterns:
 
-<file_search>**/test_*.py</file_search>
+<file_search>pattern=**/test_*.py</file_search>
 
 Once we see the results, I can help you navigate to the right file.\
 """
@@ -255,7 +251,7 @@ Once we see the results, I can help you navigate to the right file.\
 _RESP_WEB_SEARCH = """\
 Let me search for that information.
 
-<web_search>python asyncio best practices 2025</web_search>
+<web_search>query=python asyncio best practices 2025</web_search>
 
 I'll summarize the key findings once the results come back. In the meantime, here are some general tips:
 
@@ -269,7 +265,7 @@ Let me know if you want me to dig deeper into any specific topic.\
 _RESP_WEB_FETCH = """\
 Let me grab that page for you.
 
-<web_fetch>https://docs.python.org/3/library/asyncio.html</web_fetch>
+<web_fetch>url=https://docs.python.org/3/library/asyncio.html</web_fetch>
 
 I'll pull out the most relevant sections once the content loads. The asyncio documentation covers:
 
@@ -390,54 +386,49 @@ async def _stream_text(
 
 
 def _parse_tag_args(name: str, content: str) -> dict:
-    """Parse tag content into tool call args.
+    """Parse ``key=value`` tag content into tool call args.
 
-    Supports two formats:
-    - Simple: ``<tool>value</tool>`` → ``{display_arg: "value"}``
-    - Multi-arg: ``<tool>key1=val1\\nkey2=val2...</tool>`` → ``{key1: val1, key2: val2}``
+    All tool tags use the format ``<tool>key=value</tool>``.  For multi-arg
+    tools the content has one ``key=value`` per line; the last key's value
+    spans all remaining lines (allowing multi-line content like file bodies
+    or code).
 
-    For the multi-arg format, the first ``key=`` on the first line triggers
-    multi-arg parsing.  The last key's value spans all remaining lines,
-    allowing multi-line content (e.g. file contents).
+    Only identifiers that match a known parameter name for the tool are
+    treated as keys — so ``result = 2 + 2`` inside Python code won't start
+    a new arg because ``result`` isn't a parameter of the ``python`` tool.
 
     Array-typed parameters (detected from the tool schema) are split on
     commas so ``categories=os,disk`` becomes ``["os", "disk"]``.
     """
     tool_def = TOOLS.get(name)
-    # Detect multi-arg format: first line is exactly "key=value" where key
-    # is a simple identifier (no spaces/dashes before the '=').
-    first_line = content.split("\n", 1)[0]
-    eq_pos = first_line.find("=")
-    if eq_pos > 0 and first_line[:eq_pos].isidentifier():
-        args: dict = {}
-        lines = content.split("\n")
-        current_key: str | None = None
-        current_lines: list[str] = []
-        for line in lines:
-            # Check if this line starts a new key=value pair
-            eq_pos = line.find("=")
-            if eq_pos > 0 and line[:eq_pos].isidentifier():
-                if current_key is not None:
-                    args[current_key] = "\n".join(current_lines)
-                current_key = line[:eq_pos]
-                current_lines = [line[eq_pos + 1:]]
-            elif current_key is not None:
-                current_lines.append(line)
-        if current_key is not None:
-            args[current_key] = "\n".join(current_lines)
+    param_names = set(tool_def.parameters.get("properties", {})) if tool_def else set()
 
-        # Convert array-typed parameters from comma-separated strings
-        if tool_def:
-            schema_props = tool_def.parameters.get("properties", {})
-            for key, val in args.items():
-                prop = schema_props.get(key, {})
-                if prop.get("type") == "array" and isinstance(val, str):
-                    args[key] = [v.strip() for v in val.split(",")]
-        return args
+    args: dict = {}
+    lines = content.split("\n")
+    current_key: str | None = None
+    current_lines: list[str] = []
+    for line in lines:
+        eq_pos = line.find("=")
+        candidate = line[:eq_pos] if eq_pos > 0 else ""
+        if candidate and candidate.isidentifier() and candidate in param_names:
+            if current_key is not None:
+                args[current_key] = "\n".join(current_lines)
+            current_key = candidate
+            current_lines = [line[eq_pos + 1:]]
+        elif current_key is not None:
+            current_lines.append(line)
+    if current_key is not None:
+        args[current_key] = "\n".join(current_lines)
 
-    # Simple single-arg format
-    arg_key = tool_def.display_arg if tool_def else "code"
-    return {arg_key: content}
+    # Convert array-typed parameters from comma-separated strings
+    if tool_def and args:
+        schema_props = tool_def.parameters.get("properties", {})
+        for key, val in args.items():
+            prop = schema_props.get(key, {})
+            if prop.get("type") == "array" and isinstance(val, str):
+                args[key] = [v.strip() for v in val.split(",")]
+
+    return args
 
 
 def _parse_tool_calls(text: str, start_id: int = 0) -> tuple[str, list[ToolCall]]:
