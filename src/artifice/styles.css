@@ -69,11 +69,6 @@ ArtificeTerminal .in-context {
     border-left: solid $primary;
 }
 
-ArtificeTerminal PinnedOutput {
-    height: auto;
-    max-height: 30vh;
-}
-
 ArtificeTerminal #status-line {
     height: 1;
 }
@@ -351,17 +346,4 @@ TerminalOutput {
     border: none;
     padding: 0;
     margin: 0;
-}
-
-PinnedOutput {
-    height: auto;
-    max-height: 30vh;
-    overflow-y: auto;
-    display: none;
-}
-
-PinnedOutput.has-pins {
-    display: block;
-    border-top: solid $accent;
-    padding-top: 1;
 }

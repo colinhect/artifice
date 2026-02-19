@@ -13,7 +13,6 @@ from .blocks import (
 )
 from .containers import (
     HighlightableContainerMixin,
-    PinnedOutput,
     TerminalOutput,
 )
 
@@ -25,7 +24,6 @@ __all__ = [
     "CodeInputBlock",
     "CodeOutputBlock",
     "HighlightableContainerMixin",
-    "PinnedOutput",
     "TerminalOutput",
     "ThinkingOutputBlock",
     "ToolCallBlock",

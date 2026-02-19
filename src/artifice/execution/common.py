@@ -24,13 +24,3 @@ class ExecutionResult:
     error: str = ""
     result_value: Any = None
     exception: Exception | None = None
-
-    @property
-    def is_complete(self) -> bool:
-        """Check if execution is complete."""
-        return self.status in (ExecutionStatus.SUCCESS, ExecutionStatus.ERROR)
-
-    @property
-    def is_success(self) -> bool:
-        """Check if execution was successful."""
-        return self.status == ExecutionStatus.SUCCESS

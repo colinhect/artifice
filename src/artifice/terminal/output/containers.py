@@ -5,7 +5,7 @@ from __future__ import annotations
 import pyperclip
 
 from textual.binding import Binding
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import VerticalScroll
 from textual.message import Message
 
 from ..input import InputTextArea
@@ -16,7 +16,6 @@ from .blocks import (
     CodeInputBlock,
     CodeOutputBlock,
     ToolCallBlock,
-    WidgetOutputBlock,
 )
 
 
@@ -84,13 +83,6 @@ class HighlightableContainerMixin:
 class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     """Container for REPL output blocks."""
 
-    class PinRequested(Message):
-        """Posted when the user wants to pin the highlighted widget block."""
-
-        def __init__(self, block: WidgetOutputBlock) -> None:
-            super().__init__()
-            self.block = block
-
     class BlockActivated(Message):
         """Posted when the user wants to copy a block to the input."""
 
@@ -130,10 +122,6 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         if scroll:
             self.scroll_end(animate=False)
         return block
-
-    def auto_scroll(self) -> None:
-        """Scroll to the bottom without animation."""
-        self.scroll_end(animate=False)
 
     def remove_block(self, block: BaseBlock) -> None:
         """Remove a block from the blocks list and the DOM."""
@@ -188,33 +176,6 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         if block and isinstance(block, (CodeOutputBlock, AgentOutputBlock)):
             block.toggle_markdown()
 
-    def action_cycle_language(self) -> None:
-        """Cycle the language of the highlighted CodeInputBlock (not ToolCallBlocks)."""
-        block = self.get_highlighted_block()
-        if (
-            block
-            and isinstance(block, CodeInputBlock)
-            and not isinstance(block, ToolCallBlock)
-        ):
-            block.cycle_language()
-
-    def action_pin_block(self) -> None:
-        """Pin the currently highlighted widget block."""
-        block = self.get_highlighted_block()
-        if not isinstance(block, WidgetOutputBlock):
-            return
-        previous_index = self._highlighted_index
-        self._blocks.remove(block)
-        # Adjust highlighted index after removal
-        if not self._blocks:
-            self._highlighted_index = None
-        elif self._highlighted_index is not None and self._highlighted_index >= len(
-            self._blocks
-        ):
-            self._highlighted_index = len(self._blocks) - 1
-        self._update_highlight(previous_index)
-        self.post_message(self.PinRequested(block))
-
     def action_highlight_previous(self) -> None:
         """Move highlight to previous output block."""
         self.highlight_previous()
@@ -268,67 +229,3 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
             # Fallback: highlight the last block if no CodeInputBlock found
             self._highlighted_index = len(self._blocks) - 1
             self._update_highlight()
-
-
-class PinnedOutput(HighlightableContainerMixin, Vertical):
-    """Container for pinned output blocks, displayed below the input."""
-
-    class UnpinRequested(Message):
-        """Posted when the user wants to unpin a block."""
-
-        def __init__(self, block: WidgetOutputBlock) -> None:
-            super().__init__()
-            self.block = block
-
-    BINDINGS = [
-        Binding("tab", "", "Move to Next", show=False),
-        Binding("up", "highlight_previous", "Previous Pin", show=True),
-        Binding("down", "highlight_next", "Next Pin", show=True),
-        Binding("ctrl+u", "unpin_block", "Unpin Block", show=True),
-    ]
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-
-    can_focus = True
-
-    async def add_pinned_block(self, block: WidgetOutputBlock) -> None:
-        self._blocks.append(block)
-        await self.mount(block)
-        await block.recompose()
-        self.add_class("has-pins")
-
-    async def remove_pinned_block(self, block: WidgetOutputBlock) -> None:
-        if block in self._blocks:
-            previous_index = self._highlighted_index
-            idx = self._blocks.index(block)
-            self._blocks.remove(block)
-            await block.remove()
-            # Adjust highlighted index
-            if not self._blocks:
-                self._highlighted_index = None
-                self.remove_class("has-pins")
-            elif self._highlighted_index is not None:
-                if idx <= self._highlighted_index:
-                    self._highlighted_index = max(0, self._highlighted_index - 1)
-                if self._highlighted_index >= len(self._blocks):
-                    self._highlighted_index = len(self._blocks) - 1
-            self._update_highlight(previous_index)
-
-    def action_highlight_previous(self) -> None:
-        self.highlight_previous()
-
-    def action_highlight_next(self) -> None:
-        if not self.highlight_next():
-            pass  # Already at end
-
-    def action_unpin_block(self) -> None:
-        block = self.get_highlighted_block()
-        if block:
-            self.post_message(self.UnpinRequested(block))
-
-    def on_focus(self) -> None:
-        if self._blocks:
-            previous_index = self._highlighted_index
-            self._highlighted_index = 0
-            self._update_highlight(previous_index)
