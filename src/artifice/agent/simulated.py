@@ -145,11 +145,7 @@ The answer is 4. If you need more complex calculations, just let me know!\
 _RESP_SYSADMIN = """\
 Let me check a few things about the system state.
 
-<shell>df -h</shell>
-
-<shell>free -m</shell>
-
-Those will tell us about disk and memory usage. For a more complete picture, we can also look at running processes:
+<system_info>os, disk</system_info>
 
 <shell>ps aux --sort=-%mem | head -10</shell>
 
@@ -217,6 +213,66 @@ print(fibonacci(10))
 That covers the basics. Markdown is expressive enough for most documentation needs without being overwhelming.\
 """
 
+_RESP_READ_FILE = """\
+Let me read the file and see what we're working with.
+
+<read_file>src/main.py</read_file>
+
+I'll take a look at the contents and walk you through the key parts once it loads.\
+"""
+
+_RESP_WRITE_FILE = """\
+I'll create that file for you now.
+
+<write_file>output/results.txt</write_file>
+
+The file has been written. Let me verify it looks correct:
+
+<read_file>output/results.txt</read_file>
+
+Everything looks good. Let me know if you need any changes.\
+"""
+
+_RESP_FILE_SEARCH = """\
+Let me find those files for you.
+
+<file_search>**/*.py</file_search>
+
+That will locate all Python files in the project. If you need to narrow it down, I can also search for specific patterns:
+
+<file_search>**/test_*.py</file_search>
+
+Once we see the results, I can help you navigate to the right file.\
+"""
+
+_RESP_WEB_SEARCH = """\
+Let me search for that information.
+
+<web_search>python asyncio best practices 2025</web_search>
+
+I'll summarize the key findings once the results come back. In the meantime, here are some general tips:
+
+- Use `asyncio.TaskGroup` for structured concurrency
+- Prefer `async with` for resource management
+- Avoid blocking calls in async functions
+
+Let me know if you want me to dig deeper into any specific topic.\
+"""
+
+_RESP_WEB_FETCH = """\
+Let me grab that page for you.
+
+<web_fetch>https://docs.python.org/3/library/asyncio.html</web_fetch>
+
+I'll pull out the most relevant sections once the content loads. The asyncio documentation covers:
+
+1. **High-level API** — tasks, streams, synchronization
+2. **Low-level API** — event loops, transports, protocols
+3. **Policies** — customizing the event loop
+
+Want me to focus on any particular section?\
+"""
+
 _DEFAULT_SCENARIOS: list[dict] = [
     {
         "pattern": r"structure|layout|project|files",
@@ -253,6 +309,31 @@ _DEFAULT_SCENARIOS: list[dict] = [
         "response": _RESP_CALCULATE,
         "thinking": "The user wants me to perform a calculation. I'll use Python to compute the result.",
     },
+    {
+        "pattern": r"read|open|view|show|cat|contents",
+        "response": _RESP_READ_FILE,
+        "thinking": "The user wants to read a file. I'll use the read_file tool to fetch its contents.",
+    },
+    {
+        "pattern": r"write|create|save|output|generate file",
+        "response": _RESP_WRITE_FILE,
+        "thinking": "The user wants to create or write a file. I'll use write_file to create it, then verify with read_file.",
+    },
+    {
+        "pattern": r"find|search file|locate|glob|where",
+        "response": _RESP_FILE_SEARCH,
+        "thinking": "The user wants to find files in the project. I'll use file_search with glob patterns to locate them.",
+    },
+    {
+        "pattern": r"search|google|look up|research|web search",
+        "response": _RESP_WEB_SEARCH,
+        "thinking": "The user wants to search the web for information. I'll use web_search to find relevant results.",
+    },
+    {
+        "pattern": r"fetch|url|http|webpage|download|web page",
+        "response": _RESP_WEB_FETCH,
+        "thinking": "The user wants to fetch content from a URL. I'll use web_fetch to retrieve and summarize the page.",
+    },
 ]
 
 _DEFAULT_RESPONSE = (
@@ -262,7 +343,9 @@ _DEFAULT_RESPONSE = (
     "- **Data analysis** — loading, cleaning, and summarizing datasets\n"
     "- **Debugging** — tracking down errors and writing fixes\n"
     "- **Code review** — suggesting refactors and improvements\n"
-    "- **System admin** — checking disk, memory, and processes\n\n"
+    "- **System admin** — checking disk, memory, and system info\n"
+    "- **File operations** — reading, writing, and searching for files\n"
+    "- **Web research** — searching the web and fetching page content\n\n"
     "Just describe what you're working on and I'll dive in."
 )
 
