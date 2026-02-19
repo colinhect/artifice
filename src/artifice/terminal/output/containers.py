@@ -126,12 +126,12 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         self._blocks.append(block)
         self.mount(block)
         if scroll:
-            self.scroll_end(animate=False)
+            self.scroll_end(animate=True)
         return block
 
     def auto_scroll(self) -> None:
         """Scroll to the bottom without animation."""
-        self.scroll_end(animate=False)
+        self.scroll_end(animate=True)
 
     def remove_block(self, block: BaseBlock) -> None:
         """Remove a block from the blocks list and the DOM."""

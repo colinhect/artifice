@@ -270,7 +270,7 @@ class ArtificeTerminal(Widget):
             self._apply_agent_response(detector, response)
         self._stream.current_detector = None
         # Scroll after finalization — Markdown widgets may have changed content height
-        self.call_after_refresh(lambda: self.output.scroll_end(animate=False))
+        self.call_after_refresh(lambda: self.output.scroll_end(animate=True))
 
         # Create ToolCallBlocks directly for native tool calls
         if response.tool_calls:

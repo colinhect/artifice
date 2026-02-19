@@ -48,7 +48,7 @@ class OutputCallbackHandler:
         self._flush_scheduled = False
         if self._block:
             self._block.flush()
-            self._output.scroll_end(animate=False)
+            self._output.scroll_end(animate=True)
 
     def on_output(self, text: str) -> None:
         """Handle stdout text from execution."""

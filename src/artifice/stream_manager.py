@@ -85,7 +85,7 @@ class StreamManager:
     def _do_scroll(self) -> None:
         """Execute the debounced scroll."""
         self._scroll_scheduled = False
-        self._output.scroll_end(animate=False)
+        self._output.scroll_end(animate=True)
 
     def _drain_chunks(self, text: str) -> None:
         """Process all accumulated chunks in the buffer at once."""

@@ -103,7 +103,7 @@ class FakeOutput:
             self._blocks.remove(block)
         block.remove()
 
-    def scroll_end(self, animate=False):
+    def scroll_end(self, animate=True):
         pass
 
 
