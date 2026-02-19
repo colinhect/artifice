@@ -1,0 +1,36 @@
+# Example Artifice Configuration File (YAML)
+# 
+# Copy this file to ~/.config/artifice/init.yaml and customize as needed
+
+# System Prompt
+system_prompt: ""
+prompt_prefix: ""
+
+# TMUX integration
+tmux_target: "session:window.pane"
+tmux_prompt_pattern: '^\S+@\S+:\S+\$ '
+
+# Agent Configuration
+agent: "minimax"
+agents:
+  minimax:
+    api_key: "..."
+    provider: "openai"
+    model: "MiniMaxAI/MiniMax-M2.5"
+    base_url: "https://router.huggingface.co/v1"
+    context_window: 200000
+    tools:
+      - "*"  # Enable all tools (supports fnmatch wildcards: "web_*", "python", etc.)
+
+# Show/hide tool call output (the result blocks after tool execution)
+# When false, output is still sent to the agent but hidden from the UI
+show_tool_output: true
+
+# Auto-send execution results to the agent
+# When True, code execution results are automatically sent to the AI agent
+auto_send_to_agent: true
+
+# Display Settings
+agent_markdown: true
+python_markdown: false
+shell_markdown: false

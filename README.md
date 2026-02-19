@@ -1,6 +1,6 @@
 # Artifice
 
-A minimal and transparent AI agent harness with a terminal user interface. Provides direct control over model interactions, code execution, and shell commands—without complex frameworks or abstractions. Built with [Textual](https://github.com/Textualize/textual).
+A minimal and transparent AI agent harness with a terminal user interface built with [Textual](https://github.com/Textualize/textual).
 
 Artifice provides a unified interface for both building precise prompts and running full agentic flows, with support for any LLM provider through [any-llm](https://github.com/mlamina/any-llm).
 
@@ -72,7 +72,7 @@ Artifice has three input modes. Switch modes by typing a special character when 
 
 ## Configuration
 
-Copy `init.yaml.example` to `~/.config/artifice/init.yaml` and customize. Key settings:
+Copy `config/init.yaml` to `~/.config/artifice/init.yaml` and customize. Key settings:
 
 - **agent** - Select which LLM agent to use
 - **agents** - Define agents with provider, model, API key, and tool access
@@ -80,7 +80,7 @@ Copy `init.yaml.example` to `~/.config/artifice/init.yaml` and customize. Key se
 - **tmux_target** - Target tmux pane for shell command execution (e.g. `session:window.pane`)
 - **auto_send_to_agent** - Automatically send execution results back to the agent
 
-See `init.yaml.example` for the full list of options.
+See `config/init.yaml` for the full list of options.
 
 ### Running from Source
 
