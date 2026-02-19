@@ -6,11 +6,13 @@
 system_prompt: ""
 prompt_prefix: ""
 
+# TMUX integration
+tmux_target: "session:window.pane"
+tmux_prompt_pattern: '^\S+@\S+:\S+\$ '
+
 # Agent Configuration
 agent: "minimax"
 agents:
-
-  # Huggingface models
   minimax:
     api_key: "..."
     provider: "openai"
@@ -19,16 +21,6 @@ agents:
     context_window: 200000
     tools:
       - "*"  # Enable all tools (supports fnmatch wildcards: "web_*", "python", etc.)
-
-  # Ollama models (run locally via https://ollama.com)
-  llama3:
-    provider: "openai"
-    model: "llama3.1"
-    base_url: "http://localhost:11434/v1"
-    api_key: "ollama"  # Ollama doesn't require a real key, but the field is needed
-    context_window: 128000
-    tools:
-      - "*"
 
 # Show/hide tool call output (the result blocks after tool execution)
 # When false, output is still sent to the agent but hidden from the UI
@@ -42,7 +34,3 @@ auto_send_to_agent: true
 agent_markdown: true
 python_markdown: false
 shell_markdown: false
-
-# TMUX integration
-tmux_target: "session:window.pane"
-tmux_prompt_pattern: '^\S+@\S+:\S+\$ '

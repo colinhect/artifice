@@ -63,6 +63,7 @@ ArtificeTerminal TerminalInput.in-context {
 
 ArtificeTerminal .highlighted > Horizontal > .status-indicator {
     background: $surface-lighten-2;
+    transition: background 0.15s;
 }
 
 ArtificeTerminal .in-context {
