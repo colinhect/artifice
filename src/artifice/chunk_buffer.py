@@ -44,7 +44,7 @@ class ChunkBuffer:
 
     def _schedule_delayed_flush(self, delay: float) -> None:
         """Schedule a flush after the specified delay."""
-        asyncio.get_event_loop().call_later(delay, self._flush)
+        asyncio.get_running_loop().call_later(delay, self._flush)
 
     def pause(self) -> None:
         """Pause draining - buffer keeps accumulating but won't flush."""

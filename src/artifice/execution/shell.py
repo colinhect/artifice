@@ -6,7 +6,7 @@ import re
 import tempfile
 import traceback
 
-from typing import Callable, Optional
+from typing import Callable
 
 from .common import ExecutionStatus, ExecutionResult
 
@@ -27,8 +27,8 @@ class ShellExecutor:
     async def execute(
         self,
         command: str,
-        on_output: Optional[Callable[[str], None]] = None,
-        on_error: Optional[Callable[[str], None]] = None,
+        on_output: Callable[[str], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
     ) -> ExecutionResult:
         """Execute a shell command asynchronously with streaming output.
 
@@ -45,8 +45,8 @@ class ShellExecutor:
     async def _execute_simple(
         self,
         command: str,
-        on_output: Optional[Callable[[str], None]] = None,
-        on_error: Optional[Callable[[str], None]] = None,
+        on_output: Callable[[str], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
     ) -> ExecutionResult:
         result = ExecutionResult(code=command, status=ExecutionStatus.RUNNING)
         process = None
@@ -57,7 +57,6 @@ class ShellExecutor:
                 command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                # cwd=self.working_directory,
             )
 
             # Collect output
@@ -185,9 +184,9 @@ class TmuxShellExecutor:
     async def execute(
         self,
         command: str,
-        on_output: Optional[Callable[[str], None]] = None,
-        on_error: Optional[Callable[[str], None]] = None,
-        timeout: Optional[float] = None,
+        on_output: Callable[[str], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
+        timeout: float | None = None,
     ) -> ExecutionResult:
         """Execute a command in the tmux target with streaming output.
 

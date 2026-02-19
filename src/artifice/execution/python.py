@@ -3,11 +3,10 @@ from __future__ import annotations
 import asyncio
 import sys
 import threading
-import time
 import traceback
 from io import StringIO
 from queue import Queue
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from .common import ExecutionStatus, ExecutionResult
 
@@ -58,8 +57,8 @@ class CodeExecutor:
     async def execute(
         self,
         code: str,
-        on_output: Optional[Callable[[str], None]] = None,
-        on_error: Optional[Callable[[str], None]] = None,
+        on_output: Callable[[str], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
     ) -> ExecutionResult:
         """Execute Python code asynchronously with streaming output.
 
@@ -84,8 +83,6 @@ class CodeExecutor:
             exec_task = loop.run_in_executor(
                 None, self._execute_sync, code, output_queue
             )
-
-            # Poll the queue for output while execution runs
             try:
                 while not exec_task.done():
                     # Process any queued output
@@ -135,9 +132,7 @@ class CodeExecutor:
 
         return result
 
-    def _execute_sync(
-        self, code: str, output_queue: Queue, debounce: bool = False
-    ) -> tuple[Any, str, str]:
+    def _execute_sync(self, code: str, output_queue: Queue) -> tuple[Any, str, str]:
         """Execute code synchronously (called in thread pool)."""
         with self._exec_lock:
             old_stdout, old_stderr = sys.stdout, sys.stderr
@@ -163,26 +158,6 @@ class CodeExecutor:
                         # Error during exec - re-raise without showing the eval attempt
                         raise exec_error from None
 
-                if debounce:
-                    # Keep streams captured for debounce period to catch delayed output
-                    debounce_period = 3.0
-                    start_time = time.time()
-                    last_output_time = start_time
-
-                    while time.time() - last_output_time < debounce_period:
-                        # Check if there's been any new output
-                        current_size = len(captured_stdout.getvalue()) + len(
-                            captured_stderr.getvalue()
-                        )
-                        time.sleep(0.1)  # Brief sleep to avoid busy-waiting
-                        new_size = len(captured_stdout.getvalue()) + len(
-                            captured_stderr.getvalue()
-                        )
-
-                        if new_size > current_size:
-                            # New output detected, reset the debounce timer
-                            last_output_time = time.time()
-
                 return (
                     result_value,
                     captured_stdout.getvalue(),
@@ -191,7 +166,6 @@ class CodeExecutor:
             except Exception as e:
                 # Any error - capture traceback in stderr
                 captured_stderr.write(str(e))
-                # traceback.print_exc(file=captured_stderr)
                 return None, captured_stdout.getvalue(), captured_stderr.getvalue()
             finally:
                 sys.stdout, sys.stderr = old_stdout, old_stderr

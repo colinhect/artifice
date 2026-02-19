@@ -71,6 +71,23 @@ class History:
 
         self._current_input[mode] = ""
 
+    def _get_history_and_index(self, mode: str) -> tuple[list[str], int]:
+        """Get the history list and current index for a mode."""
+        if mode == "ai":
+            return self._ai_history, self._ai_history_index
+        elif mode == "shell":
+            return self._shell_history, self._shell_history_index
+        return self._python_history, self._python_history_index
+
+    def _set_history_index(self, mode: str, index: int) -> None:
+        """Set the history index for a mode."""
+        if mode == "ai":
+            self._ai_history_index = index
+        elif mode == "shell":
+            self._shell_history_index = index
+        else:
+            self._python_history_index = index
+
     def navigate_back(self, mode: str, current_input: str) -> str | None:
         """Navigate to previous history entry.
 
@@ -81,16 +98,7 @@ class History:
         Returns:
             The history entry to display, or None if at beginning.
         """
-        # Determine which history to use
-        if mode == "ai":
-            history = self._ai_history
-            history_index = self._ai_history_index
-        elif mode == "shell":
-            history = self._shell_history
-            history_index = self._shell_history_index
-        else:
-            history = self._python_history
-            history_index = self._python_history_index
+        history, history_index = self._get_history_and_index(mode)
 
         if not history:
             return None
@@ -107,14 +115,7 @@ class History:
         else:
             result = None
 
-        # Update the appropriate history index
-        if mode == "ai":
-            self._ai_history_index = history_index
-        elif mode == "shell":
-            self._shell_history_index = history_index
-        else:
-            self._python_history_index = history_index
-
+        self._set_history_index(mode, history_index)
         return result
 
     def navigate_forward(self, mode: str) -> str | None:
@@ -127,16 +128,7 @@ class History:
             The history entry to display, or the original saved input if at end.
             Returns None if not currently browsing history.
         """
-        # Determine which history to use
-        if mode == "ai":
-            history = self._ai_history
-            history_index = self._ai_history_index
-        elif mode == "shell":
-            history = self._shell_history
-            history_index = self._shell_history_index
-        else:
-            history = self._python_history
-            history_index = self._python_history_index
+        history, history_index = self._get_history_and_index(mode)
 
         if history_index == -1:
             return None  # Not browsing history
@@ -151,14 +143,7 @@ class History:
             result = self._current_input[mode]
             self._current_input[mode] = ""
 
-        # Update the appropriate history index
-        if mode == "ai":
-            self._ai_history_index = history_index
-        elif mode == "shell":
-            self._shell_history_index = history_index
-        else:
-            self._python_history_index = history_index
-
+        self._set_history_index(mode, history_index)
         return result
 
     def clear(self) -> None:

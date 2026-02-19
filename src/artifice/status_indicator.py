@@ -43,9 +43,9 @@ class StatusIndicatorManager:
         if self._config.agents:
             agent = self._config.agents.get(self._config.agent)
             if agent:
-                status = (
-                    f"{agent.get('model').lower()} ({agent.get('provider').lower()})"
-                )
+                model = agent.get("model", "unknown")
+                provider = agent.get("provider", "unknown")
+                status = f"{model.lower()} ({provider.lower()})"
                 if usage:
                     context_window = agent.get("context_window")
                     if context_window and usage.input_tokens:

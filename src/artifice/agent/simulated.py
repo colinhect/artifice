@@ -273,6 +273,24 @@ _DEFAULT_THINKING = (
 _TOOL_TAG_RE = re.compile(r"<(python|shell)>(.*?)</(python|shell)>", re.DOTALL)
 
 
+async def _stream_text(
+    text: str,
+    on_chunk: Callable | None,
+    delay: float,
+) -> None:
+    """Stream text character by character with optional delay."""
+    if on_chunk and delay > 0:
+        for ch in text:
+            on_chunk(ch)
+            await asyncio.sleep(delay)
+    elif on_chunk:
+        if text:
+            on_chunk(text)
+        await asyncio.sleep(0)
+    else:
+        await asyncio.sleep(0)
+
+
 def _parse_tool_calls(text: str, start_id: int = 0) -> tuple[str, list[ToolCall]]:
     """Extract <python>/<shell> XML tags from text, return prose + ToolCall list."""
     tool_calls: list[ToolCall] = []
@@ -324,7 +342,6 @@ class SimulatedAgent:
         self.default_thinking: str | None = _DEFAULT_THINKING
 
     def configure_defaults(self):
-        self.scenarios = []
         self.scenarios = list(_DEFAULT_SCENARIOS)
         self.default_response = _DEFAULT_RESPONSE
         self.default_thinking = _DEFAULT_THINKING
@@ -390,31 +407,14 @@ class SimulatedAgent:
 
         # Stream thinking
         if thinking_text:
-            if on_thinking_chunk and self.response_delay > 0:
-                for ch in thinking_text:
-                    on_thinking_chunk(ch)
-                    await asyncio.sleep(self.response_delay)
-            elif on_thinking_chunk:
-                on_thinking_chunk(thinking_text)
-                await asyncio.sleep(0)
-            else:
-                await asyncio.sleep(0)
+            await _stream_text(thinking_text, on_thinking_chunk, self.response_delay)
 
         # Parse tool calls from response text
         prose, tool_calls = _parse_tool_calls(response_text, start_id=self._tc_counter)
         self._tc_counter += len(tool_calls)
 
         # Stream prose text (without the tool call XML)
-        if on_chunk and self.response_delay > 0:
-            for ch in prose:
-                on_chunk(ch)
-                await asyncio.sleep(self.response_delay)
-        elif on_chunk:
-            if prose:
-                on_chunk(prose)
-            await asyncio.sleep(0)
-        else:
-            await asyncio.sleep(0)
+        await _stream_text(prose, on_chunk, self.response_delay)
 
         # Update history
         if prose:
@@ -485,29 +485,13 @@ class ScriptedAgent(SimulatedAgent):
         response_text = scenario["response"]
         thinking_text = scenario.get("thinking")
 
-        if thinking_text and on_thinking_chunk:
-            if self.response_delay > 0:
-                for ch in thinking_text:
-                    on_thinking_chunk(ch)
-                    await asyncio.sleep(self.response_delay)
-            else:
-                on_thinking_chunk(thinking_text)
-                await asyncio.sleep(0)
+        if thinking_text:
+            await _stream_text(thinking_text, on_thinking_chunk, self.response_delay)
 
         prose, tool_calls = _parse_tool_calls(response_text, start_id=self._tc_counter)
         self._tc_counter += len(tool_calls)
 
-        if on_chunk:
-            if self.response_delay > 0:
-                for ch in prose:
-                    on_chunk(ch)
-                    await asyncio.sleep(self.response_delay)
-            else:
-                if prose:
-                    on_chunk(prose)
-                await asyncio.sleep(0)
-        else:
-            await asyncio.sleep(0)
+        await _stream_text(prose, on_chunk, self.response_delay)
 
         if prose:
             self.messages.append({"role": "assistant", "content": prose})
@@ -542,25 +526,12 @@ class EchoAgent(SimulatedAgent):
     ) -> AgentResponse:
         response_text = f"{self.prefix}{prompt}"
 
-        if self.echo_thinking and on_thinking_chunk:
-            if self.response_delay > 0:
-                for ch in self.echo_thinking:
-                    on_thinking_chunk(ch)
-                    await asyncio.sleep(self.response_delay)
-            else:
-                on_thinking_chunk(self.echo_thinking)
-                await asyncio.sleep(0)
+        if self.echo_thinking:
+            await _stream_text(
+                self.echo_thinking, on_thinking_chunk, self.response_delay
+            )
 
-        if on_chunk:
-            if self.response_delay > 0:
-                for ch in response_text:
-                    on_chunk(ch)
-                    await asyncio.sleep(self.response_delay)
-            else:
-                on_chunk(response_text)
-                await asyncio.sleep(0)
-        else:
-            await asyncio.sleep(0)
+        await _stream_text(response_text, on_chunk, self.response_delay)
 
         if prompt.strip():
             self.messages.append({"role": "user", "content": prompt})

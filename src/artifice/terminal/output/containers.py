@@ -108,12 +108,6 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         Binding("ctrl+c", "activate_block", "Copy as Input", show=True),
         Binding("enter", "execute_block", "Execute", show=True),
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown", show=True),
-        # Binding("ctrl+u", "pin_block", "Pin Block", show=True),
-        # Binding("insert", "cycle_language", "Mode", show=True),
-        # *[
-        #    Binding(str(n), f"run_numbered('{n}')", f"Run #{n}", show=False)
-        #    for n in range(1, 10)
-        # ],
     ]
 
     def __init__(
