@@ -414,7 +414,7 @@ def _parse_tag_args(name: str, content: str) -> dict:
             if current_key is not None:
                 args[current_key] = "\n".join(current_lines)
             current_key = candidate
-            current_lines = [line[eq_pos + 1:]]
+            current_lines = [line[eq_pos + 1 :]]
         elif current_key is not None:
             current_lines.append(line)
     if current_key is not None:
@@ -441,9 +441,7 @@ def _parse_tool_calls(text: str, start_id: int = 0) -> tuple[str, list[ToolCall]
         name = m.group(1)
         content = m.group(2).strip()
         args = _parse_tag_args(name, content)
-        tool_calls.append(
-            ToolCall(id=f"sim_{tc_id}", name=name, args=args)
-        )
+        tool_calls.append(ToolCall(id=f"sim_{tc_id}", name=name, args=args))
         tc_id += 1
         return ""
 
