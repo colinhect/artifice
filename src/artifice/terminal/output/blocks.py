@@ -131,7 +131,7 @@ class BufferedOutputBlock(BaseBlock):
             return
         self._dirty = False
         if self._output:
-            self._output.update(self._output_str.strip())
+            self._output.update(self._output_str)
 
     def toggle_markdown(self) -> None:
         self._render_markdown = not self._render_markdown
@@ -257,14 +257,21 @@ class AgentOutputBlock(BufferedOutputBlock):
         self._dirty = True
 
     def _switch_to_markdown(self) -> None:
-        """Replace the Static widget with a Markdown widget (called once on finalization)."""
+        """Hide Static and mount Markdown (called once on finalization).
+
+        The Static is kept in the DOM (hidden via display) so that
+        toggle_markdown can swap back without remove/mount cycles.
+        """
         if self._output:
-            self._output.remove()
-            self._output = None
-        self._markdown = Markdown(
-            self._output_str.strip(), classes=self._MARKDOWN_CSS_CLASS
-        )
-        self._contents.mount(self._markdown)
+            self._output.display = False
+        if self._markdown is not None:
+            # Already mounted (e.g. toggle created it) — just show it
+            self._markdown.display = True
+        else:
+            self._markdown = Markdown(
+                self._output_str.strip(), classes=self._MARKDOWN_CSS_CLASS
+            )
+            self._contents.mount(self._markdown)
 
     def finalize_streaming(self) -> None:
         """End streaming: flush any remaining text, then swap to Markdown if enabled."""
@@ -275,6 +282,33 @@ class AgentOutputBlock(BufferedOutputBlock):
             self.flush()
         if self._render_markdown:
             self._switch_to_markdown()
+
+    def toggle_markdown(self) -> None:
+        """Toggle markdown rendering using CSS display swaps when possible."""
+        self._render_markdown = not self._render_markdown
+        if self._render_markdown:
+            if self._markdown is not None:
+                # Both widgets exist — pure CSS swap
+                if self._output:
+                    self._output.display = False
+                self._markdown.display = True
+            else:
+                # First toggle-on: need to create and mount Markdown
+                if self._output:
+                    self._output.display = False
+                self._markdown = Markdown(
+                    self._output_str, classes=self._MARKDOWN_CSS_CLASS
+                )
+                self._contents.mount(self._markdown)
+        else:
+            if self._output:
+                # Both widgets exist — pure CSS swap
+                if self._markdown:
+                    self._markdown.display = False
+                self._output.display = True
+            else:
+                # Shouldn't happen, but fall back to parent
+                super().toggle_markdown()
 
     def mark_success(self) -> None:
         self._status_indicator.styles.display = "block"
