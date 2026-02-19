@@ -145,7 +145,7 @@ The answer is 4. If you need more complex calculations, just let me know!\
 _RESP_SYSADMIN = """\
 Let me check a few things about the system state.
 
-<system_info>os, disk</system_info>
+<system_info>categories=os,disk</system_info>
 
 <shell>ps aux --sort=-%mem | head -10</shell>
 
@@ -224,7 +224,14 @@ I'll take a look at the contents and walk you through the key parts once it load
 _RESP_WRITE_FILE = """\
 I'll create that file for you now.
 
-<write_file>output/results.txt</write_file>
+<write_file>path=output/results.txt
+content=# Analysis Results
+
+Summary of findings:
+- Total records processed: 1,247
+- Valid entries: 1,198 (96.1%)
+- Anomalies detected: 49 (3.9%)
+</write_file>
 
 The file has been written. Let me verify it looks correct:
 
@@ -382,6 +389,57 @@ async def _stream_text(
         await asyncio.sleep(0)
 
 
+def _parse_tag_args(name: str, content: str) -> dict:
+    """Parse tag content into tool call args.
+
+    Supports two formats:
+    - Simple: ``<tool>value</tool>`` → ``{display_arg: "value"}``
+    - Multi-arg: ``<tool>key1=val1\\nkey2=val2...</tool>`` → ``{key1: val1, key2: val2}``
+
+    For the multi-arg format, the first ``key=`` on the first line triggers
+    multi-arg parsing.  The last key's value spans all remaining lines,
+    allowing multi-line content (e.g. file contents).
+
+    Array-typed parameters (detected from the tool schema) are split on
+    commas so ``categories=os,disk`` becomes ``["os", "disk"]``.
+    """
+    tool_def = TOOLS.get(name)
+    # Detect multi-arg format: first line is exactly "key=value" where key
+    # is a simple identifier (no spaces/dashes before the '=').
+    first_line = content.split("\n", 1)[0]
+    eq_pos = first_line.find("=")
+    if eq_pos > 0 and first_line[:eq_pos].isidentifier():
+        args: dict = {}
+        lines = content.split("\n")
+        current_key: str | None = None
+        current_lines: list[str] = []
+        for line in lines:
+            # Check if this line starts a new key=value pair
+            eq_pos = line.find("=")
+            if eq_pos > 0 and line[:eq_pos].isidentifier():
+                if current_key is not None:
+                    args[current_key] = "\n".join(current_lines)
+                current_key = line[:eq_pos]
+                current_lines = [line[eq_pos + 1:]]
+            elif current_key is not None:
+                current_lines.append(line)
+        if current_key is not None:
+            args[current_key] = "\n".join(current_lines)
+
+        # Convert array-typed parameters from comma-separated strings
+        if tool_def:
+            schema_props = tool_def.parameters.get("properties", {})
+            for key, val in args.items():
+                prop = schema_props.get(key, {})
+                if prop.get("type") == "array" and isinstance(val, str):
+                    args[key] = [v.strip() for v in val.split(",")]
+        return args
+
+    # Simple single-arg format
+    arg_key = tool_def.display_arg if tool_def else "code"
+    return {arg_key: content}
+
+
 def _parse_tool_calls(text: str, start_id: int = 0) -> tuple[str, list[ToolCall]]:
     """Extract tool XML tags from text, return prose + ToolCall list."""
     tool_calls: list[ToolCall] = []
@@ -391,10 +449,9 @@ def _parse_tool_calls(text: str, start_id: int = 0) -> tuple[str, list[ToolCall]
         nonlocal tc_id
         name = m.group(1)
         content = m.group(2).strip()
-        tool_def = TOOLS.get(name)
-        arg_key = tool_def.display_arg if tool_def else "code"
+        args = _parse_tag_args(name, content)
         tool_calls.append(
-            ToolCall(id=f"sim_{tc_id}", name=name, args={arg_key: content})
+            ToolCall(id=f"sim_{tc_id}", name=name, args=args)
         )
         tc_id += 1
         return ""
