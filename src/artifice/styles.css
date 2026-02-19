@@ -63,6 +63,7 @@ ArtificeTerminal TerminalInput.in-context {
 
 ArtificeTerminal .highlighted > Horizontal > .status-indicator {
     background: $surface-lighten-2;
+    transition: background 0.15s;
 }
 
 ArtificeTerminal .in-context {
@@ -151,6 +152,7 @@ TerminalInput TextArea {
     padding: 0 !important;
     margin: 0 !important;
     background: $background-darken-3;
+    transition: background 0.15s;
 }
 
 TerminalInput TextArea:focus {
@@ -187,6 +189,7 @@ BaseBlock {
     margin: 0 0 1 0;
     padding: 0;
     padding-left: 1;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 BaseBlock.in-context {
@@ -194,6 +197,7 @@ BaseBlock.in-context {
     border-left: solid $primary;
     margin-bottom: 0;
     padding-bottom: 1;
+    transition: border-color 0.2s, background 0.15s;
 }
 
 BaseBlock Horizontal {
@@ -230,10 +234,12 @@ BaseBlock .status-indicator LoadingIndicator {
 
 BaseBlock .status-success {
     color: $primary;
+    transition: color 0.15s;
 }
 
 BaseBlock .status-error {
     color: $error;
+    transition: color 0.15s;
 }
 
 BaseBlock .status-unexecuted {
@@ -264,6 +270,7 @@ CodeOutputBlock {
 
 CodeOutputBlock.hide-tool-output {
     display: none;
+    transition: opacity 0.1s;
 }
 
 CodeOutputBlock .code-output {
@@ -333,6 +340,7 @@ AgentOutputBlock .text-output {
 ThinkingOutputBlock {
     color: $foreground 60%;
     border-left: solid $primary;
+    transition: color 0.15s, border-color 0.15s;
 }
 
 TerminalOutput {

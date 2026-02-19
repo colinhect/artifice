@@ -85,7 +85,7 @@ class StreamManager:
     def _do_scroll(self) -> None:
         """Execute the debounced scroll."""
         self._scroll_scheduled = False
-        self._output.scroll_end(animate=True)
+        self._output.scroll_end(animate=False)
 
     def _drain_chunks(self, text: str) -> None:
         """Process all accumulated chunks in the buffer at once."""
@@ -137,6 +137,9 @@ class StreamManager:
         self._chunk_buf.flush_sync()
         if self._current_detector:
             self._current_detector.finish()
+
+        # Final scroll with animation after streaming completes
+        self._output.scroll_end(animate=True)
 
     def resume(self) -> None:
         """Resume streaming after a pause-on-code-block."""
