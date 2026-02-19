@@ -8,58 +8,14 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable
 
+from .tools import ToolCall, get_all_schemas
+
 if TYPE_CHECKING:
     from any_llm.types.completion import ChatCompletionChunk
     from typing import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
-_PYTHON_TOOL: dict = {
-    "type": "function",
-    "function": {
-        "name": "python",
-        "description": "Execute Python code in the user's REPL session.",
-        "parameters": {
-            "type": "object",
-            "required": ["code"],
-            "properties": {"code": {"type": "string"}},
-        },
-    },
-}
-
-_SHELL_TOOL: dict = {
-    "type": "function",
-    "function": {
-        "name": "shell",
-        "description": "Execute a shell command in the user's terminal session.",
-        "parameters": {
-            "type": "object",
-            "required": ["command"],
-            "properties": {"command": {"type": "string"}},
-        },
-    },
-}
-
-_ALL_TOOLS = [_PYTHON_TOOL, _SHELL_TOOL]
-
-
-@dataclass
-class ToolCall:
-    """A tool call requested by the model."""
-
-    id: str
-    name: str  # "python" or "shell"
-    args: dict  # {"code": "..."} or {"command": "..."}
-
-    @property
-    def code(self) -> str:
-        """Return the code/command string."""
-        return self.args.get("code") or self.args.get("command", "")
-
-    @property
-    def language(self) -> str:
-        """Return 'python' or 'bash'."""
-        return "bash" if self.name == "shell" else "python"
 
 
 @dataclass
@@ -136,7 +92,7 @@ class Agent:
         if self._base_url is not None:
             kwargs["api_base"] = self._base_url
         if self.use_tools:
-            kwargs["tools"] = _ALL_TOOLS
+            kwargs["tools"] = get_all_schemas()
             kwargs["tool_choice"] = "auto"
 
         try:

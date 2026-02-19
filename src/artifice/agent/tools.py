@@ -1,0 +1,167 @@
+"""Tool definitions and registry for agent tool calls."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+@dataclass
+class ToolCall:
+    """A tool call requested by the model."""
+
+    id: str
+    name: str
+    args: dict
+
+    @property
+    def display_text(self) -> str:
+        """Return the primary text to display (code, path, query, etc.)."""
+        tool_def = TOOLS.get(self.name)
+        if tool_def:
+            return self.args.get(tool_def.display_arg, str(self.args))
+        return str(self.args)
+
+    @property
+    def display_language(self) -> str:
+        """Return syntax highlighting language."""
+        tool_def = TOOLS.get(self.name)
+        return tool_def.display_language if tool_def else "text"
+
+@dataclass
+class ToolDef:
+    """Self-contained definition of a tool available to the agent."""
+
+    name: str
+    description: str
+    parameters: dict
+    display_language: str
+    display_arg: str
+
+    def to_schema(self) -> dict:
+        """Serialize to OpenAI function-call format."""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self.parameters,
+            },
+        }
+
+
+TOOLS: dict[str, ToolDef] = {}
+
+
+def _register(tool: ToolDef) -> ToolDef:
+    TOOLS[tool.name] = tool
+    return tool
+
+
+# --- Implemented tools ---
+
+_register(ToolDef(
+    name="python",
+    description="Execute Python code in the user's REPL session.",
+    parameters={
+        "type": "object",
+        "required": ["code"],
+        "properties": {"code": {"type": "string"}},
+    },
+    display_language="python",
+    display_arg="code",
+))
+
+_register(ToolDef(
+    name="shell",
+    description="Execute a shell command in the user's terminal session.",
+    parameters={
+        "type": "object",
+        "required": ["command"],
+        "properties": {"command": {"type": "string"}},
+    },
+    display_language="bash",
+    display_arg="command",
+))
+
+# --- Stub tools (schemas defined, not wired to executors yet) ---
+
+_register(ToolDef(
+    name="read_file",
+    description="Read the contents of a file.",
+    parameters={
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+            "path": {"type": "string", "description": "Absolute or relative file path."},
+            "offset": {"type": "integer", "description": "Line number to start reading from (0-based)."},
+            "limit": {"type": "integer", "description": "Maximum number of lines to read."},
+        },
+    },
+    display_language="text",
+    display_arg="path",
+))
+
+_register(ToolDef(
+    name="write_file",
+    description="Write or create a file with the given content.",
+    parameters={
+        "type": "object",
+        "required": ["path", "content"],
+        "properties": {
+            "path": {"type": "string", "description": "Absolute or relative file path."},
+            "content": {"type": "string", "description": "Content to write to the file."},
+        },
+    },
+    display_language="text",
+    display_arg="path",
+))
+
+_register(ToolDef(
+    name="web_search",
+    description="Search the web for information.",
+    parameters={
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+            "query": {"type": "string", "description": "Search query."},
+        },
+    },
+    display_language="text",
+    display_arg="query",
+))
+
+_register(ToolDef(
+    name="web_fetch",
+    description="Fetch the contents of a URL.",
+    parameters={
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+            "url": {"type": "string", "description": "URL to fetch."},
+        },
+    },
+    display_language="text",
+    display_arg="url",
+))
+
+_register(ToolDef(
+    name="system_info",
+    description="Get system information.",
+    parameters={
+        "type": "object",
+        "required": ["categories"],
+        "properties": {
+            "categories": {
+                "type": "array",
+                "items": {"type": "string", "enum": ["os", "env", "cwd", "disk"]},
+                "description": "Categories of system info to retrieve.",
+            },
+        },
+    },
+    display_language="text",
+    display_arg="categories",
+))
+
+
+def get_all_schemas() -> list[dict]:
+    """Return OpenAI function-call schemas for all registered tools."""
+    return [tool.to_schema() for tool in TOOLS.values()]

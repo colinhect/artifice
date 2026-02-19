@@ -2,7 +2,8 @@
 
 import pytest
 
-from artifice.agent import SimulatedAgent
+from artifice.agent import SimulatedAgent, ToolCall, ToolDef, TOOLS
+from artifice.agent.tools import get_all_schemas
 
 
 @pytest.mark.asyncio
@@ -117,3 +118,80 @@ async def test_agent_tool_result():
         m.get("role") == "tool" and m.get("tool_call_id") == "call_123"
         for m in agent.messages
     )
+
+
+# --- Tool registry tests ---
+
+
+def test_tool_def_to_schema():
+    """Test that ToolDef.to_schema() produces valid OpenAI function-call format."""
+    tool = ToolDef(
+        name="test_tool",
+        description="A test tool.",
+        parameters={"type": "object", "required": ["x"], "properties": {"x": {"type": "string"}}},
+        display_language="python",
+        display_arg="x",
+    )
+    schema = tool.to_schema()
+    assert schema["type"] == "function"
+    assert schema["function"]["name"] == "test_tool"
+    assert schema["function"]["description"] == "A test tool."
+    assert schema["function"]["parameters"]["required"] == ["x"]
+
+
+def test_registry_contains_expected_tools():
+    """Test that TOOLS contains python and shell (and stubs)."""
+    assert "python" in TOOLS
+    assert "shell" in TOOLS
+    assert "read_file" in TOOLS
+    assert "write_file" in TOOLS
+    assert "web_search" in TOOLS
+    assert "web_fetch" in TOOLS
+    assert "system_info" in TOOLS
+
+
+def test_get_all_schemas_returns_valid_list():
+    """Test that get_all_schemas() returns a list of valid schemas."""
+    schemas = get_all_schemas()
+    assert isinstance(schemas, list)
+    assert len(schemas) == len(TOOLS)
+    for schema in schemas:
+        assert schema["type"] == "function"
+        assert "name" in schema["function"]
+        assert "description" in schema["function"]
+        assert "parameters" in schema["function"]
+
+
+def test_toolcall_display_text_python():
+    """Test ToolCall.display_text for python tool."""
+    tc = ToolCall(id="1", name="python", args={"code": "print('hi')"})
+    assert tc.display_text == "print('hi')"
+
+
+def test_toolcall_display_text_shell():
+    """Test ToolCall.display_text for shell tool."""
+    tc = ToolCall(id="2", name="shell", args={"command": "ls -la"})
+    assert tc.display_text == "ls -la"
+
+
+def test_toolcall_display_language():
+    """Test ToolCall.display_language for known tools."""
+    tc_py = ToolCall(id="1", name="python", args={"code": "x"})
+    assert tc_py.display_language == "python"
+
+    tc_sh = ToolCall(id="2", name="shell", args={"command": "ls"})
+    assert tc_sh.display_language == "bash"
+
+
+def test_toolcall_display_text_read_file():
+    """Test ToolCall.display_text for stub tools."""
+    tc = ToolCall(id="3", name="read_file", args={"path": "/tmp/foo.txt"})
+    assert tc.display_text == "/tmp/foo.txt"
+    assert tc.display_language == "text"
+
+
+def test_toolcall_unknown_tool():
+    """Test ToolCall behavior for an unregistered tool name."""
+    tc = ToolCall(id="99", name="unknown_tool", args={"foo": "bar"})
+    assert tc.display_text == str({"foo": "bar"})
+    assert tc.display_language == "text"

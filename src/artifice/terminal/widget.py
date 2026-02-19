@@ -280,8 +280,8 @@ class ArtificeTerminal(Widget):
                     tool_block = ToolCallBlock(
                         tool_call_id=tc.id,
                         name=tc.name,
-                        code=tc.code,
-                        language=tc.language,
+                        code=tc.display_text,
+                        language=tc.display_language,
                     )
                     self.output.append_block(tool_block)
                     self._mark_block_in_context(tool_block)

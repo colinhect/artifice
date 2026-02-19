@@ -100,6 +100,6 @@ async def test_simulated_agent_tool_calls():
 
     assert len(response.tool_calls) == 1
     assert response.tool_calls[0].name == "python"
-    assert "print('hi')" in response.tool_calls[0].code
+    assert "print('hi')" in response.tool_calls[0].display_text
     # Prose should not contain the XML tags
     assert "<python>" not in response.text

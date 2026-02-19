@@ -8,6 +8,7 @@ import logging
 from typing import Any, Callable
 
 from .agent import AgentResponse, ToolCall
+from .tools import TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +271,13 @@ _DEFAULT_THINKING = (
     "I should offer some guidance on what I can help with."
 )
 
-_TOOL_TAG_RE = re.compile(r"<(python|shell)>(.*?)</(python|shell)>", re.DOTALL)
+def _build_tool_tag_re() -> re.Pattern:
+    """Build regex matching XML tags for all registered tool names."""
+    names = "|".join(re.escape(name) for name in TOOLS)
+    return re.compile(rf"<({names})>(.*?)</({names})>", re.DOTALL)
+
+
+_TOOL_TAG_RE = _build_tool_tag_re()
 
 
 async def _stream_text(
@@ -292,17 +299,17 @@ async def _stream_text(
 
 
 def _parse_tool_calls(text: str, start_id: int = 0) -> tuple[str, list[ToolCall]]:
-    """Extract <python>/<shell> XML tags from text, return prose + ToolCall list."""
+    """Extract tool XML tags from text, return prose + ToolCall list."""
     tool_calls: list[ToolCall] = []
     tc_id = start_id
 
     def replace(m: re.Match) -> str:
         nonlocal tc_id
-        tag = m.group(1)
-        code = m.group(2).strip()
-        name = "python" if tag == "python" else "shell"
-        arg_key = "code" if name == "python" else "command"
-        tool_calls.append(ToolCall(id=f"sim_{tc_id}", name=name, args={arg_key: code}))
+        name = m.group(1)
+        content = m.group(2).strip()
+        tool_def = TOOLS.get(name)
+        arg_key = tool_def.display_arg if tool_def else "code"
+        tool_calls.append(ToolCall(id=f"sim_{tc_id}", name=name, args={arg_key: content}))
         tc_id += 1
         return ""
 
