@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Callable
 
 from .agent import Agent, AgentResponse, ToolCall
 from .simulated import EchoAgent, ScriptedAgent, SimulatedAgent
-from .tools import TOOLS, ToolDef
+from .tools import TOOLS, ToolDef, execute_tool_call
 
 if TYPE_CHECKING:
     from ..config import ArtificeConfig
@@ -22,6 +22,7 @@ __all__ = [
     "TOOLS",
     "ToolCall",
     "ToolDef",
+    "execute_tool_call",
 ]
 
 logger = logging.getLogger(__name__)

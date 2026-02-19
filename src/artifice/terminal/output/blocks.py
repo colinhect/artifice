@@ -325,11 +325,15 @@ class ThinkingOutputBlock(AgentOutputBlock):
 
 
 class ToolCallBlock(CodeInputBlock):
-    """Block for an AI-requested tool call (python or shell).
+    """Block for an AI-requested tool call.
 
     Created directly from AgentResponse.tool_calls — bypasses the fence
     detector XML hack used previously. Displays a tool-name label above
     the syntax-highlighted code so the user can inspect and execute it.
+
+    For tools with a direct executor (read_file, web_fetch, etc.) the
+    ``tool_args`` dict carries the full arguments so the executor can be
+    invoked without reparsing the display text.
     """
 
     def __init__(
@@ -338,6 +342,7 @@ class ToolCallBlock(CodeInputBlock):
         name: str,
         code: str,
         language: str,
+        tool_args: dict | None = None,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -349,6 +354,7 @@ class ToolCallBlock(CodeInputBlock):
         )
         self.tool_call_id = tool_call_id
         self._tool_name = name
+        self.tool_args: dict = tool_args or {}
         self._label = Static(name, classes="tool-name")
 
     def compose(self) -> ComposeResult:

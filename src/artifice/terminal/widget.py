@@ -13,7 +13,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import LoadingIndicator, Static
 
-from ..agent import Agent, SimulatedAgent, create_agent
+from ..agent import Agent, SimulatedAgent, create_agent, execute_tool_call
 from ..execution import ExecutionResult, ExecutionStatus
 from ..history import History
 from .input import TerminalInput, InputTextArea
@@ -282,6 +282,7 @@ class ArtificeTerminal(Widget):
                         name=tc.name,
                         code=tc.display_text,
                         language=tc.display_language,
+                        tool_args=tc.args,
                     )
                     self.output.append_block(tool_block)
                     self._mark_block_in_context(tool_block)
@@ -359,6 +360,15 @@ class ArtificeTerminal(Widget):
             )
             return
 
+        # Check if this is a tool call with a direct executor (read_file, etc.)
+        if isinstance(block, ToolCallBlock) and block.tool_args:
+            from ..agent.tools import TOOLS
+
+            tool_def = TOOLS.get(block._tool_name)
+            if tool_def and tool_def.executor:
+                self._execute_tool_with_executor(block)
+                return
+
         code = block.get_code()
         mode = block.get_mode()
         language = "bash" if mode == "shell" else "python"
@@ -396,6 +406,53 @@ class ArtificeTerminal(Widget):
         def cleanup():
             if state["result"]:
                 block.update_status(state["result"])
+            block.finish_streaming()
+            if not state["sent_to_agent"]:
+                self.input.focus_input()
+
+        self._current_task = asyncio.create_task(
+            self._run_cancellable(do_execute(), finally_callback=cleanup)
+        )
+
+    def _execute_tool_with_executor(self, block: ToolCallBlock) -> None:
+        """Execute a tool call that has a direct executor (not code execution)."""
+        block.show_loading()
+        self.input.query_one("#code-input", InputTextArea).focus()
+
+        state: dict = {"sent_to_agent": False}
+
+        async def do_execute():
+            from ..agent.tools import ToolCall as _ToolCall
+
+            tc = _ToolCall(id=block.tool_call_id, name=block._tool_name, args=block.tool_args)
+            result_text = await execute_tool_call(tc)
+            if result_text is None:
+                result_text = "(no executor for this tool)"
+
+            # Show result as a success
+            result = ExecutionResult(
+                code=block.get_code(),
+                status=ExecutionStatus.SUCCESS,
+                output=result_text,
+            )
+            block.update_status(result)
+
+            # Display result in an output block
+            output_block = CodeOutputBlock(
+                result_text,
+                in_context=self._auto_send_to_agent,
+            )
+            self.output.append_block(output_block)
+            self._mark_block_in_context(output_block)
+
+            # Send result back to agent
+            if self._auto_send_to_agent and self._agent is not None:
+                state["sent_to_agent"] = True
+                self._agent.add_tool_result(block.tool_call_id, result_text)
+                if not self._agent.has_pending_tool_calls:
+                    await self._stream_agent_response(self._agent, "")
+
+        def cleanup():
             block.finish_streaming()
             if not state["sent_to_agent"]:
                 self.input.focus_input()

@@ -2,7 +2,7 @@
 
 import pytest
 
-from artifice.agent import SimulatedAgent, ToolCall, ToolDef, TOOLS
+from artifice.agent import SimulatedAgent, ToolCall, ToolDef, TOOLS, execute_tool_call
 from artifice.agent.tools import get_all_schemas
 
 
@@ -195,3 +195,147 @@ def test_toolcall_unknown_tool():
     tc = ToolCall(id="99", name="unknown_tool", args={"foo": "bar"})
     assert tc.display_text == str({"foo": "bar"})
     assert tc.display_language == "text"
+
+
+def test_registry_contains_file_search():
+    """Test that file_search tool is registered."""
+    assert "file_search" in TOOLS
+    assert TOOLS["file_search"].display_arg == "pattern"
+
+
+def test_tools_with_executors():
+    """Test that non-code tools have executors, code tools do not."""
+    assert TOOLS["python"].executor is None
+    assert TOOLS["shell"].executor is None
+    assert TOOLS["read_file"].executor is not None
+    assert TOOLS["write_file"].executor is not None
+    assert TOOLS["file_search"].executor is not None
+    assert TOOLS["web_search"].executor is not None
+    assert TOOLS["web_fetch"].executor is not None
+    assert TOOLS["system_info"].executor is not None
+
+
+# --- Tool executor tests ---
+
+
+@pytest.mark.asyncio
+async def test_execute_read_file(tmp_path):
+    """Test read_file executor reads file contents with line numbers."""
+    f = tmp_path / "test.txt"
+    f.write_text("line1\nline2\nline3\n")
+
+    tc = ToolCall(id="1", name="read_file", args={"path": str(f)})
+    result = await execute_tool_call(tc)
+
+    assert result is not None
+    assert "line1" in result
+    assert "line2" in result
+    assert "   1 |" in result  # line numbers
+
+
+@pytest.mark.asyncio
+async def test_execute_read_file_with_offset_and_limit(tmp_path):
+    """Test read_file executor respects offset and limit."""
+    f = tmp_path / "test.txt"
+    f.write_text("a\nb\nc\nd\ne\n")
+
+    tc = ToolCall(id="1", name="read_file", args={"path": str(f), "offset": 1, "limit": 2})
+    result = await execute_tool_call(tc)
+
+    assert result is not None
+    assert "b" in result
+    assert "c" in result
+    assert "a" not in result
+    assert "d" not in result
+
+
+@pytest.mark.asyncio
+async def test_execute_read_file_not_found():
+    """Test read_file executor handles missing files."""
+    tc = ToolCall(id="1", name="read_file", args={"path": "/nonexistent/file.txt"})
+    result = await execute_tool_call(tc)
+
+    assert result is not None
+    assert "Error" in result
+
+
+@pytest.mark.asyncio
+async def test_execute_write_file(tmp_path):
+    """Test write_file executor creates files."""
+    f = tmp_path / "output.txt"
+
+    tc = ToolCall(id="1", name="write_file", args={"path": str(f), "content": "hello world"})
+    result = await execute_tool_call(tc)
+
+    assert result is not None
+    assert "Wrote" in result
+    assert f.read_text() == "hello world"
+
+
+@pytest.mark.asyncio
+async def test_execute_write_file_creates_dirs(tmp_path):
+    """Test write_file executor creates parent directories."""
+    f = tmp_path / "sub" / "dir" / "file.txt"
+
+    tc = ToolCall(id="1", name="write_file", args={"path": str(f), "content": "nested"})
+    result = await execute_tool_call(tc)
+
+    assert result is not None
+    assert f.read_text() == "nested"
+
+
+@pytest.mark.asyncio
+async def test_execute_file_search(tmp_path):
+    """Test file_search executor finds files by glob pattern."""
+    (tmp_path / "a.py").write_text("")
+    (tmp_path / "b.py").write_text("")
+    (tmp_path / "c.txt").write_text("")
+
+    tc = ToolCall(id="1", name="file_search", args={"pattern": "*.py", "path": str(tmp_path)})
+    result = await execute_tool_call(tc)
+
+    assert result is not None
+    assert "a.py" in result
+    assert "b.py" in result
+    assert "c.txt" not in result
+
+
+@pytest.mark.asyncio
+async def test_execute_file_search_no_matches(tmp_path):
+    """Test file_search executor when no files match."""
+    tc = ToolCall(id="1", name="file_search", args={"pattern": "*.xyz", "path": str(tmp_path)})
+    result = await execute_tool_call(tc)
+
+    assert result is not None
+    assert "No files matching" in result
+
+
+@pytest.mark.asyncio
+async def test_execute_system_info():
+    """Test system_info executor returns OS and cwd info."""
+    tc = ToolCall(id="1", name="system_info", args={"categories": ["os", "cwd"]})
+    result = await execute_tool_call(tc)
+
+    assert result is not None
+    assert "OS:" in result
+    assert "Working directory:" in result
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_call_returns_none_for_code_tools():
+    """Test that execute_tool_call returns None for python/shell (no executor)."""
+    tc = ToolCall(id="1", name="python", args={"code": "print('hi')"})
+    result = await execute_tool_call(tc)
+    assert result is None
+
+    tc2 = ToolCall(id="2", name="shell", args={"command": "ls"})
+    result2 = await execute_tool_call(tc2)
+    assert result2 is None
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_call_returns_none_for_unknown():
+    """Test that execute_tool_call returns None for unknown tools."""
+    tc = ToolCall(id="1", name="nonexistent_tool", args={})
+    result = await execute_tool_call(tc)
+    assert result is None

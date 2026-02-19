@@ -111,7 +111,7 @@ ArtificeTerminal #connection-status {
 
 ArtificeTerminal #agent-status {
     height: 1;
-    color: $primary 33%;
+    color: $primary 50%;
 }
 
 TerminalInput {
