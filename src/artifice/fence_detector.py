@@ -106,14 +106,14 @@ class StreamingFenceDetector:
     def _create_and_mount_prose(self, activity: bool = True) -> AgentOutputBlock:
         """Create a prose block using the factory or test override."""
         block = self._make_prose_block(activity)
-        self._output.append_block(block)
+        self._output.append_block(block, scroll=False)
         self._factory.all_blocks.append(block)
         return block
 
     def _create_and_mount_code(self, code: str, lang: str) -> CodeInputBlock:
         """Create a code block using the factory or test override."""
         block = self._make_code_block(code, lang)
-        self._output.append_block(block)
+        self._output.append_block(block, scroll=False)
         self._factory.all_blocks.append(block)
         return block
 
@@ -347,15 +347,14 @@ class StreamingFenceDetector:
 
         # Mark the last block as complete
         if isinstance(self._current_block, AgentOutputBlock):
-            self._current_block.flush()  # Ensure final content is rendered
             self._current_block.mark_success()
 
         # Finalize all blocks: switch from streaming mode to final rendering
+        # (finalize_streaming calls flush() internally if needed)
         for block in self._factory.all_blocks:
             if isinstance(block, CodeInputBlock):
                 block.finish_streaming()
             elif isinstance(block, AgentOutputBlock):
-                block.flush()  # Ensure all content is rendered before finalizing
                 block.finalize_streaming()
 
         # Remove empty AgentOutputBlocks (including first_agent_block)

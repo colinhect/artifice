@@ -29,7 +29,7 @@ class BlockFactory:
     def create_prose_block(self, activity: bool = True) -> AgentOutputBlock:
         """Create a new prose (agent output) block, mount it, and track it."""
         block = AgentOutputBlock(activity=activity)
-        self._output.append_block(block)
+        self._output.append_block(block, scroll=False)
         self.all_blocks.append(block)
         return block
 
@@ -38,7 +38,7 @@ class BlockFactory:
         block = CodeInputBlock(
             code, language=language, show_loading=False, in_context=True
         )
-        self._output.append_block(block)
+        self._output.append_block(block, scroll=False)
         self.all_blocks.append(block)
         return block
 

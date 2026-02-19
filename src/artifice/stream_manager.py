@@ -101,10 +101,11 @@ class StreamManager:
             # Lazily create thinking block on first chunk
             if self._thinking_block is None:
                 self._thinking_block = ThinkingOutputBlock(activity=True)
-                self._output.append_block(self._thinking_block)
-            self._thinking_block.append(text)
-            self._thinking_block.flush()
-            self._output.scroll_end(animate=False)
+                self._output.append_block(self._thinking_block, scroll=False)
+            with self._batch_update():
+                self._thinking_block.append(text)
+                self._thinking_block.flush()
+            self._call_after_refresh(lambda: self._output.scroll_end(animate=False))
         except Exception:
             logger.exception("Error processing thinking buffer")
 

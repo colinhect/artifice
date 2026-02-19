@@ -140,8 +140,9 @@ class ArtificeTerminal(Widget):
             if code_block is not None:
                 idx = self.output.index_of(code_block)
                 if idx is not None:
+                    previous = self.output._highlighted_index
                     self.output._highlighted_index = idx
-                    self.output._update_highlight()
+                    self.output._update_highlight(previous)
                     self.output.focus()
 
     def compose(self) -> ComposeResult:
@@ -286,8 +287,9 @@ class ArtificeTerminal(Widget):
             if first_tool_block is not None:
                 idx = self.output.index_of(first_tool_block)
                 if idx is not None:
+                    previous = self.output._highlighted_index
                     self.output._highlighted_index = idx
-                    self.output._update_highlight()
+                    self.output._update_highlight(previous)
                     self.output.focus()
 
         return detector, response

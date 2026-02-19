@@ -95,7 +95,7 @@ class FakeOutput:
         self._blocks = []
         self._command_counter = 0
 
-    def append_block(self, block):
+    def append_block(self, block, scroll=True):
         self._blocks.append(block)
 
     def remove_block(self, block):

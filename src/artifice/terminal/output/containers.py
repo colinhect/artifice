@@ -32,35 +32,37 @@ class HighlightableContainerMixin:
         """Move highlight to next block. Returns True if the index changed."""
         if not self._blocks:
             return False
-        original_index = self._highlighted_index
+        previous_index = self._highlighted_index
         if self._highlighted_index is None:
             self._highlighted_index = 0
         else:
             self._highlighted_index = min(
                 self._highlighted_index + 1, len(self._blocks) - 1
             )
-        self._update_highlight()
-        return original_index != self._highlighted_index
+        self._update_highlight(previous_index)
+        return previous_index != self._highlighted_index
 
     def highlight_previous(self) -> None:
         """Move highlight to previous block."""
         if not self._blocks:
             return
+        previous_index = self._highlighted_index
         if self._highlighted_index is None:
             self._highlighted_index = len(self._blocks) - 1
         else:
             self._highlighted_index = max(self._highlighted_index - 1, 0)
-        self._update_highlight()
+        self._update_highlight(previous_index)
 
-    def _update_highlight(self) -> None:
-        """Update visual highlight on blocks."""
-        for i, block in enumerate(self._blocks):
-            if i == self._highlighted_index:
-                block.add_class("highlighted")
-                # Auto-scroll to make the highlighted block visible
-                self.scroll_to_widget(block, animate=True)  # type: ignore
-            else:
-                block.remove_class("highlighted")
+    def _update_highlight(self, previous_index: int | None = None) -> None:
+        """Update visual highlight on blocks. Only touches the old and new block (O(1))."""
+        # Remove highlight from previous block
+        if previous_index is not None and 0 <= previous_index < len(self._blocks):
+            self._blocks[previous_index].remove_class("highlighted")
+        # Add highlight to new block
+        if self._highlighted_index is not None and 0 <= self._highlighted_index < len(self._blocks):
+            block = self._blocks[self._highlighted_index]
+            block.add_class("highlighted")
+            self.scroll_to_widget(block, animate=True)  # type: ignore
 
     def get_highlighted_block(self):
         """Get the currently highlighted block, if any."""
@@ -72,8 +74,9 @@ class HighlightableContainerMixin:
 
     def on_blur(self) -> None:
         """When unfocusing, unhighlight the highlighted block."""
+        previous_index = self._highlighted_index
         self._highlighted_index = None
-        self._update_highlight()
+        self._update_highlight(previous_index)
 
 
 class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
@@ -119,10 +122,11 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
 
-    def append_block(self, block: BaseBlock):
+    def append_block(self, block: BaseBlock, scroll: bool = True):
         self._blocks.append(block)
         self.mount(block)
-        self.scroll_end(animate=False)
+        if scroll:
+            self.scroll_end(animate=False)
         return block
 
     def auto_scroll(self) -> None:
@@ -197,6 +201,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         block = self.get_highlighted_block()
         if not isinstance(block, WidgetOutputBlock):
             return
+        previous_index = self._highlighted_index
         self._blocks.remove(block)
         # Adjust highlighted index after removal
         if not self._blocks:
@@ -205,7 +210,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
             self._blocks
         ):
             self._highlighted_index = len(self._blocks) - 1
-        self._update_highlight()
+        self._update_highlight(previous_index)
         self.post_message(self.PinRequested(block))
 
     def action_highlight_previous(self) -> None:
@@ -221,6 +226,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         """Move highlight to the previous CodeInputBlock, skipping other block types."""
         if not self._blocks:
             return
+        previous_index = self._highlighted_index
         start = (
             (self._highlighted_index - 1)
             if self._highlighted_index is not None
@@ -229,20 +235,21 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         for i in range(start, -1, -1):
             if isinstance(self._blocks[i], CodeInputBlock):
                 self._highlighted_index = i
-                self._update_highlight()
+                self._update_highlight(previous_index)
                 return
 
     def action_highlight_next_code(self) -> None:
         """Move highlight to the next CodeInputBlock, skipping other block types."""
         if not self._blocks:
             return
+        previous_index = self._highlighted_index
         start = (
             (self._highlighted_index + 1) if self._highlighted_index is not None else 0
         )
         for i in range(start, len(self._blocks)):
             if isinstance(self._blocks[i], CodeInputBlock):
                 self._highlighted_index = i
-                self._update_highlight()
+                self._update_highlight(previous_index)
                 return
         # No more code blocks forward -- move focus to input
         self.app.query_one("#code-input", InputTextArea).focus()
@@ -291,6 +298,7 @@ class PinnedOutput(HighlightableContainerMixin, Vertical):
 
     async def remove_pinned_block(self, block: WidgetOutputBlock) -> None:
         if block in self._blocks:
+            previous_index = self._highlighted_index
             idx = self._blocks.index(block)
             self._blocks.remove(block)
             await block.remove()
@@ -303,7 +311,7 @@ class PinnedOutput(HighlightableContainerMixin, Vertical):
                     self._highlighted_index = max(0, self._highlighted_index - 1)
                 if self._highlighted_index >= len(self._blocks):
                     self._highlighted_index = len(self._blocks) - 1
-            self._update_highlight()
+            self._update_highlight(previous_index)
 
     def action_highlight_previous(self) -> None:
         self.highlight_previous()
@@ -319,5 +327,6 @@ class PinnedOutput(HighlightableContainerMixin, Vertical):
 
     def on_focus(self) -> None:
         if self._blocks:
+            previous_index = self._highlighted_index
             self._highlighted_index = 0
-            self._update_highlight()
+            self._update_highlight(previous_index)
