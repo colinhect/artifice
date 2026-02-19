@@ -53,6 +53,8 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+n", "clear_agent_context", "Clear Context", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
+        Binding("pageup", "scroll_output_up", "Page Up", show=False),
+        Binding("pagedown", "scroll_output_down", "Page Down", show=False),
     ]
 
     _MARKDOWN_SETTINGS = {
@@ -263,9 +265,12 @@ class ArtificeTerminal(Widget):
         self._status_manager.set_inactive()
         self._status_manager.update_agent_info(usage=getattr(response, "usage", None))
 
-        self._stream.finalize()
-        self._apply_agent_response(detector, response)
+        with self.app.batch_update():
+            self._stream.finalize()
+            self._apply_agent_response(detector, response)
         self._stream.current_detector = None
+        # Scroll after finalization — Markdown widgets may have changed content height
+        self.call_after_refresh(lambda: self.output.scroll_end(animate=False))
 
         # Create ToolCallBlocks directly for native tool calls
         if response.tool_calls:
@@ -514,6 +519,14 @@ class ArtificeTerminal(Widget):
             else:
                 self._agent.system_prompt = event.content
             self.app.notify(f"Loaded prompt: {event.name}")
+
+    def action_scroll_output_up(self) -> None:
+        """Scroll the output window up by one page."""
+        self.output.scroll_page_up(animate=False)
+
+    def action_scroll_output_down(self) -> None:
+        """Scroll the output window down by one page."""
+        self.output.scroll_page_down(animate=False)
 
     def action_clear_agent_context(self) -> None:
         """Clear the agent's conversation context."""

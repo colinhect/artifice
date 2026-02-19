@@ -41,6 +41,7 @@ class StreamManager:
         self._chunk_buf = ChunkBuffer(call_later, self._drain_chunks)
         self._thinking_buf = ChunkBuffer(call_later, self._drain_thinking)
         self._stream_paused = False
+        self._scroll_scheduled = False
 
     @property
     def is_paused(self) -> bool:
@@ -75,6 +76,17 @@ class StreamManager:
         """Handle an incoming thinking chunk."""
         self._thinking_buf.append(text)
 
+    def _schedule_scroll(self) -> None:
+        """Schedule a single scroll_end after the next refresh, debounced."""
+        if not self._scroll_scheduled:
+            self._scroll_scheduled = True
+            self._call_after_refresh(self._do_scroll)
+
+    def _do_scroll(self) -> None:
+        """Execute the debounced scroll."""
+        self._scroll_scheduled = False
+        self._output.scroll_end(animate=False)
+
     def _drain_chunks(self, text: str) -> None:
         """Process all accumulated chunks in the buffer at once."""
         if not self._current_detector:
@@ -83,8 +95,7 @@ class StreamManager:
         try:
             with self._batch_update():
                 self._current_detector.feed(text)
-            # Schedule scroll after layout refresh so Markdown widget height is recalculated
-            self._call_after_refresh(lambda: self._output.scroll_end(animate=False))
+            self._schedule_scroll()
 
             # Check if detector paused after a code block
             if self._current_detector.is_paused:
@@ -105,7 +116,7 @@ class StreamManager:
             with self._batch_update():
                 self._thinking_block.append(text)
                 self._thinking_block.flush()
-            self._call_after_refresh(lambda: self._output.scroll_end(animate=False))
+            self._schedule_scroll()
         except Exception:
             logger.exception("Error processing thinking buffer")
 
