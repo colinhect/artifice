@@ -69,7 +69,6 @@ class StreamManager:
     def on_chunk(self, text: str) -> None:
         """Handle an incoming stream chunk."""
         if self._current_detector:
-            self._current_detector.start()
             self._chunk_buf.append(text)
 
     def on_thinking_chunk(self, text: str) -> None:

@@ -233,10 +233,12 @@ class ArtificeTerminal(Widget):
         After streaming, ToolCallBlocks are created directly from response.tool_calls.
         """
         detector = self._stream.create_detector()
-        # Create the initial AgentOutputBlock here, in the Textual event context,
-        # before streaming starts. This avoids NoActiveAppError from mounting widgets
-        # inside the async streaming loop.
-        detector.start()
+        # NOTE: We intentionally do NOT call detector.start() here.
+        # Starting the detector eagerly would mount the AgentOutputBlock before
+        # any thinking block, causing a race condition where thinking content
+        # (which arrives first from the agent) appears after the prose block.
+        # Instead, detector.start() is called lazily in _drain_chunks (via
+        # call_later) so block ordering matches the arrival order of content.
 
         def on_chunk(text):
             self._stream.on_chunk(text)
