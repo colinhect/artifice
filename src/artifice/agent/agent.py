@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-
 @dataclass
 class TokenUsage:
     input_tokens: int = 0

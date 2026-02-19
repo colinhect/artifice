@@ -128,7 +128,11 @@ def test_tool_def_to_schema():
     tool = ToolDef(
         name="test_tool",
         description="A test tool.",
-        parameters={"type": "object", "required": ["x"], "properties": {"x": {"type": "string"}}},
+        parameters={
+            "type": "object",
+            "required": ["x"],
+            "properties": {"x": {"type": "string"}},
+        },
         display_language="python",
         display_arg="x",
     )
@@ -272,7 +276,9 @@ async def test_execute_read_file_with_offset_and_limit(tmp_path):
     f = tmp_path / "test.txt"
     f.write_text("a\nb\nc\nd\ne\n")
 
-    tc = ToolCall(id="1", name="read_file", args={"path": str(f), "offset": 1, "limit": 2})
+    tc = ToolCall(
+        id="1", name="read_file", args={"path": str(f), "offset": 1, "limit": 2}
+    )
     result = await execute_tool_call(tc)
 
     assert result is not None
@@ -297,7 +303,9 @@ async def test_execute_write_file(tmp_path):
     """Test write_file executor creates files."""
     f = tmp_path / "output.txt"
 
-    tc = ToolCall(id="1", name="write_file", args={"path": str(f), "content": "hello world"})
+    tc = ToolCall(
+        id="1", name="write_file", args={"path": str(f), "content": "hello world"}
+    )
     result = await execute_tool_call(tc)
 
     assert result is not None
@@ -324,7 +332,9 @@ async def test_execute_file_search(tmp_path):
     (tmp_path / "b.py").write_text("")
     (tmp_path / "c.txt").write_text("")
 
-    tc = ToolCall(id="1", name="file_search", args={"pattern": "*.py", "path": str(tmp_path)})
+    tc = ToolCall(
+        id="1", name="file_search", args={"pattern": "*.py", "path": str(tmp_path)}
+    )
     result = await execute_tool_call(tc)
 
     assert result is not None
@@ -336,7 +346,9 @@ async def test_execute_file_search(tmp_path):
 @pytest.mark.asyncio
 async def test_execute_file_search_no_matches(tmp_path):
     """Test file_search executor when no files match."""
-    tc = ToolCall(id="1", name="file_search", args={"pattern": "*.xyz", "path": str(tmp_path)})
+    tc = ToolCall(
+        id="1", name="file_search", args={"pattern": "*.xyz", "path": str(tmp_path)}
+    )
     result = await execute_tool_call(tc)
 
     assert result is not None

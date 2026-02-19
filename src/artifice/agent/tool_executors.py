@@ -96,7 +96,8 @@ async def execute_web_fetch(args: dict[str, Any]) -> str:
         req = urllib.request.Request(url, headers={"User-Agent": "Artifice/1.0"})
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
-            None, lambda: urllib.request.urlopen(req, timeout=15)  # noqa: S310
+            None,
+            lambda: urllib.request.urlopen(req, timeout=15),  # noqa: S310
         )
         content = response.read()
         try:
@@ -126,7 +127,8 @@ async def execute_web_search(args: dict[str, Any]) -> str:
         req = urllib.request.Request(url, headers={"User-Agent": "Artifice/1.0"})
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
-            None, lambda: urllib.request.urlopen(req, timeout=15)  # noqa: S310
+            None,
+            lambda: urllib.request.urlopen(req, timeout=15),  # noqa: S310
         )
         html = response.read().decode("utf-8", errors="replace")
 
@@ -165,8 +167,14 @@ async def execute_system_info(args: dict[str, Any]) -> str:
 
     if "env" in categories:
         safe_vars = [
-            "HOME", "USER", "SHELL", "TERM", "PATH",
-            "LANG", "EDITOR", "VIRTUAL_ENV",
+            "HOME",
+            "USER",
+            "SHELL",
+            "TERM",
+            "PATH",
+            "LANG",
+            "EDITOR",
+            "VIRTUAL_ENV",
         ]
         env_lines = []
         for var in safe_vars:

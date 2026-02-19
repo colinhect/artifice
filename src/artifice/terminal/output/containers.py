@@ -59,7 +59,9 @@ class HighlightableContainerMixin:
         if previous_index is not None and 0 <= previous_index < len(self._blocks):
             self._blocks[previous_index].remove_class("highlighted")
         # Add highlight to new block
-        if self._highlighted_index is not None and 0 <= self._highlighted_index < len(self._blocks):
+        if self._highlighted_index is not None and 0 <= self._highlighted_index < len(
+            self._blocks
+        ):
             block = self._blocks[self._highlighted_index]
             block.add_class("highlighted")
             self.scroll_to_widget(block, animate=True)  # type: ignore

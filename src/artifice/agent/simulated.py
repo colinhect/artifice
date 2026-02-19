@@ -271,6 +271,7 @@ _DEFAULT_THINKING = (
     "I should offer some guidance on what I can help with."
 )
 
+
 def _build_tool_tag_re() -> re.Pattern:
     """Build regex matching XML tags for all registered tool names."""
     names = "|".join(re.escape(name) for name in TOOLS)
@@ -309,7 +310,9 @@ def _parse_tool_calls(text: str, start_id: int = 0) -> tuple[str, list[ToolCall]
         content = m.group(2).strip()
         tool_def = TOOLS.get(name)
         arg_key = tool_def.display_arg if tool_def else "code"
-        tool_calls.append(ToolCall(id=f"sim_{tc_id}", name=name, args={arg_key: content}))
+        tool_calls.append(
+            ToolCall(id=f"sim_{tc_id}", name=name, args={arg_key: content})
+        )
         tc_id += 1
         return ""
 

@@ -424,7 +424,9 @@ class ArtificeTerminal(Widget):
         async def do_execute():
             from ..agent.tools import ToolCall as _ToolCall
 
-            tc = _ToolCall(id=block.tool_call_id, name=block._tool_name, args=block.tool_args)
+            tc = _ToolCall(
+                id=block.tool_call_id, name=block._tool_name, args=block.tool_args
+            )
             result_text = await execute_tool_call(tc)
             if result_text is None:
                 result_text = "(no executor for this tool)"
