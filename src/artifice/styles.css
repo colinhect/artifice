@@ -278,6 +278,7 @@ CodeOutputBlock .code-output {
     color: $foreground 66%;
     padding-left: 0;
     padding-right: 0;
+    transition: opacity 0.15s;
 }
 
 CodeOutputBlock .error-output {
@@ -285,6 +286,7 @@ CodeOutputBlock .error-output {
     color: $error;
     padding-left: 0;
     padding-right: 0;
+    transition: opacity 0.15s;
 }
 
 CodeOutputBlock .markdown-output {
@@ -292,6 +294,7 @@ CodeOutputBlock .markdown-output {
     padding-left: 0;
     padding-right: 0;
     layout: stream;
+    transition: opacity 0.15s;
 }
 
 BufferedOutputBlock Markdown MarkdownBlock:last-child {
@@ -325,6 +328,7 @@ AgentOutputBlock .agent-output {
     padding-left: 0;
     padding-right: 0;
     layout: stream;
+    transition: opacity 0.15s;
 }
 
 AgentOutputBlock .loading-indicator {
@@ -335,6 +339,7 @@ AgentOutputBlock .loading-indicator {
 AgentOutputBlock .text-output {
     padding: 0;
     margin: 0;
+    transition: opacity 0.15s;
 }
 
 ThinkingOutputBlock {
