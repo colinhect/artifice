@@ -3,7 +3,7 @@
 from pathlib import Path
 
 
-from artifice.prompts import list_prompts, load_prompt, fuzzy_match, get_prompt_dirs
+from artifice.prompts import list_prompts, fuzzy_match, get_prompt_dirs
 
 
 class TestFuzzyMatch:
@@ -90,4 +90,3 @@ class TestListPrompts:
 
         prompts = list_prompts()
         assert prompts["shared"] == local_dir / "shared.md"
-

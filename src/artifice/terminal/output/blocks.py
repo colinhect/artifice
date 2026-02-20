@@ -296,7 +296,7 @@ class AgentOutputBlock(BufferedOutputBlock):
 class ThinkingOutputBlock(AgentOutputBlock):
     """Block for AI thinking content. Styled distinctly via CSS."""
 
-    def __init__(self, output="", activity=True) -> None:
+    def __init__(self, output="(thinking) ", activity=True) -> None:
         super().__init__(output=output, activity=activity, render_markdown=False)
 
 

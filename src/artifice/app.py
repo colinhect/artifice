@@ -10,7 +10,6 @@ from textual.widgets import Footer, Static
 
 from artifice import ArtificeTerminal
 from artifice.config import load_config, ArtificeConfig
-from artifice.prompts import load_prompt
 from artifice.theme import create_artifice_theme
 
 

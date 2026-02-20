@@ -463,7 +463,9 @@ class TerminalInput(Static):
             if prompt is not None:
                 (path, text) = prompt
                 self.post_message(
-                    TerminalInput.PromptSelected(name=value, path=path, content=text.strip())
+                    TerminalInput.PromptSelected(
+                        name=value, path=path, content=text.strip()
+                    )
                 )
             if self._search_manager:
                 self._search_manager.exit_search()
