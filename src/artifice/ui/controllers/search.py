@@ -10,7 +10,7 @@ from textual_autocomplete import AutoComplete, DropdownItem, TargetState
 
 if TYPE_CHECKING:
     from textual.screen import Screen
-    from .terminal.input import InputTextArea
+    from ...ui.components.input import InputTextArea
 
 
 class SearchAutoComplete(AutoComplete):
