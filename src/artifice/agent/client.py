@@ -11,8 +11,9 @@ from typing import TYPE_CHECKING, Any, Callable
 from artifice.agent.tools.base import ToolCall, get_schemas_for
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from any_llm.types.completion import ChatCompletionChunk
-    from typing import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class Agent:
         provider: str | None = None,
         base_url: str | None = None,
         on_connect: Callable | None = None,
-    ):
+    ) -> None:
         self.model = model
         self.system_prompt = system_prompt
         self.tools = tools
@@ -81,7 +82,7 @@ class Agent:
         messages = self.messages.copy()
         sys_content = self.system_prompt or ""
         if sys_content and (not messages or messages[0].get("role") != "system"):
-            messages = [{"role": "system", "content": sys_content}] + messages
+            messages = [{"role": "system", "content": sys_content}, *messages]
 
         kwargs: dict[str, Any] = dict(model=self.model, messages=messages, stream=True)
         if self._api_key is not None:

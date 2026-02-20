@@ -4,25 +4,27 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from artifice.agent.client import Agent, AgentResponse
 from artifice.agent.simulated import EchoAgent, ScriptedAgent, SimulatedAgent
-from artifice.agent.tools.base import TOOLS, ToolDef, ToolCall, execute_tool_call
+from artifice.agent.tools.base import TOOLS, ToolCall, ToolDef, execute_tool_call
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from artifice.core.config import ArtificeConfig
 
 __all__ = [
     "Agent",
     "AgentResponse",
     "EchoAgent",
+    "execute_tool_call",
     "ScriptedAgent",
     "SimulatedAgent",
-    "TOOLS",
     "ToolCall",
     "ToolDef",
-    "execute_tool_call",
+    "TOOLS",
 ]
 
 logger = logging.getLogger(__name__)

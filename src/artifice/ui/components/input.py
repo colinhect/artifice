@@ -398,7 +398,7 @@ class TerminalInput(Static):
                 """Truncate multi-line items to first 3 lines with ... if more exist."""
                 lines = item.split("\n")
                 if len(lines) > 3:
-                    truncated = "\n".join(lines[:2] + [lines[2] + "..."])
+                    truncated = "\n".join([*lines[:2], lines[2] + "..."])
                     # Store mapping from truncated to full
                     if self._search_manager:
                         self._search_manager.set_truncation_mapping(truncated, item)

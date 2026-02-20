@@ -148,12 +148,12 @@ class CodeExecutor:
                 # Try to compile as expression first (for return value)
                 try:
                     compiled = compile(code, "<repl>", "eval")
-                    result_value = eval(compiled, globals(), globals())
+                    result_value = eval(compiled, self._globals, self._locals)
                 except SyntaxError:
                     # Not an expression, try as statements
                     try:
                         compiled = compile(code, "<repl>", "exec")
-                        exec(compiled, globals(), globals())
+                        exec(compiled, self._globals, self._locals)
                     except Exception as exec_error:
                         # Error during exec - re-raise without showing the eval attempt
                         raise exec_error from None
