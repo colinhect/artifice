@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 import pytest
-from artifice.agent.streaming.detector import StreamingFenceDetector, _FenceState
+from artifice.agent.streaming.detector import StreamingFenceDetector
+from artifice.utils.fencing import FenceState
 
 if TYPE_CHECKING:
     from typing import Protocol
@@ -427,19 +428,19 @@ class TestEmptyBlocks:
 class TestStateTransitions:
     def test_state_starts_as_prose(self):
         d, _ = make_detector()
-        assert d._state == _FenceState.PROSE
+        assert d._parser.current_state == FenceState.PROSE
 
     def test_fence_transitions_to_code(self):
         d, _ = make_detector()
         d.start()
         d.feed("```python\n")
-        assert d._state == _FenceState.CODE
+        assert d._parser.current_state == FenceState.CODE
 
     def test_closing_fence_transitions_to_prose(self):
         d, _ = make_detector()
         d.start()
         d.feed("```python\ncode\n```")
-        assert d._state == _FenceState.PROSE
+        assert d._parser.current_state == FenceState.PROSE
 
 
 class TestPauseAfterCodeBlock:

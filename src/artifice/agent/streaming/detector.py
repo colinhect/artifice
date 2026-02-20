@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import enum
-
 from artifice.ui.components.blocks.blocks import (
     AgentOutputBlock,
     BaseBlock,
@@ -11,17 +9,14 @@ from artifice.ui.components.blocks.blocks import (
 )
 from artifice.ui.components.blocks.factory import BlockFactory
 from artifice.ui.components.output import TerminalOutput
-
-
-class _FenceState(enum.Enum):
-    PROSE = "prose"
-    CODE = "code"
+from artifice.utils.fencing import FenceParser, FenceState
 
 
 class StreamingFenceDetector:
     """Detects code fences in streaming text and splits into blocks in real-time.
 
-    Processes chunks character-by-character using a state machine:
+    Uses a FenceParser for pure parsing logic, handling UI coordination
+    separately. Processes chunks character-by-character:
     PROSE -> CODE (on ```language) -> PROSE (on ```)
 
     Empty lines in prose split into separate AgentOutputBlocks.
@@ -35,24 +30,19 @@ class StreamingFenceDetector:
         self._paused = False
         self._remainder = ""
         self._last_code_block: BaseBlock | None = None
-        self._state = _FenceState.PROSE
-        self._pending_buffer = ""  # Text to add to current block
-        self._chunk_buffer = ""  # Accumulates text for current chunk to display
-        self._current_lang = "bash"
-        self._current_block: BaseBlock | None = (
-            None  # The block we're currently appending to
+        self._current_block: BaseBlock | None = None
+        self._pending_prose_text: str = ""  # Text accumulated for current prose block
+        self._pending_code_text: str = ""  # Text accumulated for current code block
+
+        # Create parser with callbacks for state transitions
+        self._parser = FenceParser(
+            on_code_start=self._on_code_start,
+            on_code_end=self._on_code_end,
         )
-        self._current_line_buffer = (
-            ""  # Tracks current line in PROSE for blank line detection
+        self._current_code_block: CodeInputBlock | None = (
+            None  # Track current code block for updates
         )
-        self._strip_leading_whitespace = False  # Strip whitespace after closing fences
-        # Markdown fence detection
-        self._fence_backtick_count = 0  # Count backticks for fence detection
-        self._fence_language_buffer = ""  # Accumulate language after ```
-        self._detecting_fence_open = (
-            False  # True when we've seen ``` and reading language
-        )
-        self._fence_close_backtick_count = 0  # Count backticks for closing fence
+
         # Factory methods for block creation (can be overridden for testing)
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
         self._make_code_block = lambda code, lang: CodeInputBlock(
@@ -61,6 +51,70 @@ class StreamingFenceDetector:
             show_loading=False,
             in_context=True,
         )
+
+    # Callbacks for parser state transitions
+    def _on_code_start(self, lang: str) -> None:
+        """Handle transition from PROSE to CODE state.
+
+        Called by the parser when a code fence is detected.
+        The prose text has already been flushed by the parser.
+        """
+        # Flush any pending prose text to the current block
+        if self._pending_prose_text and isinstance(
+            self._current_block, AgentOutputBlock
+        ):
+            self._current_block.append(self._pending_prose_text)
+            self._current_block.flush()
+            self._current_block.mark_success()
+        self._pending_prose_text = ""
+
+        # Remove empty prose block, or mark it complete
+        current_is_empty = (
+            isinstance(self._current_block, AgentOutputBlock)
+            and not self._current_block._output_str.strip()
+        )
+        if current_is_empty:
+            if self._current_block is self._factory.first_agent_block:
+                self._factory.first_agent_block = None
+            if self._current_block is not None:
+                self._factory.remove_block(self._current_block)
+        elif isinstance(self._current_block, AgentOutputBlock):
+            self._current_block.mark_success()
+
+        # Create new code block
+        self._current_block = self._create_and_mount_code("", lang)
+        self._current_code_block = self._current_block  # Track for updates
+        self._pending_code_text = ""
+
+    def _on_code_end(self, code_text: str) -> None:
+        """Handle transition from CODE to PROSE state.
+
+        Called by the parser when a closing fence is detected.
+        Receives the code text that was in the block.
+        """
+        # Flush any pending code text + the received code text to the current block
+        full_code = self._pending_code_text + code_text
+        if full_code and isinstance(self._current_block, CodeInputBlock):
+            existing = self._current_block.get_code()
+            self._current_block.update_code(existing + full_code)
+        self._pending_code_text = ""
+
+        # Capture as the last completed code block
+        if isinstance(self._current_block, CodeInputBlock):
+            self._last_code_block = self._current_block
+            self._current_block.finish_streaming()
+
+        # Clear current code block tracking
+        self._current_code_block = None
+
+        # Start new prose block
+        self._current_block = self._create_and_mount_prose(activity=True)
+        self._pending_prose_text = ""
+
+        # Pause after code block if enabled
+        if self._pause_after_code:
+            self._paused = True
+            self._parser.pause()  # Also pause the parser so it saves the remainder
 
     @property
     def all_blocks(self) -> list[BaseBlock]:
@@ -87,9 +141,10 @@ class StreamingFenceDetector:
     def resume(self) -> None:
         """Resume processing after a pause, feeding any saved remainder."""
         self._paused = False
-        remainder = self._remainder
-        self._remainder = ""
-        if remainder:
+        self._parser.resume()  # Clear parser remainder
+        if self._remainder:
+            remainder = self._remainder
+            self._remainder = ""
             self.feed(remainder)
 
     def start(self) -> None:
@@ -100,6 +155,7 @@ class StreamingFenceDetector:
         if self._started:
             return
         self._started = True
+        self._parser.start()
         self._current_block = self._create_and_mount_prose(activity=True)
         self._factory.first_agent_block = self._current_block
 
@@ -123,241 +179,110 @@ class StreamingFenceDetector:
         If pause_after_code is enabled and a code block closes, processing
         stops early and remaining text is saved in _remainder.
         """
-        self._chunk_buffer = ""  # Reset for this chunk
-        for i, ch in enumerate(text):
-            self._feed_char(ch)
-            if self._paused:
-                # Save unprocessed remainder (chars after current one),
-                # stripping any trailing junk on the same line as the closing fence
-                raw_remainder = text[i + 1 :]
-                newline_pos = raw_remainder.find("\n")
-                if newline_pos >= 0:
-                    self._remainder = raw_remainder[newline_pos + 1 :]
-                else:
-                    self._remainder = ""
-                break
-        # Flush any pending text to the chunk buffer for display
-        self._flush_pending_to_chunk()
-        # Update current block with accumulated chunk text
-        if self._chunk_buffer and self._current_block:
-            self._update_current_block_with_chunk()
-            self._chunk_buffer = ""  # Clear after updating to avoid reprocessing
+        # Feed to parser and handle results
+        results = self._parser.feed(text)
 
-    def _feed_char(self, ch: str) -> None:
-        if self._state == _FenceState.PROSE:
-            self._feed_prose(ch)
-        elif self._state == _FenceState.CODE:
-            self._feed_code(ch)
+        for chunk in results:
+            if chunk.is_code_block_start:
+                # Transition already handled by callback, but we need to handle the prose text
+                # The text in this chunk is the prose that triggered the transition
+                if chunk.text and self._current_block:
+                    # Add to the OLD prose block (before transition happened)
+                    if isinstance(self._current_block, AgentOutputBlock):
+                        self._current_block.append(chunk.text)
+                        self._current_block.flush()
+                        self._current_block.mark_success()
+            elif chunk.is_code_block_end:
+                # Code block completed - text already handled in _on_code_end callback
+                # No need to process here since callback receives code_text directly
+                pass
+            else:
+                # Regular prose or code text - accumulate based on state
+                if chunk.state == FenceState.PROSE:
+                    self._pending_prose_text += chunk.text
+                    # Check for empty line finalization
+                    if (
+                        "\n\n" in self._pending_prose_text
+                        or self._pending_prose_text.endswith("\n\n")
+                    ):
+                        lines = self._pending_prose_text.split("\n")
+                        # Find where the empty line is
+                        for i, line in enumerate(lines[:-1]):
+                            if line.strip() == "" and i > 0:
+                                # Empty line detected - split here
+                                before_empty = "\n".join(lines[:i]) + "\n"
+                                after_empty = "\n".join(lines[i + 1 :])
 
-    def _flush_and_update_chunk(self) -> None:
-        """Flush pending text and update the current block with the chunk buffer."""
-        if self._chunk_buffer and self._current_block:
-            self._update_current_block_with_chunk()
-            self._chunk_buffer = ""
+                                # Flush what we have so far
+                                if before_empty and isinstance(
+                                    self._current_block, AgentOutputBlock
+                                ):
+                                    self._current_block.append(before_empty)
+                                    self._current_block.flush()
+                                    self._current_block.finalize_streaming()
+                                    self._current_block.mark_success()
 
-    def _transition_to_code(self, lang: str) -> None:
-        """Handle the transition from PROSE to CODE state."""
-        self._current_lang = lang
+                                # Create new prose block
+                                self._current_block = self._create_and_mount_prose(
+                                    activity=True
+                                )
+                                self._pending_prose_text = after_empty
+                                break
+                        else:
+                            # No empty line found, just append normally
+                            if isinstance(self._current_block, AgentOutputBlock):
+                                self._current_block.append(self._pending_prose_text)
+                                self._current_block.flush()
+                            self._pending_prose_text = ""
+                    else:
+                        # No empty line yet, just flush what we have
+                        if isinstance(self._current_block, AgentOutputBlock):
+                            self._current_block.append(self._pending_prose_text)
+                            self._current_block.flush()
+                        self._pending_prose_text = ""
+                else:  # CODE state
+                    self._pending_code_text += chunk.text
 
-        self._flush_pending_to_chunk()
-        self._flush_and_update_chunk()
-
-        # Remove empty prose block, or mark it complete
-        current_is_empty = (
-            isinstance(self._current_block, AgentOutputBlock)
-            and not self._current_block._output_str.strip()
-        )
-        if current_is_empty:
-            if self._current_block is self._factory.first_agent_block:
-                self._factory.first_agent_block = None
-            if self._current_block is not None:
-                self._factory.remove_block(self._current_block)
-        elif isinstance(self._current_block, AgentOutputBlock):
-            self._current_block.mark_success()
-
-        # Create new code block
-        self._current_block = self._create_and_mount_code("", lang)
-
-        self._pending_buffer = ""
-        self._current_line_buffer = ""
-        self._state = _FenceState.CODE
-
-    def _transition_to_prose_from_code(self) -> None:
-        """Handle the transition from CODE back to PROSE state."""
-        # Capture as the last completed code block
-        if isinstance(self._current_block, CodeInputBlock):
-            self._last_code_block = self._current_block
-            self._current_block.finish_streaming()
-
-        # Start new prose block
-        self._current_block = self._create_and_mount_prose(activity=True)
-
-        self._current_line_buffer = ""
-        self._strip_leading_whitespace = True
-        self._state = _FenceState.PROSE
-
-        # Pause after code block if enabled
-        if self._pause_after_code:
+        # Handle pause and remainder
+        if self._parser.is_paused:
             self._paused = True
-
-    def _feed_prose(self, ch: str) -> None:
-        """Process prose text, looking for markdown fences or empty lines to split blocks."""
-        # Strip leading whitespace after closing fences
-        if self._strip_leading_whitespace:
-            if ch.isspace():
-                return
-            self._strip_leading_whitespace = False
-
-        # Check for markdown fence opening (```language)
-        if self._detecting_fence_open:
-            # We've seen ``` and are now reading the language identifier
-            if ch == "\n":
-                # End of language line - transition to CODE state
-                lang = self._fence_language_buffer.strip().lower()
-                # Map common language names to our internal names
-                if lang in ("bash", "sh", "shell"):
-                    lang = "bash"
-                elif lang in ("python", "py"):
-                    lang = "python"
-                elif lang == "":
-                    # Default to bash if no language specified
-                    lang = "bash"
-                else:
-                    # For other languages, default to python for syntax highlighting
-                    lang = "python"
-
-                self._detecting_fence_open = False
-                self._fence_language_buffer = ""
-
-                # Don't include the backticks or language in the prose
-                self._transition_to_code(lang)
-            else:
-                # Accumulate language name
-                self._fence_language_buffer += ch
-            return
-
-        # Check if we're starting a fence (```)
-        if ch == "`":
-            self._fence_backtick_count += 1
-            if self._fence_backtick_count == 3:
-                # We've seen ``` - now read the language
-                self._detecting_fence_open = True
-                self._fence_backtick_count = 0
-            return
-        elif self._fence_backtick_count > 0:
-            # We had some backticks but didn't reach 3, or got interrupted
-            self._pending_buffer += "`" * self._fence_backtick_count
-            self._fence_backtick_count = 0
-            # Continue processing current character normally
-
-        # Check for empty lines to split blocks
-        if ch == "\n":
-            # Add newline to pending buffer
-            self._pending_buffer += ch
-
-            # Check if the line we just completed was empty/whitespace-only
-            if self._current_line_buffer.strip() == "":
-                # Empty line detected - finalize current block and start new one
-                self._flush_pending_to_chunk()
-                self._flush_and_update_chunk()
-
-                # Finalize current prose block (renders as Markdown immediately)
-                if isinstance(self._current_block, AgentOutputBlock):
-                    self._current_block.finalize_streaming()
-                    self._current_block.mark_success()
-
-                # Create new prose block
-                self._current_block = self._create_and_mount_prose(activity=True)
-
-            # Reset line buffer for next line
-            self._current_line_buffer = ""
-        else:
-            self._pending_buffer += ch
-            self._current_line_buffer += ch
-
-    def _feed_code(self, ch: str) -> None:
-        """Process code text, looking for closing fence (```)."""
-        if ch == "`":
-            # Check if we're at start of line before starting fence close detection
-            lines = self._pending_buffer.split("\n")
-            current_line_in_pending = lines[-1] if lines else ""
-
-            # Only detect closing fence if at start of line
-            if current_line_in_pending.strip() == "":
-                self._fence_close_backtick_count += 1
-                if self._fence_close_backtick_count == 3:
-                    # We've seen three backticks at start of line - this closes the fence
-                    # Remove any trailing newline from code before the closing fence
-                    if self._pending_buffer.endswith("\n"):
-                        self._pending_buffer = self._pending_buffer[:-1]
-
-                    # Flush pending code (without the closing backticks)
-                    self._flush_pending_to_chunk()
-                    self._flush_and_update_chunk()
-
-                    # Reset fence state
-                    self._fence_close_backtick_count = 0
-
-                    self._transition_to_prose_from_code()
-                # Don't add backtick to pending - we're accumulating them for fence detection
-                return
-            else:
-                # Backtick not at start of line - it's part of code content
-                if self._fence_close_backtick_count > 0:
-                    self._pending_buffer += "`" * self._fence_close_backtick_count
-                    self._fence_close_backtick_count = 0
-                # Add current backtick as regular code content
-                self._pending_buffer += ch
-                return
-        elif self._fence_close_backtick_count > 0:
-            # We had some backticks at start of line but got interrupted by non-backtick
-            self._pending_buffer += "`" * self._fence_close_backtick_count
-            self._fence_close_backtick_count = 0
-            # Fall through to add current character
-
-        # Regular code character
-        self._pending_buffer += ch
-
-    def _flush_pending_to_chunk(self) -> None:
-        """Move pending buffer to chunk buffer."""
-        self._chunk_buffer += self._pending_buffer
-        self._pending_buffer = ""
-
-    def _update_current_block_with_chunk(self) -> None:
-        """Update the current block with the chunk buffer."""
-        if self._chunk_buffer and self._current_block:
-            if isinstance(self._current_block, CodeInputBlock):
-                existing = self._current_block.get_code()
-                self._current_block.update_code(existing + self._chunk_buffer)
-            elif isinstance(self._current_block, AgentOutputBlock):
-                self._current_block.append(self._chunk_buffer)
-                self._current_block.flush()
+            # Save the remainder from parser (don't call resume which clears it)
+            self._remainder = self._parser.remainder
 
     def finish(self) -> None:
         """Flush any remaining state at end of stream."""
         # Ensure start() was called (handles empty stream edge case)
         self.start()
 
-        # Flush any remaining text ONLY if there's pending content
-        if self._pending_buffer:
-            self._flush_pending_to_chunk()
-            if self._chunk_buffer and self._current_block:
-                self._update_current_block_with_chunk()
-                self._chunk_buffer = ""  # Clear to avoid double-processing
+        # Flush any pending text from parser
+        remainder = self._parser.finish()
+        if remainder:
+            if self._parser.current_state == FenceState.PROSE:
+                self._pending_prose_text += remainder
+            else:
+                self._pending_code_text += remainder
+
+        # Flush any accumulated text to current block
+        if self._pending_prose_text and isinstance(
+            self._current_block, AgentOutputBlock
+        ):
+            self._current_block.append(self._pending_prose_text)
+        if self._pending_code_text and isinstance(self._current_block, CodeInputBlock):
+            existing = self._current_block.get_code()
+            self._current_block.update_code(existing + self._pending_code_text)
 
         # Mark the last block as complete
         if isinstance(self._current_block, AgentOutputBlock):
             self._current_block.mark_success()
 
         # Finalize all blocks: switch from streaming mode to final rendering
-        # (finalize_streaming calls flush() internally if needed)
         for block in self._factory.all_blocks:
             if isinstance(block, CodeInputBlock):
                 block.finish_streaming()
             elif isinstance(block, AgentOutputBlock):
                 block.finalize_streaming()
 
-        # Remove empty AgentOutputBlocks (including first_agent_block)
+        # Remove empty AgentOutputBlocks
         for block in [
             b
             for b in self._factory.all_blocks
