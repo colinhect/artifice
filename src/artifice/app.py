@@ -8,9 +8,9 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Static
 
-from artifice import ArtificeTerminal
-from artifice.config import load_config, ArtificeConfig
-from artifice.theme import create_artifice_theme
+from artifice.ui.widget import ArtificeTerminal
+from artifice.core.config import load_config, ArtificeConfig
+from artifice.utils.theme import create_artifice_theme
 
 
 class ArtificeHeader(Static):

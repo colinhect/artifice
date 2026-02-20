@@ -80,8 +80,78 @@
 - Support multiple agents sharing same provider
 - Handle `openai_format` for compatibility
 
+## Project Structure
+
+```
+src/artifice/
+├── __init__.py              # Public API exports
+├── app.py                   # Entry point (argparse, main())
+│
+├── core/                    # Domain layer - business logic
+│   ├── config.py           # Configuration management
+│   ├── events.py           # Event types, InputMode
+│   ├── history.py          # Conversation history
+│   └── prompts.py          # System prompt loading
+│
+├── execution/               # Code execution layer
+│   ├── base.py             # ExecutionResult, ExecutionStatus
+│   ├── python.py           # Python REPL executor
+│   ├── shell.py            # Shell + Tmux executors
+│   ├── callbacks.py        # Output callback handlers
+│   └── coordinator.py      # Execution orchestration
+│
+├── agent/                   # LLM integration
+│   ├── client.py           # Main Agent class
+│   ├── factory.py          # Agent creation logic
+│   ├── simulated.py        # Mock agents for testing
+│   ├── tools/              # Tool system
+│   │   ├── base.py         # ToolDef, ToolCall
+│   │   ├── registry.py     # TOOLS registry
+│   │   └── executors.py    # Tool implementations
+│   └── streaming/          # Stream handling
+│       ├── manager.py      # Stream coordination
+│       ├── buffer.py       # Chunk buffering
+│       └── detector.py     # Code fence detection
+│
+├── ui/                      # User interface layer
+│   ├── app.py              # Textual app (ArtificeApp)
+│   ├── theme.py            # UI themes
+│   ├── widget.py           # Main terminal widget
+│   ├── components/         # Reusable UI components
+│   │   ├── blocks/         # Output blocks
+│   │   ├── input.py        # TerminalInput
+│   │   └── output.py       # TerminalOutput
+│   └── controllers/        # UI coordination
+│       ├── agent_coordinator.py
+│       ├── nav_controller.py
+│       └── context_tracker.py
+│
+└── utils/                   # Shared utilities
+    ├── text.py             # Text processing
+    ├── theme.py            # Theme utilities
+    └── fencing/            # Code fence parsing
+        ├── parser.py
+        └── state.py
+```
+
 ## Configuration
 - User config at `~/.config/artifice/init.yaml`
-- Load via `load_config()` from `artifice.config`
+- Load via `load_config()` from `artifice.core.config`
 - All settings have sensible defaults
 - Command-line args override config
+
+## Import Guidelines
+
+### Core modules (business logic)
+- Config: `from artifice.core.config import load_config, ArtificeConfig`
+- History: `from artifice.core.history import History`
+- Prompts: `from artifice.core.prompts import load_prompt, list_prompts`
+
+### UI components
+- Widget: `from artifice.ui.widget import ArtificeTerminal`
+- Theme: `from artifice.utils.theme import create_artifice_theme`
+
+### Agent & Execution
+- Agent: `from artifice.agent.client import Agent`
+- Streaming: `from artifice.agent.streaming.manager import StreamManager`
+- Execution: `from artifice.execution.coordinator import ExecutionCoordinator`

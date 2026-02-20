@@ -3,7 +3,7 @@
 from pathlib import Path
 
 
-from artifice.prompts import list_prompts, fuzzy_match, get_prompt_dirs
+from artifice.core.prompts import list_prompts, fuzzy_match, get_prompt_dirs
 
 
 class TestFuzzyMatch:

@@ -1,7 +1,7 @@
 """Tests for History - command history with multi-mode navigation and persistence."""
 
 import json
-from artifice.history import History
+from artifice.core.history import History
 
 
 class TestHistoryAdd:

@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 import pytest
-from artifice.fence_detector import StreamingFenceDetector, _FenceState
+from artifice.agent.streaming.detector import StreamingFenceDetector, _FenceState
 
 if TYPE_CHECKING:
     from typing import Protocol

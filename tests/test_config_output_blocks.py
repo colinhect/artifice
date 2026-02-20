@@ -1,6 +1,6 @@
 """Tests for output code block configuration options."""
 
-from artifice.config import ArtificeConfig
+from artifice.core.config import ArtificeConfig
 
 
 def test_default_config_values():
@@ -19,7 +19,7 @@ def test_default_config_values():
 def test_config_loading_output_block_settings(tmp_path):
     """Test that output block settings can be loaded from YAML."""
     import yaml
-    from artifice.config import load_config
+    from artifice.core.config import load_config
 
     # Create a temp config file
     config_file = tmp_path / "init.yaml"

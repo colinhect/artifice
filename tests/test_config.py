@@ -2,7 +2,7 @@
 
 import yaml
 
-from artifice.config import ArtificeConfig, load_config
+from artifice.core.config import ArtificeConfig, load_config
 
 
 def test_default_config():

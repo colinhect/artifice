@@ -1,6 +1,6 @@
 """Tests for the ChunkBuffer helper class."""
 
-from artifice.chunk_buffer import ChunkBuffer
+from artifice.agent.streaming.buffer import ChunkBuffer
 
 
 class TestChunkBuffer:
