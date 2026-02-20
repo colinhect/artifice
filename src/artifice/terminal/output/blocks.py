@@ -299,6 +299,13 @@ class ThinkingOutputBlock(AgentOutputBlock):
     def __init__(self, output="", activity=True) -> None:
         super().__init__(output=output, activity=activity, render_markdown=False)
 
+class SystemBlock(BufferedOutputBlock):
+    _STATIC_CSS_CLASS = "system-output"
+    _MARKDOWN_CSS_CLASS = "system-markdown-output"
+
+    def __init__(self, output="", render_markdown=True) -> None:
+        super().__init__(output=output, render_markdown=render_markdown)
+
 
 class ToolCallBlock(CodeInputBlock):
     """Block for an AI-requested tool call.

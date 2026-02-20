@@ -10,6 +10,7 @@ from .blocks import (
     ThinkingOutputBlock,
     ToolCallBlock,
     WidgetOutputBlock,
+    SystemBlock
 )
 from .containers import (
     HighlightableContainerMixin,
@@ -28,4 +29,5 @@ __all__ = [
     "ThinkingOutputBlock",
     "ToolCallBlock",
     "WidgetOutputBlock",
+    "SystemBlock"
 ]

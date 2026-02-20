@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -215,8 +216,9 @@ class TerminalInput(Static):
     class PromptSelected(Message):
         """Message sent when a prompt template is selected via / command."""
 
-        def __init__(self, name: str, content: str) -> None:
+        def __init__(self, name: str, path: Path, content: str) -> None:
             self.name = name
+            self.path = path
             self.content = content
             super().__init__()
 
@@ -457,10 +459,11 @@ class TerminalInput(Static):
 
         def apply_prompt(value: str) -> None:
             """Load the selected prompt and exit search."""
-            content = load_prompt(value)
-            if content is not None:
+            prompt = load_prompt(value)
+            if prompt is not None:
+                (path, text) = prompt
                 self.post_message(
-                    TerminalInput.PromptSelected(name=value, content=content.strip())
+                    TerminalInput.PromptSelected(name=value, path=path, content=text.strip())
                 )
             if self._search_manager:
                 self._search_manager.exit_search()

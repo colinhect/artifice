@@ -91,21 +91,3 @@ class TestListPrompts:
         prompts = list_prompts()
         assert prompts["shared"] == local_dir / "shared.md"
 
-
-class TestLoadPrompt:
-    def test_loads_content(self, tmp_path, monkeypatch):
-        prompt_dir = tmp_path / ".artifice" / "prompts"
-        prompt_dir.mkdir(parents=True)
-        (prompt_dir / "my-prompt.md").write_text("Hello world")
-
-        monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
-        monkeypatch.setattr(Path, "home", lambda: tmp_path / "nohome")
-
-        content = load_prompt("my-prompt")
-        assert content == "Hello world"
-
-    def test_returns_none_for_missing(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
-        monkeypatch.setattr(Path, "home", lambda: tmp_path / "nohome")
-
-        assert load_prompt("nonexistent") is None

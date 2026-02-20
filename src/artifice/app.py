@@ -110,12 +110,6 @@ def main():
         print(f"\n❌ Configuration Error:\n{config_error}\n", file=sys.stderr)
         sys.exit(1)
 
-    # Auto-load system prompt from prompts/system.md if not set in config
-    if config.system_prompt is None:
-        system_prompt_content = load_prompt("system")
-        if system_prompt_content is not None:
-            config.system_prompt = system_prompt_content
-
     # Command-line arguments override config
     if args.agent is not None:
         config.agent = args.agent

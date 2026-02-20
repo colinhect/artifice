@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -13,6 +14,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import LoadingIndicator, Static
 
+from ..prompts import load_prompt
 from ..agent import Agent, SimulatedAgent, create_agent, execute_tool_call
 from ..execution import ExecutionResult, ExecutionStatus
 from ..history import History
@@ -24,6 +26,7 @@ from .output import (
     CodeInputBlock,
     CodeOutputBlock,
     ToolCallBlock,
+    SystemBlock,
     BaseBlock,
 )
 from ..fence_detector import StreamingFenceDetector
@@ -121,6 +124,12 @@ class ArtificeTerminal(Widget):
         def on_connect(_):
             self.connection_status.add_class("connected")
 
+        self._system_prompt_path: Path | None = None
+        prompt = load_prompt("system")
+        if prompt is not None:
+            (self._system_prompt_path, content) = prompt
+            self._config.system_prompt = content
+
         # Create agent
         self._agent: AnyAgent | None = None
         self._agent = create_agent(self._config, on_connect=on_connect)
@@ -158,6 +167,10 @@ class ArtificeTerminal(Widget):
 
     def on_mount(self) -> None:
         self._status_manager.update_agent_info()
+        if self._system_prompt_path is not None:
+            block = SystemBlock(output=f"[`{self._system_prompt_path}`]", render_markdown=True)
+            block.flush()
+            self.output.append_block(block)
 
     async def _run_cancellable(self, coro, *, finally_callback=None):
         """Run a coroutine with standard cancel handling."""
@@ -575,11 +588,11 @@ class ArtificeTerminal(Widget):
     ) -> None:
         """Handle prompt template selection: append to agent's system prompt."""
         if self._agent is not None:
-            if self._agent.system_prompt:
-                self._agent.system_prompt += "\n\n" + event.content
-            else:
-                self._agent.system_prompt = event.content
-            self.app.notify(f"Loaded prompt: {event.name}")
+            self._agent.messages.append({"role": "user", "content": event.content})
+            block = SystemBlock(output=f"[`{os.path.relpath(event.path, os.getcwd())}`]", render_markdown=True)
+            block.toggle_markdown()
+            block.flush()
+            self.output.append_block(block)
 
     def action_scroll_output_up(self) -> None:
         """Scroll the output window up by one page."""
