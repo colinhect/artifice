@@ -76,7 +76,7 @@ Artifice is a minimal AI agent harness with a terminal interface. It provides a 
 ## Data Flow
 
 ```
-User Input → ArtificeTerminal → Input Mode?
+User Input → ArtificeTerminal ──────> Input Mode?
                               │
               ┌───────────────┼───────────────┐
               │               │               │
@@ -96,6 +96,9 @@ User Input → ArtificeTerminal → Input Mode?
                               │
                               ▼
                     TerminalOutput Blocks
+                              │
+                              │ (auto_send_to_agent?)
+                              └───yes──> Agent.send()
 ```
 
 ## Streaming Architecture
