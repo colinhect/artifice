@@ -45,6 +45,7 @@ class NavigationController:
 
     def navigate_up(self) -> None:
         """Navigate up: from input to output, or up through output blocks."""
+        from artifice.ui.components.input import InputTextArea
         input_area = self._input.query_one("#code-input", InputTextArea)
         if input_area.has_focus and self._output._blocks:
             self._output.focus()

@@ -35,7 +35,7 @@ class ArtificeHeader(Static):
 
 class ArtificeApp(App):
     TITLE = "Artifice Terminal"
-    CSS_PATH = "styles.css"
+    CSS_PATH = "styles.tcss"
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit"),

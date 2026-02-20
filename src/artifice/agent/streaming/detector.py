@@ -33,6 +33,8 @@ class StreamingFenceDetector:
         self._current_block: BaseBlock | None = None
         self._pending_prose_text: str = ""  # Text accumulated for current prose block
         self._pending_code_text: str = ""  # Text accumulated for current code block
+        self._pending_prose_dirty: bool = False  # Whether prose needs flush
+        self._pending_code_dirty: bool = False  # Whether code needs flush
 
         # Create parser with callbacks for state transitions
         self._parser = FenceParser(
@@ -67,6 +69,7 @@ class StreamingFenceDetector:
             self._current_block.flush()
             self._current_block.mark_success()
         self._pending_prose_text = ""
+        self._pending_prose_dirty = False
 
         # Remove empty prose block, or mark it complete
         current_is_empty = (
@@ -85,6 +88,7 @@ class StreamingFenceDetector:
         self._current_block = self._create_and_mount_code("", lang)
         self._current_code_block = self._current_block  # Track for updates
         self._pending_code_text = ""
+        self._pending_code_dirty = False
 
     def _on_code_end(self, code_text: str) -> None:
         """Handle transition from CODE to PROSE state.
@@ -96,8 +100,10 @@ class StreamingFenceDetector:
         full_code = self._pending_code_text + code_text
         if full_code and isinstance(self._current_block, CodeInputBlock):
             existing = self._current_block.get_code()
+            # Apply final syntax highlight at the end of code block
             self._current_block.update_code(existing + full_code)
         self._pending_code_text = ""
+        self._pending_code_dirty = False
 
         # Capture as the last completed code block
         if isinstance(self._current_block, CodeInputBlock):
@@ -110,6 +116,7 @@ class StreamingFenceDetector:
         # Start new prose block
         self._current_block = self._create_and_mount_prose(activity=True)
         self._pending_prose_text = ""
+        self._pending_prose_dirty = False
 
         # Pause after code block if enabled
         if self._pause_after_code:
@@ -190,8 +197,7 @@ class StreamingFenceDetector:
                     # Add to the OLD prose block (before transition happened)
                     if isinstance(self._current_block, AgentOutputBlock):
                         self._current_block.append(chunk.text)
-                        self._current_block.flush()
-                        self._current_block.mark_success()
+                        self._pending_prose_dirty = True
             elif chunk.is_code_block_end:
                 # Code block completed - text already handled in _on_code_end callback
                 # No need to process here since callback receives code_text directly
@@ -200,54 +206,60 @@ class StreamingFenceDetector:
                 # Regular prose or code text - accumulate based on state
                 if chunk.state == FenceState.PROSE:
                     self._pending_prose_text += chunk.text
-                    # Check for empty line finalization
-                    if (
-                        "\n\n" in self._pending_prose_text
-                        or self._pending_prose_text.endswith("\n\n")
-                    ):
-                        lines = self._pending_prose_text.split("\n")
-                        # Find where the empty line is
-                        for i, line in enumerate(lines[:-1]):
-                            if line.strip() == "" and i > 0:
-                                # Empty line detected - split here
-                                before_empty = "\n".join(lines[:i]) + "\n"
-                                after_empty = "\n".join(lines[i + 1 :])
+                    self._pending_prose_dirty = True
+                    # Check for empty line finalization - only check the end of buffer
+                    if "\n\n" in self._pending_prose_text:
+                        # Find the last empty line to split on
+                        last_empty = self._pending_prose_text.rfind("\n\n")
+                        if last_empty >= 0:
+                            before_empty = self._pending_prose_text[: last_empty + 1]
+                            after_empty = self._pending_prose_text[last_empty + 2 :]
 
-                                # Flush what we have so far
-                                if before_empty and isinstance(
-                                    self._current_block, AgentOutputBlock
-                                ):
-                                    self._current_block.append(before_empty)
-                                    self._current_block.flush()
-                                    self._current_block.finalize_streaming()
-                                    self._current_block.mark_success()
+                            # Flush what we have so far
+                            if before_empty and isinstance(
+                                self._current_block, AgentOutputBlock
+                            ):
+                                self._current_block.append(before_empty)
+                                self._current_block.finalize_streaming()
+                                self._current_block.mark_success()
 
-                                # Create new prose block
-                                self._current_block = self._create_and_mount_prose(
-                                    activity=True
-                                )
-                                self._pending_prose_text = after_empty
-                                break
-                        else:
-                            # No empty line found, just append normally
-                            if isinstance(self._current_block, AgentOutputBlock):
-                                self._current_block.append(self._pending_prose_text)
-                                self._current_block.flush()
-                            self._pending_prose_text = ""
-                    else:
-                        # No empty line yet, just flush what we have
-                        if isinstance(self._current_block, AgentOutputBlock):
-                            self._current_block.append(self._pending_prose_text)
-                            self._current_block.flush()
-                        self._pending_prose_text = ""
+                            # Create new prose block
+                            self._current_block = self._create_and_mount_prose(
+                                activity=True
+                            )
+                            self._pending_prose_text = after_empty
+                            self._pending_prose_dirty = bool(after_empty)
                 else:  # CODE state
                     self._pending_code_text += chunk.text
+                    self._pending_code_dirty = True
 
         # Handle pause and remainder
         if self._parser.is_paused:
             self._paused = True
             # Save the remainder from parser (don't call resume which clears it)
             self._remainder = self._parser.remainder
+
+        # Batch flush all pending text at the end of the feed call
+        self._flush_pending()
+
+    def _flush_pending(self) -> None:
+        """Flush any pending text to the UI in a single batch."""
+        # Flush prose text
+        if self._pending_prose_dirty and self._pending_prose_text:
+            if isinstance(self._current_block, AgentOutputBlock):
+                self._current_block.append(self._pending_prose_text)
+                self._current_block.flush()
+            self._pending_prose_text = ""
+            self._pending_prose_dirty = False
+
+        # Flush code text
+        if self._pending_code_dirty and self._pending_code_text:
+            if isinstance(self._current_block, CodeInputBlock):
+                existing = self._current_block.get_code()
+                full_code = existing + self._pending_code_text
+                self._current_block.update_code(full_code)
+            self._pending_code_text = ""
+            self._pending_code_dirty = False
 
     def finish(self) -> None:
         """Flush any remaining state at end of stream."""
@@ -259,17 +271,13 @@ class StreamingFenceDetector:
         if remainder:
             if self._parser.current_state == FenceState.PROSE:
                 self._pending_prose_text += remainder
+                self._pending_prose_dirty = True
             else:
                 self._pending_code_text += remainder
+                self._pending_code_dirty = True
 
-        # Flush any accumulated text to current block
-        if self._pending_prose_text and isinstance(
-            self._current_block, AgentOutputBlock
-        ):
-            self._current_block.append(self._pending_prose_text)
-        if self._pending_code_text and isinstance(self._current_block, CodeInputBlock):
-            existing = self._current_block.get_code()
-            self._current_block.update_code(existing + self._pending_code_text)
+        # Flush any accumulated text using the batched flush method
+        self._flush_pending()
 
         # Mark the last block as complete
         if isinstance(self._current_block, AgentOutputBlock):
@@ -278,6 +286,8 @@ class StreamingFenceDetector:
         # Finalize all blocks: switch from streaming mode to final rendering
         for block in self._factory.all_blocks:
             if isinstance(block, CodeInputBlock):
+                # Apply final syntax highlighting at the end
+                block.update_code(block.get_code())
                 block.finish_streaming()
             elif isinstance(block, AgentOutputBlock):
                 block.finalize_streaming()

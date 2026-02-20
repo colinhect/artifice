@@ -17,7 +17,7 @@ class ChunkBuffer:
         min_interval: Minimum seconds between drain operations (default: 1/60 for 60 FPS).
     """
 
-    def __init__(self, schedule, drain, min_interval: float = 1.0 / 120.0) -> None:
+    def __init__(self, schedule, drain, min_interval: float = 1.0 / 30.0) -> None:
         self._schedule = schedule
         self._drain = drain
         self._buffer: str = ""
