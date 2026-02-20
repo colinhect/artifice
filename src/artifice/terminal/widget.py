@@ -169,15 +169,21 @@ class ArtificeTerminal(Widget):
         """Append a SystemBlock with formatted path and content info.
 
         Path formatting:
-        - If in home directory: ~/relative/path
-        - Otherwise: relative to current working directory
+        - If under ~/.artifice/prompts: show as ~/.artifice/prompts/...
+        - Otherwise if under home: show relative to current directory
+        - Otherwise: show as-is
         """
         path_obj = Path(path).expanduser().resolve()
         home = Path.home()
+        artifice_prompts = home / ".artifice" / "prompts"
 
         try:
-            if path_obj.is_relative_to(home):
-                display_path = f"~/{path_obj.relative_to(home)}"
+            if path_obj.is_relative_to(artifice_prompts):
+                display_path = (
+                    f"~/.artifice/prompts/{path_obj.relative_to(artifice_prompts)}"
+                )
+            elif path_obj.is_relative_to(home):
+                display_path = os.path.relpath(path_obj, os.getcwd())
             else:
                 display_path = os.path.relpath(path_obj, os.getcwd())
         except ValueError:
