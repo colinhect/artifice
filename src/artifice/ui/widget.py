@@ -6,7 +6,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -19,14 +19,11 @@ from artifice.core.history import History
 from artifice.core.prompts import load_prompt
 from artifice.agent import Agent, SimulatedAgent, create_agent
 from artifice.agent.streaming.manager import StreamManager
-from artifice.agent.streaming.detector import StreamingFenceDetector
 from artifice.execution import ExecutionResult, ExecutionStatus
 from artifice.execution.coordinator import ExecutionCoordinator
 from artifice.ui.components.input import TerminalInput, InputTextArea
 from artifice.ui.components.output import TerminalOutput
 from artifice.ui.components.blocks.blocks import (
-    AgentInputBlock,
-    AgentOutputBlock,
     BaseBlock,
     CodeInputBlock,
     CodeOutputBlock,
@@ -34,6 +31,7 @@ from artifice.ui.components.blocks.blocks import (
     ToolCallBlock,
 )
 from artifice.ui.components.status import StatusIndicatorManager
+from artifice.ui.controllers import AgentCoordinator, NavigationController
 
 if TYPE_CHECKING:
     from artifice.app import ArtificeApp
@@ -74,6 +72,12 @@ class ArtificeTerminal(Widget):
         classes: str | None = None,
         history_file: str | Path | None = None,
         max_history_size: int = 1000,
+        *,
+        agent: AnyAgent | None = None,
+        execution_coordinator: ExecutionCoordinator | None = None,
+        agent_coordinator: AgentCoordinator | None = None,
+        navigation_controller: NavigationController | None = None,
+        stream_manager: StreamManager | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
 
@@ -94,13 +98,16 @@ class ArtificeTerminal(Widget):
         # Context tracking
         self._context_blocks: list[BaseBlock] = []
 
-        # Execution coordinator
-        self._exec = ExecutionCoordinator(
-            config=self._config,
-            output=self.output,
-            schedule_fn=self.call_later,
-            context_tracker=self._mark_block_in_context,
-        )
+        # Execution coordinator (injected or created)
+        if execution_coordinator is not None:
+            self._exec = execution_coordinator
+        else:
+            self._exec = ExecutionCoordinator(
+                config=self._config,
+                output=self.output,
+                schedule_fn=self.call_later,
+                context_tracker=self._mark_block_in_context,
+            )
 
         # Status indicator manager
         self._status_manager = StatusIndicatorManager(
@@ -112,14 +119,17 @@ class ArtificeTerminal(Widget):
 
         self._current_task: asyncio.Task | None = None
 
-        # Stream manager
-        self._stream = StreamManager(
-            output=self.output,
-            call_later=self.call_later,
-            call_after_refresh=self.call_after_refresh,
-            batch_update=self._batch_update_ctx,
-            on_pause=self._on_stream_paused,
-        )
+        # Stream manager (injected or created)
+        if stream_manager is not None:
+            self._stream = stream_manager
+        else:
+            self._stream = StreamManager(
+                output=self.output,
+                call_later=self.call_later,
+                call_after_refresh=self.call_after_refresh,
+                batch_update=self._batch_update_ctx,
+                on_pause=self._on_stream_paused,
+            )
 
         def on_connect(_):
             self.connection_status.add_class("connected")
@@ -130,14 +140,66 @@ class ArtificeTerminal(Widget):
             (self._system_prompt_path, content) = prompt
             self._config.system_prompt = content
 
-        # Create agent
+        # Create agent (injected or created)
         self._agent: AnyAgent | None = None
-        self._agent = create_agent(self._config, on_connect=on_connect)
+        if agent is not None:
+            self._agent = agent
+        else:
+            self._agent = create_agent(self._config, on_connect=on_connect)
         self._status_manager.set_inactive()
+
+        # Agent coordinator (injected or created)
+        if agent_coordinator is not None:
+            self._agent_coord = agent_coordinator
+        else:
+            self._agent_coord = AgentCoordinator(
+                agent=self._agent,
+                stream_manager=self._stream,
+                output=self.output,
+                batch_update_fn=self._batch_update_ctx,
+                call_after_refresh_fn=self.call_after_refresh,
+                mark_block_in_context_fn=self._mark_block_in_context,
+                set_auto_send_to_agent_fn=self._set_auto_send_to_agent,
+                is_auto_send_to_agent_fn=self._is_auto_send_to_agent,
+                get_config_attr_fn=self._get_config_attr,
+                status_manager=self._status_manager,
+            )
+
+        # Navigation controller (injected or created)
+        if navigation_controller is not None:
+            self._nav = navigation_controller
+        else:
+            self._nav = NavigationController(
+                input_widget=self.input,
+                output_widget=self.output,
+                focus_input_fn=self._focus_input,
+                context_blocks=self._context_blocks,
+                mark_block_in_context_fn=self._mark_block_in_context,
+            )
 
     def _batch_update_ctx(self):
         """Return the app's batch_update context manager."""
         return self.app.batch_update()
+
+    def _set_auto_send_to_agent(self, value: bool) -> None:
+        """Set auto-send to agent mode."""
+        self._auto_send_to_agent = value
+        if value:
+            self.input.add_class("in-context")
+        else:
+            self.input.remove_class("in-context")
+
+    def _is_auto_send_to_agent(self) -> bool:
+        """Check if auto-send to agent mode is enabled."""
+        return self._auto_send_to_agent
+
+    def _get_config_attr(self, name: str) -> Any:
+        """Get a config attribute by name."""
+        return getattr(self._config, name, None)
+
+    def _focus_input(self) -> None:
+        """Focus the input text area."""
+        self.input.query_one("#code-input", InputTextArea).focus()
 
     def _on_stream_paused(self) -> None:
         """Called by StreamManager when the detector pauses on a code block."""
@@ -259,129 +321,17 @@ class ArtificeTerminal(Widget):
             block.remove_class("in-context")
         self._context_blocks.clear()
 
-    def _apply_agent_response(self, detector: StreamingFenceDetector, response) -> None:
-        """Mark context, handle errors, and auto-highlight the first code block."""
-        with self.app.batch_update():
-            for block in detector.all_blocks:
-                self._mark_block_in_context(block)
-
-            if detector.first_agent_block:
-                if response.error:
-                    detector.first_agent_block.append(
-                        f"\n**Error:** {response.error}\n"
-                    )
-                    detector.first_agent_block.flush()
-                    detector.first_agent_block.mark_failed()
-                else:
-                    detector.first_agent_block.flush()
-                    detector.first_agent_block.mark_success()
-
-    async def _stream_agent_response(
-        self, agent: AnyAgent, prompt: str
-    ) -> tuple[StreamingFenceDetector, object]:
-        """Stream an agent response, splitting into prose and code blocks.
-
-        Returns the detector (with all_blocks, first_agent_block) and AgentResponse.
-        After streaming, ToolCallBlocks are created directly from response.tool_calls.
-        """
-        detector = self._stream.create_detector()
-        # NOTE: We intentionally do NOT call detector.start() here.
-        # Starting the detector eagerly would mount the AgentOutputBlock before
-        # any thinking block, causing a race condition where thinking content
-        # (which arrives first from the agent) appears after the prose block.
-        # Instead, detector.start() is called lazily in _drain_chunks (via
-        # call_later) so block ordering matches the arrival order of content.
-
-        def on_chunk(text):
-            self._stream.on_chunk(text)
-
-        def on_thinking_chunk(text):
-            self._stream.on_thinking_chunk(text)
-
-        if self._config.prompt_prefix and prompt.strip():
-            prompt = self._config.prompt_prefix + " " + prompt
-
-        self._status_manager.set_active()
-        try:
-            response = await agent.send(
-                prompt, on_chunk=on_chunk, on_thinking_chunk=on_thinking_chunk
-            )
-        except asyncio.CancelledError:
-            self._status_manager.set_inactive()
-            self._stream.finalize()
-            self._stream.current_detector = None
-            raise
-        self._status_manager.set_inactive()
-        self._status_manager.update_agent_info(usage=getattr(response, "usage", None))
-
-        with self.app.batch_update():
-            self._stream.finalize()
-            self._apply_agent_response(detector, response)
-        self._stream.current_detector = None
-        # Scroll after finalization — Markdown widgets may have changed content height
-        self.call_after_refresh(lambda: self.output.scroll_end(animate=True))
-
-        # Create ToolCallBlocks directly for native tool calls
-        if response.tool_calls:
-            with self.app.batch_update():
-                first_tool_block = None
-                for tc in response.tool_calls:
-                    tool_block = ToolCallBlock(
-                        tool_call_id=tc.id,
-                        name=tc.name,
-                        code=tc.display_text,
-                        language=tc.display_language,
-                        tool_args=tc.args,
-                    )
-                    self.output.append_block(tool_block)
-                    self._mark_block_in_context(tool_block)
-                    if first_tool_block is None:
-                        first_tool_block = tool_block
-
-            # Highlight first tool call block so user can run it
-            if first_tool_block is not None:
-                idx = self.output.index_of(first_tool_block)
-                if idx is not None:
-                    previous = self.output._highlighted_index
-                    self.output._highlighted_index = idx
-                    self.output._update_highlight(previous)
-                    self.output.focus()
-
-        return detector, response
-
     async def _handle_agent_prompt(self, prompt: str) -> None:
         """Handle AI agent prompt with code block detection."""
-        agent_input_block = AgentInputBlock(prompt)
-        self.output.append_block(agent_input_block)
-        self._mark_block_in_context(agent_input_block)
-
-        if self._agent is None:
-            agent_output_block = AgentOutputBlock("No AI agent configured.")
-            self.output.append_block(agent_output_block)
-            agent_output_block.mark_failed()
-            return
-
-        await self._stream_agent_response(self._agent, prompt)
-
-        # After first agent interaction, enable auto-send mode
-        if not self._auto_send_to_agent:
-            self._auto_send_to_agent = True
-            self.input.add_class("in-context")
+        await self._agent_coord.handle_agent_prompt(prompt)
 
     async def _send_execution_result_to_agent(
         self, code: str, language: str, result: ExecutionResult
     ) -> None:
         """Send execution results back to the agent and get its response."""
-        if self._agent is None:
-            return
-        output = result.output + result.error
-        prompt = (
-            f"Executed: <{language}>{code}</{language}>"
-            + "\n\nOutput:\n"
-            + output
-            + "\n"
+        await self._agent_coord.send_execution_result_to_agent(
+            code, language, result.output, result.error
         )
-        await self._stream_agent_response(self._agent, prompt)
 
     async def on_terminal_output_block_activated(
         self, event: TerminalOutput.BlockActivated
@@ -444,9 +394,9 @@ class ArtificeTerminal(Widget):
                 output = state["result"].output + state["result"].error
                 if tool_call_id is not None:
                     # Structured tool result — agent knows which call this answers
-                    self._agent.add_tool_result(tool_call_id, output)
-                    if not self._agent.has_pending_tool_calls:
-                        await self._stream_agent_response(self._agent, "")
+                    self._agent_coord.add_tool_result(tool_call_id, output)
+                    if not self._agent_coord.has_pending_tool_calls:
+                        await self._agent_coord.continue_after_tool_call()
                 else:
                     await self._send_execution_result_to_agent(
                         code, language, state["result"]
@@ -504,9 +454,9 @@ class ArtificeTerminal(Widget):
             # Send result back to agent
             if self._auto_send_to_agent and self._agent is not None:
                 state["sent_to_agent"] = True
-                self._agent.add_tool_result(block.tool_call_id, result_text)
-                if not self._agent.has_pending_tool_calls:
-                    await self._stream_agent_response(self._agent, "")
+                self._agent_coord.add_tool_result(block.tool_call_id, result_text)
+                if not self._agent_coord.has_pending_tool_calls:
+                    await self._agent_coord.continue_after_tool_call()
 
         def cleanup():
             block.finish_streaming()
@@ -601,17 +551,11 @@ class ArtificeTerminal(Widget):
 
     def action_navigate_up(self) -> None:
         """Navigate up: from input to output, or up through output blocks."""
-        input_area = self.input.query_one("#code-input", InputTextArea)
-        if input_area.has_focus and self.output._blocks:
-            self.output.focus()
-        elif self.output.has_focus:
-            self.output.highlight_previous()
+        self._nav.navigate_up()
 
     def action_navigate_down(self) -> None:
         """Navigate down: through output blocks, or from output to input."""
-        if self.output.has_focus:
-            if not self.output.highlight_next():
-                self.input.query_one("#code-input", InputTextArea).focus()
+        self._nav.navigate_down()
 
     def action_toggle_auto_send_to_agent(self) -> None:
         """Toggle auto-send mode."""
@@ -636,11 +580,11 @@ class ArtificeTerminal(Widget):
 
     def action_scroll_output_up(self) -> None:
         """Scroll the output window up by one page."""
-        self.output.scroll_page_up(animate=True)
+        self._nav.scroll_output_up()
 
     def action_scroll_output_down(self) -> None:
         """Scroll the output window down by one page."""
-        self.output.scroll_page_down(animate=True)
+        self._nav.scroll_output_down()
 
     def action_clear_agent_context(self) -> None:
         """Clear the agent's conversation context."""
