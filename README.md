@@ -78,7 +78,7 @@ Copy `config/init.yaml` to `~/.config/artifice/init.yaml` and customize. Key set
 - **agents** - Define agents with provider, model, API key, and tool access
 - **system_prompt** - Custom system prompt for the AI agent
 - **tmux_target** - Target tmux pane for shell command execution (e.g. `session:window.pane`)
-- **auto_send_to_agent** - Automatically send execution results back to the agent
+- **send_user_commands_to_agent** - Automatically send execution results back to the agent
 
 See `config/init.yaml` for the full list of options.
 

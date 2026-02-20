@@ -11,7 +11,7 @@ def test_default_config():
     assert config.agent is None
     assert config.agents is None
     assert config.banner is False
-    assert config.auto_send_to_agent is True
+    assert config.send_user_commands_to_agent is True
     assert config.agent_markdown is True
     assert config.show_tool_output is True
 
@@ -41,7 +41,7 @@ def test_load_basic_yaml(tmp_path, monkeypatch):
         "agent": "llama",
         "banner": True,
         "system_prompt": "Test prompt",
-        "auto_send_to_agent": False,
+        "send_user_commands_to_agent": False,
     }
     init_file.write_text(yaml.dump(yaml_content))
 
@@ -52,7 +52,7 @@ def test_load_basic_yaml(tmp_path, monkeypatch):
     assert config.agent == "llama"
     assert config.banner is True
     assert config.system_prompt == "Test prompt"
-    assert config.auto_send_to_agent is False
+    assert config.send_user_commands_to_agent is False
 
 
 def test_load_models_dict(tmp_path, monkeypatch):

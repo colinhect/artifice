@@ -50,7 +50,7 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+l", "clear", "Clear", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
-        Binding("ctrl+g", "toggle_auto_send_to_agent", "Toggle Agent", show=True),
+        Binding("ctrl+g", "toggle_send_user_commands_to_agent", "Toggle Agent", show=True),
         Binding("ctrl+n", "clear_agent_context", "Clear Context", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
@@ -82,7 +82,7 @@ class ArtificeTerminal(Widget):
         super().__init__(name=name, id=id, classes=classes)
 
         self._config = app.config
-        self._auto_send_to_agent: bool = self._config.auto_send_to_agent
+        self._send_user_commands_to_agent: bool = self._config.send_user_commands_to_agent
 
         # Create history manager
         self._history = History(
@@ -159,8 +159,8 @@ class ArtificeTerminal(Widget):
                 batch_update_fn=self._batch_update_ctx,
                 call_after_refresh_fn=self.call_after_refresh,
                 mark_block_in_context_fn=self._mark_block_in_context,
-                set_auto_send_to_agent_fn=self._set_auto_send_to_agent,
-                is_auto_send_to_agent_fn=self._is_auto_send_to_agent,
+                set_send_user_commands_to_agent_fn=self._set_send_user_commands_to_agent,
+                is_send_user_commands_to_agent_fn=self._is_send_user_commands_to_agent,
                 get_config_attr_fn=self._get_config_attr,
                 status_manager=self._status_manager,
             )
@@ -181,17 +181,17 @@ class ArtificeTerminal(Widget):
         """Return the app's batch_update context manager."""
         return self.app.batch_update()
 
-    def _set_auto_send_to_agent(self, value: bool) -> None:
+    def _set_send_user_commands_to_agent(self, value: bool) -> None:
         """Set auto-send to agent mode."""
-        self._auto_send_to_agent = value
+        self._send_user_commands_to_agent = value
         if value:
             self.input.add_class("in-context")
         else:
             self.input.remove_class("in-context")
 
-    def _is_auto_send_to_agent(self) -> bool:
+    def _is_send_user_commands_to_agent(self) -> bool:
         """Check if auto-send to agent mode is enabled."""
-        return self._auto_send_to_agent
+        return self._send_user_commands_to_agent
 
     def _get_config_attr(self, name: str) -> Any:
         """Get a config attribute by name."""
@@ -256,7 +256,7 @@ class ArtificeTerminal(Widget):
             render_markdown=True,
         )
         block.flush()
-        if self._auto_send_to_agent:
+        if self._send_user_commands_to_agent:
             self._mark_block_in_context(block)
         self.output.append_block(block)
 
@@ -296,15 +296,15 @@ class ArtificeTerminal(Widget):
                 await self._handle_agent_prompt(code)
             elif event.is_shell_command:
                 result = await self._exec.execute(
-                    code, language="bash", in_context=self._auto_send_to_agent
+                    code, language="bash", in_context=self._send_user_commands_to_agent
                 )
-                if self._auto_send_to_agent:
+                if self._send_user_commands_to_agent:
                     await self._send_execution_result_to_agent(code, "bash", result)
             else:
                 result = await self._exec.execute(
-                    code, language="python", in_context=self._auto_send_to_agent
+                    code, language="python", in_context=self._send_user_commands_to_agent
                 )
-                if self._auto_send_to_agent:
+                if self._send_user_commands_to_agent:
                     await self._send_execution_result_to_agent(code, "python", result)
 
         self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
@@ -386,10 +386,10 @@ class ArtificeTerminal(Widget):
                 code,
                 language=language,
                 code_input_block=block,
-                in_context=self._auto_send_to_agent,
+                in_context=self._send_user_commands_to_agent,
             )
             block.update_status(state["result"])
-            if self._auto_send_to_agent and self._agent is not None:
+            if self._send_user_commands_to_agent and self._agent is not None:
                 state["sent_to_agent"] = True
                 output = state["result"].output + state["result"].error
                 if tool_call_id is not None:
@@ -444,7 +444,7 @@ class ArtificeTerminal(Widget):
             # Display result in an output block
             output_block = CodeOutputBlock(
                 result_text,
-                in_context=self._auto_send_to_agent,
+                in_context=self._send_user_commands_to_agent,
             )
             if not self._config.show_tool_output:
                 output_block.add_class("hide-tool-output")
@@ -452,7 +452,7 @@ class ArtificeTerminal(Widget):
             self._mark_block_in_context(output_block)
 
             # Send result back to agent
-            if self._auto_send_to_agent and self._agent is not None:
+            if self._send_user_commands_to_agent and self._agent is not None:
                 state["sent_to_agent"] = True
                 self._agent_coord.add_tool_result(block.tool_call_id, result_text)
                 if not self._agent_coord.has_pending_tool_calls:
@@ -489,10 +489,10 @@ class ArtificeTerminal(Widget):
             code,
             language=language,
             code_input_block=code_block,
-            in_context=self._auto_send_to_agent,
+            in_context=self._send_user_commands_to_agent,
         )
         self._resume_stream()
-        if self._auto_send_to_agent:
+        if self._send_user_commands_to_agent:
             await self._send_execution_result_to_agent(code, language, result)
 
     def on_key(self, event) -> None:
@@ -557,11 +557,11 @@ class ArtificeTerminal(Widget):
         """Navigate down: through output blocks, or from output to input."""
         self._nav.navigate_down()
 
-    def action_toggle_auto_send_to_agent(self) -> None:
+    def action_toggle_send_user_commands_to_agent(self) -> None:
         """Toggle auto-send mode."""
-        self._auto_send_to_agent = not self._auto_send_to_agent
+        self._send_user_commands_to_agent = not self._send_user_commands_to_agent
 
-        if self._auto_send_to_agent:
+        if self._send_user_commands_to_agent:
             self.input.add_class("in-context")
             for block in self.output.children:
                 if isinstance(block, BaseBlock) and block not in self._context_blocks:

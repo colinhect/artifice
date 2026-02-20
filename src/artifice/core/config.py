@@ -35,7 +35,7 @@ _FIELDS: dict[str, Any] = {
     "tmux_output_code_block": False,
     "python_output_code_block": True,
     # Auto-send settings
-    "auto_send_to_agent": True,
+    "send_user_commands_to_agent": True,
     # Tool output visibility
     "show_tool_output": True,
     # Shell init script
@@ -73,7 +73,7 @@ class ArtificeConfig:
     python_output_code_block: bool
 
     # Auto-send settings
-    auto_send_to_agent: bool
+    send_user_commands_to_agent: bool
 
     # Tool output visibility
     show_tool_output: bool

@@ -15,8 +15,8 @@ Artifice is a minimal AI agent harness with a terminal interface. It provides a 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    ArtificeApp (Entry)                        │
-│  - Parses args, loads config                                  │
+│                    ArtificeApp (Entry)                      │
+│  - Parses args, loads config                                │
 │  - Initializes Textual app with theme                       │
 └───────────────────────┬─────────────────────────────────────┘
                         │
@@ -34,7 +34,7 @@ Artifice is a minimal AI agent harness with a terminal interface. It provides a 
 │   (LLM)       │ │         │ │   Manager      │
 ├───────────────┤ ├─────────┤ ├────────────────┤
 │ Agent         │ │Execution│ │ StreamManager  │
-│ manages       │ │Coordinator│ - Buffers    │
+│ manages       │ │Coordinator│ - Buffers      │
 │ conversation  │ │         │ │   chunks       │
 │ history via   │ │Python   │ │                │
 │ any-llm       │ │Executor │ │ FenceDetector  │
@@ -97,7 +97,7 @@ User Input → ArtificeTerminal ──────> Input Mode?
                               ▼
                     TerminalOutput Blocks
                               │
-                              │ (auto_send_to_agent?)
+                              │ (send_user_commands_to_agent?)
                               └───yes──> Agent.send()
 ```
 

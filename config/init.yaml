@@ -36,7 +36,7 @@ show_tool_output: true
 
 # Auto-send execution results to the agent
 # When True, code execution results are automatically sent to the AI agent
-auto_send_to_agent: true
+send_user_commands_to_agent: true
 
 # Display Settings
 agent_markdown: true

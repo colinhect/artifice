@@ -43,8 +43,8 @@ class AgentCoordinator:
         batch_update_fn: Callable,
         call_after_refresh_fn: Callable,
         mark_block_in_context_fn: Callable[[BaseBlock], None],
-        set_auto_send_to_agent_fn: Callable[[bool], None],
-        is_auto_send_to_agent_fn: Callable[[], bool],
+        set_send_user_commands_to_agent_fn: Callable[[bool], None],
+        is_send_user_commands_to_agent_fn: Callable[[], bool],
         get_config_attr_fn: Callable[[str], Any],
         status_manager,
     ) -> None:
@@ -57,8 +57,8 @@ class AgentCoordinator:
             batch_update_fn: Function to get batch_update context manager
             call_after_refresh_fn: Function to schedule work after refresh
             mark_block_in_context_fn: Function to mark blocks as in-context
-            set_auto_send_to_agent_fn: Function to set auto-send mode
-            is_auto_send_to_agent_fn: Function to check auto-send mode
+            set_send_user_commands_to_agent_fn: Function to set auto-send mode
+            is_send_user_commands_to_agent_fn: Function to check auto-send mode
             get_config_attr_fn: Function to get config attributes
             status_manager: Status indicator manager for updating UI
         """
@@ -68,8 +68,8 @@ class AgentCoordinator:
         self._batch_update = batch_update_fn
         self._call_after_refresh = call_after_refresh_fn
         self._mark_block_in_context = mark_block_in_context_fn
-        self._set_auto_send_to_agent = set_auto_send_to_agent_fn
-        self._is_auto_send_to_agent = is_auto_send_to_agent_fn
+        self._set_send_user_commands_to_agent = set_send_user_commands_to_agent_fn
+        self._is_send_user_commands_to_agent = is_send_user_commands_to_agent_fn
         self._get_config_attr = get_config_attr_fn
         self._status_manager = status_manager
         self._current_task: asyncio.Task | None = None
@@ -96,8 +96,8 @@ class AgentCoordinator:
         self._apply_agent_response(detector, response)
 
         # After first agent interaction, enable auto-send mode
-        if not self._is_auto_send_to_agent():
-            self._set_auto_send_to_agent(True)
+        if not self._is_send_user_commands_to_agent():
+            self._set_send_user_commands_to_agent(True)
 
     async def send_execution_result_to_agent(
         self, code: str, language: str, output: str, error: str
