@@ -165,12 +165,42 @@ class ArtificeTerminal(Widget):
                 yield self.connection_status
                 yield self.agent_status
 
+    def _append_system_block(self, path: str | Path, content: str) -> None:
+        """Append a SystemBlock with formatted path and content info.
+
+        Path formatting:
+        - If in home directory: ~/relative/path
+        - Otherwise: relative to current working directory
+        """
+        path_obj = Path(path).expanduser().resolve()
+        home = Path.home()
+
+        try:
+            if path_obj.is_relative_to(home):
+                display_path = f"~/{path_obj.relative_to(home)}"
+            else:
+                display_path = os.path.relpath(path_obj, os.getcwd())
+        except ValueError:
+            display_path = str(path_obj)
+
+        block = SystemBlock(
+            output=f"{display_path} (_{len(content)} characters_)",
+            render_markdown=True,
+        )
+        block.flush()
+        if self._auto_send_to_agent:
+            self._mark_block_in_context(block)
+        self.output.append_block(block)
+
     def on_mount(self) -> None:
         self._status_manager.update_agent_info()
-        if self._system_prompt_path is not None:
-            block = SystemBlock(output=f"[`{self._system_prompt_path}`]", render_markdown=True)
-            block.flush()
-            self.output.append_block(block)
+        if (
+            self._system_prompt_path is not None
+            and self._config.system_prompt is not None
+        ):
+            self._append_system_block(
+                self._system_prompt_path, self._config.system_prompt
+            )
 
     async def _run_cancellable(self, coro, *, finally_callback=None):
         """Run a coroutine with standard cancel handling."""
@@ -580,8 +610,12 @@ class ArtificeTerminal(Widget):
 
         if self._auto_send_to_agent:
             self.input.add_class("in-context")
+            for block in self.output.children:
+                if isinstance(block, BaseBlock) and block not in self._context_blocks:
+                    self._mark_block_in_context(block)
         else:
             self.input.remove_class("in-context")
+            self._clear_all_context_highlights()
 
     def on_terminal_input_prompt_selected(
         self, event: TerminalInput.PromptSelected
@@ -589,10 +623,7 @@ class ArtificeTerminal(Widget):
         """Handle prompt template selection: append to agent's system prompt."""
         if self._agent is not None:
             self._agent.messages.append({"role": "user", "content": event.content})
-            block = SystemBlock(output=f"[`{os.path.relpath(event.path, os.getcwd())}`]", render_markdown=True)
-            block.toggle_markdown()
-            block.flush()
-            self.output.append_block(block)
+            self._append_system_block(event.path, event.content)
 
     def action_scroll_output_up(self) -> None:
         """Scroll the output window up by one page."""

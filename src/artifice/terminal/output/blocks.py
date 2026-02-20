@@ -147,6 +147,14 @@ class BufferedOutputBlock(BaseBlock):
             self._markdown.styles.display = "none"
             self._output.styles.display = "block"
 
+    def _switch_to_markdown(self) -> None:
+        """Switch to markdown display - both widgets pre-mounted, just toggle display."""
+        if not self._markdown_loaded:
+            self._markdown_loaded = True
+            self._markdown.update(self._output_str.strip())
+        self._output.styles.display = "none"
+        self._markdown.styles.display = "block"
+
 
 class CodeOutputBlock(BufferedOutputBlock):
     _STATIC_CSS_CLASS = "code-output"
@@ -255,14 +263,6 @@ class AgentOutputBlock(BufferedOutputBlock):
         self._output_str += response
         self._dirty = True
 
-    def _switch_to_markdown(self) -> None:
-        """Switch to markdown display - both widgets pre-mounted, just toggle display."""
-        if not self._markdown_loaded:
-            self._markdown_loaded = True
-            self._markdown.update(self._output_str.strip())
-        self._output.styles.display = "none"
-        self._markdown.styles.display = "block"
-
     def finalize_streaming(self) -> None:
         """End streaming: flush any remaining text, then swap to Markdown if enabled."""
         if not self._streaming:
@@ -299,12 +299,26 @@ class ThinkingOutputBlock(AgentOutputBlock):
     def __init__(self, output="", activity=True) -> None:
         super().__init__(output=output, activity=activity, render_markdown=False)
 
+
 class SystemBlock(BufferedOutputBlock):
     _STATIC_CSS_CLASS = "system-output"
     _MARKDOWN_CSS_CLASS = "system-markdown-output"
 
     def __init__(self, output="", render_markdown=True) -> None:
         super().__init__(output=output, render_markdown=render_markdown)
+        self._status_indicator = Static("", classes="status-indicator")
+
+    def compose(self) -> ComposeResult:
+        with self._contents:
+            yield self._status_indicator
+            yield self._output
+            yield self._markdown
+
+    def on_mount(self) -> None:
+        """Switch to Markdown immediately since system blocks are always complete."""
+        self._markdown.styles.display = "none"
+        if self._render_markdown:
+            self._switch_to_markdown()
 
 
 class ToolCallBlock(CodeInputBlock):
