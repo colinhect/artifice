@@ -23,7 +23,7 @@ class ToolCall:
         """Return the primary text to display (code, path, query, etc.)."""
         tool_def = TOOLS.get(self.name)
         if tool_def:
-            return self.args.get(tool_def.display_arg, str(self.args))
+            return str(self.args.get(tool_def.display_arg, self.args))
         return str(self.args)
 
     @property

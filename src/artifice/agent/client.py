@@ -81,6 +81,14 @@ class Agent:
         """Send a prompt, stream the response, and return the full result."""
         if prompt.strip():
             self.messages.append({"role": "user", "content": prompt})
+            # If user sends a new message while there are pending tool calls,
+            # clear them - the user is choosing to respond instead of executing
+            if self._pending_tool_calls:
+                logger.debug(
+                    "Clearing %d pending tool calls due to new user message",
+                    len(self._pending_tool_calls),
+                )
+                self._pending_tool_calls.clear()
 
         messages = self.messages.copy()
         sys_content = self.system_prompt or ""
@@ -147,13 +155,22 @@ class Agent:
 
         # Parse raw tool calls into ToolCall objects
         tool_calls: list[ToolCall] = []
-        for rtc in raw_tool_calls:
+        logger.debug("Parsing %d raw tool calls", len(raw_tool_calls))
+        for i, rtc in enumerate(raw_tool_calls):
             name = rtc["function"]["name"]
+            args_str = rtc["function"]["arguments"]
+            logger.debug(
+                "Raw tool call %d: id=%s name=%s args=%s", i, rtc["id"], name, args_str
+            )
             try:
-                args = json.loads(rtc["function"]["arguments"])
-            except json.JSONDecodeError:
+                args = json.loads(args_str)
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    "Failed to parse tool call arguments: %s (args_str=%s)", e, args_str
+                )
                 args = {}
             tool_calls.append(ToolCall(id=rtc["id"], name=name, args=args))
+        logger.debug("Parsed %d tool calls", len(tool_calls))
 
         # Update conversation history
         if tool_calls:

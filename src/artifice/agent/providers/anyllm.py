@@ -123,6 +123,9 @@ class AnyLLMProvider(Provider):
                     }
                     for tc in delta.tool_calls
                 ]
+                logger.debug(
+                    "Extracted tool calls from chunk: %s", stream_chunk.tool_calls
+                )
 
             yield stream_chunk
 

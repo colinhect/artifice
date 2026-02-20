@@ -172,10 +172,14 @@ class AgentCoordinator:
         self._call_after_refresh(lambda: self._output.scroll_end(animate=True))
 
         # Create ToolCallBlocks directly for native tool calls
+        logger.debug("Response has %d tool calls", len(response.tool_calls))
         if response.tool_calls:
             with self._batch_update():
                 first_tool_block = None
                 for tc in response.tool_calls:
+                    logger.debug(
+                        "Creating ToolCallBlock for %s with args %s", tc.name, tc.args
+                    )
                     tool_block = ToolCallBlock(
                         tool_call_id=tc.id,
                         name=tc.name,

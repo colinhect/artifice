@@ -20,9 +20,23 @@ class ShellExecutor:
     Only execute commands from trusted sources.
     """
 
+    # ANSI escape patterns shared with TmuxShellExecutor
+    _OSC_RE = re.compile(r"\x1b\].*?(?:\x1b\\|\x07)")
+    _CSI_RE = re.compile(r"\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]")
+    _OTHER_ESC_RE = re.compile(r"\x1b[()#].|\x1b[=>]")
+
     def __init__(self) -> None:
         self.working_directory = os.getcwd()
         self.init_script: str | None = None
+
+    @classmethod
+    def _strip_escapes(cls, text: str) -> str:
+        """Strip ANSI/OSC escape sequences and carriage returns from terminal output."""
+        text = cls._OSC_RE.sub("", text)
+        text = cls._CSI_RE.sub("", text)
+        text = cls._OTHER_ESC_RE.sub("", text)
+        text = text.replace("\r", "")
+        return text
 
     async def execute(
         self,
@@ -70,6 +84,7 @@ class ShellExecutor:
                     if not line:
                         break
                     text = line.decode("utf-8", errors="replace")
+                    text = self._strip_escapes(text)
                     lines_list.append(text)
                     if text and callback:
                         callback(text)
