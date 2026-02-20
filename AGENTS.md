@@ -72,7 +72,7 @@
 - Providers are stateless API clients
 - Receive full conversation history on each call
 - Return `ProviderResponse` with streaming support
-- Implement `ProviderBase` interface
+- Implement `Provider` abstract base class from `artifice.agent.providers.base`
 
 ### Agent Pattern
 - Agents manage conversation history
@@ -85,7 +85,7 @@
 ```
 src/artifice/
 ├── __init__.py              # Public API exports
-├── app.py                   # Entry point (argparse, main())
+├── app.py                   # Entry point (argparse, main(), ArtificeApp)
 │
 ├── core/                    # Domain layer - business logic
 │   ├── config.py           # Configuration management
@@ -95,6 +95,7 @@ src/artifice/
 │
 ├── execution/               # Code execution layer
 │   ├── base.py             # ExecutionResult, ExecutionStatus
+│   ├── common.py           # Backward compatibility re-exports
 │   ├── python.py           # Python REPL executor
 │   ├── shell.py            # Shell + Tmux executors
 │   ├── callbacks.py        # Output callback handlers
@@ -102,11 +103,12 @@ src/artifice/
 │
 ├── agent/                   # LLM integration
 │   ├── client.py           # Main Agent class
-│   ├── factory.py          # Agent creation logic
 │   ├── simulated.py        # Mock agents for testing
+│   ├── providers/          # LLM provider implementations
+│   │   ├── base.py         # Provider base class and response types
+│   │   └── anyllm.py       # Any-LLM provider implementation
 │   ├── tools/              # Tool system
 │   │   ├── base.py         # ToolDef, ToolCall
-│   │   ├── registry.py     # TOOLS registry
 │   │   └── executors.py    # Tool implementations
 │   └── streaming/          # Stream handling
 │       ├── manager.py      # Stream coordination
@@ -114,21 +116,23 @@ src/artifice/
 │       └── detector.py     # Code fence detection
 │
 ├── ui/                      # User interface layer
-│   ├── app.py              # Textual app (ArtificeApp)
-│   ├── theme.py            # UI themes
 │   ├── widget.py           # Main terminal widget
 │   ├── components/         # Reusable UI components
 │   │   ├── blocks/         # Output blocks
+│   │   │   ├── blocks.py   # Block widget implementations
+│   │   │   ├── registry.py # BlockRenderer protocol and registry
+│   │   │   └── factory.py  # BlockFactory for creating blocks
 │   │   ├── input.py        # TerminalInput
-│   │   └── output.py       # TerminalOutput
+│   │   ├── output.py       # TerminalOutput
+│   │   └── status.py       # StatusIndicatorManager
 │   └── controllers/        # UI coordination
 │       ├── agent_coordinator.py
 │       ├── nav_controller.py
-│       └── context_tracker.py
+│       └── search.py       # Search mode management
 │
 └── utils/                   # Shared utilities
     ├── text.py             # Text processing
-    ├── theme.py            # Theme utilities
+    ├── theme.py            # Theme utilities (create_artifice_theme)
     └── fencing/            # Code fence parsing
         ├── parser.py
         └── state.py

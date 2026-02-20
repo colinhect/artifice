@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from artifice.ui.components.blocks.blocks import BaseBlock
-    from artifice.ui.components.input import TerminalInput, InputTextArea
+    from artifice.ui.components.input import TerminalInput
     from artifice.ui.components.output import TerminalOutput
 
 
@@ -46,6 +46,7 @@ class NavigationController:
     def navigate_up(self) -> None:
         """Navigate up: from input to output, or up through output blocks."""
         from artifice.ui.components.input import InputTextArea
+
         input_area = self._input.query_one("#code-input", InputTextArea)
         if input_area.has_focus and self._output._blocks:
             self._output.focus()
