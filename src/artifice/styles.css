@@ -292,21 +292,20 @@ CodeOutputBlock .markdown-output {
 }
 
 SystemBlock {
-    color: $foreground 60%;
+    color: $foreground 44%;
     border-left: solid $primary;
     transition: color 0.15s, border-color 0.15s;
 }
 
 SystemBlock .system-output {
-    background: $surface-darken-1;
-    color: $foreground 66%;
+    color: $foreground 44%;
     padding-left: 0;
     padding-right: 0;
     transition: opacity 0.15s;
 }
 
 SystemBlock .system-markdown-output {
-    background: $surface-darken-1;
+    color: $foreground 44%;
     padding-left: 0;
     padding-right: 0;
     layout: stream;

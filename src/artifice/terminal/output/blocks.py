@@ -213,7 +213,7 @@ class WidgetOutputBlock(BaseBlock):
 class AgentInputBlock(BaseBlock):
     def __init__(self, prompt: str, in_context=False, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._status_indicator = Static(">", classes="status-indicator status-pending")
+        self._status_indicator = Static(">", classes="status-indicator status-success")
         self._prompt = Static(prompt, classes="prompt")
         self._original_prompt = prompt  # Store original prompt for re-use
         if in_context:
@@ -306,7 +306,7 @@ class SystemBlock(BufferedOutputBlock):
 
     def __init__(self, output="", render_markdown=True) -> None:
         super().__init__(output=output, render_markdown=render_markdown)
-        self._status_indicator = Static("", classes="status-indicator")
+        self._status_indicator = Static(">", classes="status-indicator status-success")
 
     def compose(self) -> ComposeResult:
         with self._contents:
