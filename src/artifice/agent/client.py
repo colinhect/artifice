@@ -1,4 +1,4 @@
-"""Agent - manages LLM conversation and tool calls via any-llm."""
+"""Agent - manages LLM conversation and tool calls via provider abstraction."""
 
 from __future__ import annotations
 
@@ -6,23 +6,15 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Callable
 
+from artifice.agent.providers.base import Provider, TokenUsage
 from artifice.agent.tools.base import ToolCall, get_schemas_for
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-
-    from any_llm.types.completion import ChatCompletionChunk
+    pass
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class TokenUsage:
-    input_tokens: int = 0
-    output_tokens: int = 0
-    total_tokens: int = 0
 
 
 @dataclass
@@ -35,37 +27,50 @@ class AgentResponse:
 
 
 class Agent:
-    """Manages LLM conversation history and streaming via any-llm.
+    """Manages LLM conversation history and streaming via provider abstraction.
 
     Supports native OpenAI-style tool calls (python/shell) and maintains
-    conversation context across turns.
+    conversation context across turns. Uses a Provider for low-level
+    LLM communication.
 
-    Configuration is passed directly: model string, optional api_key,
-    optional provider override, optional base_url. The any-llm library
-    handles provider routing from the model string (e.g. "moonshot-v1-8k"
-    for Kimi, "abab6.5s-chat" for MiniMax, etc.).
+    Configuration can be passed either via a Provider instance or directly
+    (for backward compatibility with any-llm style config).
     """
 
     def __init__(
         self,
-        model: str,
+        model: str | None = None,
         system_prompt: str | None = None,
         tools: list[str] | None = None,
+        provider: Provider | None = None,
         api_key: str | None = None,
-        provider: str | None = None,
+        provider_name: str | None = None,
         base_url: str | None = None,
         on_connect: Callable | None = None,
     ) -> None:
-        self.model = model
         self.system_prompt = system_prompt
         self.tools = tools
-        self._api_key = api_key
-        self._provider = provider
-        self._base_url = base_url
         self._on_connect = on_connect
         self._connected = False
         self.messages: list[dict] = []
         self._pending_tool_calls: list[ToolCall] = []
+
+        # Initialize provider
+        if provider is not None:
+            self._provider = provider
+        elif model is not None:
+            # Backward compatibility: create AnyLLMProvider
+            from artifice.agent.providers.anyllm import AnyLLMProvider
+
+            self._provider = AnyLLMProvider(
+                model=model,
+                api_key=api_key,
+                provider=provider_name,
+                base_url=base_url,
+            )
+        else:
+            error = "Either 'provider' or 'model' must be provided"
+            raise ValueError(error)
 
     async def send(
         self,
@@ -74,8 +79,6 @@ class Agent:
         on_thinking_chunk: Callable | None = None,
     ) -> AgentResponse:
         """Send a prompt, stream the response, and return the full result."""
-        from any_llm import acompletion
-
         if prompt.strip():
             self.messages.append({"role": "user", "content": prompt})
 
@@ -84,22 +87,50 @@ class Agent:
         if sys_content and (not messages or messages[0].get("role") != "system"):
             messages = [{"role": "system", "content": sys_content}, *messages]
 
-        kwargs: dict[str, Any] = dict(model=self.model, messages=messages, stream=True)
-        if self._api_key is not None:
-            kwargs["api_key"] = self._api_key
-        if self._provider is not None:
-            kwargs["provider"] = self._provider
-        if self._base_url is not None:
-            kwargs["api_base"] = self._base_url
-        if self.tools is not None:
-            kwargs["tools"] = get_schemas_for(self.tools)
-            kwargs["tool_choice"] = "auto"
+        tool_schemas = get_schemas_for(self.tools) if self.tools else None
 
         try:
-            stream = await acompletion(**kwargs)
-            from typing import cast
+            # Stream via provider
+            text = ""
+            thinking = ""
+            usage: TokenUsage | None = None
+            raw_tool_calls: list[dict] = []
 
-            stream = cast("AsyncIterator[ChatCompletionChunk]", stream)
+            async for chunk in self._provider.stream_completion(
+                messages=messages,
+                tools=tool_schemas,
+                on_chunk=on_chunk,
+                on_thinking_chunk=on_thinking_chunk,
+            ):
+                if chunk.usage:
+                    usage = chunk.usage
+                if chunk.content:
+                    text += chunk.content
+                if chunk.reasoning:
+                    thinking += chunk.reasoning
+                if chunk.tool_calls:
+                    for tc in chunk.tool_calls:
+                        idx = tc["index"]
+                        while len(raw_tool_calls) <= idx:
+                            raw_tool_calls.append(
+                                {
+                                    "id": "",
+                                    "type": "function",
+                                    "function": {"name": "", "arguments": ""},
+                                }
+                            )
+                        rtc = raw_tool_calls[idx]
+                        if tc["id"]:
+                            rtc["id"] += tc["id"]
+                        if tc["function"]["name"]:
+                            rtc["function"]["name"] += tc["function"]["name"]
+                        if tc["function"]["arguments"]:
+                            rtc["function"]["arguments"] += tc["function"]["arguments"]
+
+        except asyncio.CancelledError:
+            if prompt.strip() and self.messages and self.messages[-1]["role"] == "user":
+                self.messages.pop()
+            raise
         except Exception:
             import traceback
 
@@ -113,58 +144,6 @@ class Agent:
             self._connected = True
             if self._on_connect:
                 self._on_connect("connected")
-
-        text = ""
-        thinking = ""
-        usage: TokenUsage | None = None
-        raw_tool_calls: list[dict] = []
-
-        try:
-            async for chunk in stream:
-                if hasattr(chunk, "usage") and chunk.usage:
-                    usage = TokenUsage(
-                        input_tokens=chunk.usage.prompt_tokens or 0,
-                        output_tokens=chunk.usage.completion_tokens or 0,
-                        total_tokens=chunk.usage.total_tokens or 0,
-                    )
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-                if hasattr(delta, "reasoning") and delta.reasoning:
-                    reasoning_content = (
-                        delta.reasoning.content
-                        if hasattr(delta.reasoning, "content")
-                        else str(delta.reasoning)
-                    )
-                    thinking += reasoning_content
-                    if on_thinking_chunk:
-                        on_thinking_chunk(reasoning_content)
-                if delta.content:
-                    text += delta.content
-                    if on_chunk:
-                        on_chunk(delta.content)
-                if hasattr(delta, "tool_calls") and delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        idx = tc.index
-                        while len(raw_tool_calls) <= idx:
-                            raw_tool_calls.append(
-                                {
-                                    "id": "",
-                                    "type": "function",
-                                    "function": {"name": "", "arguments": ""},
-                                }
-                            )
-                        rtc = raw_tool_calls[idx]
-                        if tc.id:
-                            rtc["id"] += tc.id
-                        if tc.function and tc.function.name:
-                            rtc["function"]["name"] += tc.function.name
-                        if tc.function and tc.function.arguments:
-                            rtc["function"]["arguments"] += tc.function.arguments
-        except asyncio.CancelledError:
-            if prompt.strip() and self.messages and self.messages[-1]["role"] == "user":
-                self.messages.pop()
-            raise
 
         # Parse raw tool calls into ToolCall objects
         tool_calls: list[ToolCall] = []

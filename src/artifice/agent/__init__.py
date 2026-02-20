@@ -7,6 +7,13 @@ import os
 from typing import TYPE_CHECKING
 
 from artifice.agent.client import Agent, AgentResponse
+from artifice.agent.providers import (
+    AnyLLMProvider,
+    Provider,
+    ProviderResponse,
+    StreamChunk,
+    TokenUsage,
+)
 from artifice.agent.simulated import EchoAgent, ScriptedAgent, SimulatedAgent
 from artifice.agent.tools.base import TOOLS, ToolCall, ToolDef, execute_tool_call
 
@@ -18,12 +25,17 @@ if TYPE_CHECKING:
 __all__ = [
     "Agent",
     "AgentResponse",
+    "AnyLLMProvider",
     "EchoAgent",
     "execute_tool_call",
+    "Provider",
+    "ProviderResponse",
     "ScriptedAgent",
     "SimulatedAgent",
+    "StreamChunk",
     "ToolCall",
     "ToolDef",
+    "TokenUsage",
     "TOOLS",
 ]
 
@@ -90,7 +102,7 @@ def create_agent(
         system_prompt=system_prompt,
         tools=tools,
         api_key=api_key,
-        provider=llm_provider,
+        provider_name=llm_provider,
         base_url=base_url,
         on_connect=on_connect,
     )
