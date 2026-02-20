@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Callable
 
-from .terminal.output import TerminalOutput, CodeOutputBlock
+from artifice.ui.components.output import TerminalOutput
+from artifice.ui.components.blocks.blocks import CodeOutputBlock
 
 
 class OutputCallbackHandler:

@@ -7,8 +7,8 @@ import re
 import logging
 from typing import Any, Callable
 
-from .agent import AgentResponse, ToolCall
-from .tools import TOOLS
+from artifice.agent.client import AgentResponse
+from artifice.agent.tools.base import TOOLS, ToolCall
 
 logger = logging.getLogger(__name__)
 

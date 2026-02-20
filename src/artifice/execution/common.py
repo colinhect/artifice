@@ -1,26 +1,10 @@
+"""Backward compatibility re-export for execution.common module (now base)."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum, auto
-from typing import Any
+from artifice.execution.base import (
+    ExecutionResult as ExecutionResult,
+    ExecutionStatus as ExecutionStatus,
+)
 
-
-class ExecutionStatus(Enum):
-    """Status of code execution."""
-
-    PENDING = auto()
-    RUNNING = auto()
-    SUCCESS = auto()
-    ERROR = auto()
-
-
-@dataclass
-class ExecutionResult:
-    """Result of executing Python code."""
-
-    code: str
-    status: ExecutionStatus = ExecutionStatus.PENDING
-    output: str = ""
-    error: str = ""
-    result_value: Any = None
-    exception: Exception | None = None
+__all__ = ["ExecutionResult", "ExecutionStatus"]

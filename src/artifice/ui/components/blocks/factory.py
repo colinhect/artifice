@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .terminal.output import BaseBlock
+from artifice.ui.components.blocks.blocks import BaseBlock
 
 if TYPE_CHECKING:
-    from .terminal.output import AgentOutputBlock, TerminalOutput
+    from artifice.ui.components.blocks.blocks import AgentOutputBlock
+    from artifice.ui.components.output import TerminalOutput
 
 
 class BlockFactory:

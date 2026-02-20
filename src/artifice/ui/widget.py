@@ -14,29 +14,29 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import LoadingIndicator, Static
 
-from ..prompts import load_prompt
-from ..agent import Agent, SimulatedAgent, create_agent, execute_tool_call
-from ..execution import ExecutionResult, ExecutionStatus
-from ..history import History
-from .input import TerminalInput, InputTextArea
-from .output import (
-    TerminalOutput,
+from artifice.core.events import InputMode
+from artifice.core.history import History
+from artifice.core.prompts import load_prompt
+from artifice.agent import Agent, SimulatedAgent, create_agent
+from artifice.agent.streaming.manager import StreamManager
+from artifice.agent.streaming.detector import StreamingFenceDetector
+from artifice.execution import ExecutionResult, ExecutionStatus
+from artifice.execution.coordinator import ExecutionCoordinator
+from artifice.ui.components.input import TerminalInput, InputTextArea
+from artifice.ui.components.output import TerminalOutput
+from artifice.ui.components.blocks.blocks import (
     AgentInputBlock,
     AgentOutputBlock,
+    BaseBlock,
     CodeInputBlock,
     CodeOutputBlock,
-    ToolCallBlock,
     SystemBlock,
-    BaseBlock,
+    ToolCallBlock,
 )
-from ..fence_detector import StreamingFenceDetector
-from ..status_indicator import StatusIndicatorManager
-from ..execution_coordinator import ExecutionCoordinator
-from ..stream_manager import StreamManager
-from ..input_mode import InputMode
+from artifice.ui.components.status import StatusIndicatorManager
 
 if TYPE_CHECKING:
-    from ..app import ArtificeApp
+    from artifice.app import ArtificeApp
     from typing import Union
 
     AnyAgent = Union[Agent, SimulatedAgent]
@@ -411,7 +411,7 @@ class ArtificeTerminal(Widget):
 
         # Check if this is a tool call with a direct executor (read_file, etc.)
         if isinstance(block, ToolCallBlock) and block.tool_args:
-            from ..agent.tools import TOOLS
+            from artifice.agent.tools.base import TOOLS
 
             tool_def = TOOLS.get(block._tool_name)
             if tool_def and tool_def.executor:
@@ -471,7 +471,10 @@ class ArtificeTerminal(Widget):
         state: dict = {"sent_to_agent": False}
 
         async def do_execute():
-            from ..agent.tools import ToolCall as _ToolCall
+            from artifice.agent.tools.base import (
+                ToolCall as _ToolCall,
+                execute_tool_call,
+            )
 
             tc = _ToolCall(
                 id=block.tool_call_id, name=block._tool_name, args=block.tool_args

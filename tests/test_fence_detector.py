@@ -111,8 +111,8 @@ class FakeOutput:
 def _patch_block_types():
     """Patch isinstance targets so the detector recognizes our fakes."""
     with (
-        patch("artifice.fence_detector.AgentOutputBlock", FakeAgentBlock),
-        patch("artifice.fence_detector.CodeInputBlock", FakeCodeBlock),
+        patch("artifice.agent.streaming.detector.AgentOutputBlock", FakeAgentBlock),
+        patch("artifice.agent.streaming.detector.CodeInputBlock", FakeCodeBlock),
     ):
         yield
 

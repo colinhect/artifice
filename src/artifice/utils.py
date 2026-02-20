@@ -1,12 +1,7 @@
-"""Utility functions and helpers for Artifice."""
+"""Backward compatibility re-export for utils module (now in utils.text)."""
 
 from __future__ import annotations
 
+from artifice.utils.text import format_tokens
 
-def format_tokens(n: int) -> str:
-    """Format token count as a compact string (e.g. 1.2k, 128k)."""
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    if n >= 1_000:
-        return f"{n / 1_000:.1f}k"
-    return str(n)
+__all__ = ["format_tokens"]

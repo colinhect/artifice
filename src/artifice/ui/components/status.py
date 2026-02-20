@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .utils import format_tokens
+from artifice.utils.text import format_tokens
 
 if TYPE_CHECKING:
     from textual.widgets import LoadingIndicator, Static
-    from .config import ArtificeConfig
+    from artifice.core.config import ArtificeConfig
 
 
 class StatusIndicatorManager:

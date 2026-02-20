@@ -1,10 +1,14 @@
-from .common import (
+"""Backward compatibility re-export for execution module."""
+
+from __future__ import annotations
+
+from artifice.execution.base import (
     ExecutionResult as ExecutionResult,
     ExecutionStatus as ExecutionStatus,
 )
-from .python import CodeExecutor as CodeExecutor
-from .shell import ShellExecutor as ShellExecutor
-from .shell import TmuxShellExecutor as TmuxShellExecutor
+from artifice.execution.python import CodeExecutor as CodeExecutor
+from artifice.execution.shell import ShellExecutor as ShellExecutor
+from artifice.execution.shell import TmuxShellExecutor as TmuxShellExecutor
 
 __all__ = [
     "ExecutionResult",

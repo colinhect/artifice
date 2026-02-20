@@ -8,7 +8,7 @@ import traceback
 
 from typing import Callable
 
-from .common import ExecutionStatus, ExecutionResult
+from artifice.execution.base import ExecutionResult, ExecutionStatus
 
 
 class ShellExecutor:

@@ -8,7 +8,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import Static, LoadingIndicator, Markdown
 
-from ...execution import ExecutionResult, ExecutionStatus
+from artifice.execution.base import ExecutionResult, ExecutionStatus
 
 
 class BaseBlock(Static):

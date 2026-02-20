@@ -1,33 +1,29 @@
-"""Terminal output package - re-exports all public names for backward compatibility."""
+"""Output blocks components."""
 
-from .blocks import (
+from __future__ import annotations
+
+from artifice.ui.components.blocks.blocks import (
     AgentInputBlock,
     AgentOutputBlock,
     BaseBlock,
-    BufferedOutputBlock,
     CodeInputBlock,
     CodeOutputBlock,
+    SystemBlock,
     ThinkingOutputBlock,
     ToolCallBlock,
     WidgetOutputBlock,
-    SystemBlock,
 )
-from .containers import (
-    HighlightableContainerMixin,
-    TerminalOutput,
-)
+from artifice.ui.components.blocks.factory import BlockFactory
 
 __all__ = [
     "AgentInputBlock",
     "AgentOutputBlock",
     "BaseBlock",
-    "BufferedOutputBlock",
     "CodeInputBlock",
     "CodeOutputBlock",
-    "HighlightableContainerMixin",
-    "TerminalOutput",
+    "SystemBlock",
     "ThinkingOutputBlock",
     "ToolCallBlock",
     "WidgetOutputBlock",
-    "SystemBlock",
+    "BlockFactory",
 ]

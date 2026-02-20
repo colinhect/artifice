@@ -33,7 +33,7 @@ def test_config_loading_output_block_settings(tmp_path):
         yaml.dump(config_data, f)
 
     # Monkey patch the config path
-    import artifice.config as config_module
+    import artifice.core.config as config_module
 
     original_get_init_script_path = config_module.get_init_script_path
 

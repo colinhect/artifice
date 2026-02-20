@@ -119,7 +119,7 @@ _register(
 
 # Imports are deferred to avoid circular imports and keep this module fast
 # to import.  The executor functions live in tool_executors.py.
-from .tool_executors import (  # noqa pyright:ignore
+from artifice.agent.tools.executors import (  # noqa pyright:ignore
     execute_file_search,
     execute_read_file,
     execute_system_info,

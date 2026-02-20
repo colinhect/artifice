@@ -1,4 +1,4 @@
-"""Agent - manages LLM conversation and tool calls via any-llm."""
+"""Backward compatibility re-export for agent module."""
 
 from __future__ import annotations
 
@@ -6,12 +6,12 @@ import logging
 import os
 from typing import TYPE_CHECKING, Callable
 
-from .agent import Agent, AgentResponse, ToolCall
-from .simulated import EchoAgent, ScriptedAgent, SimulatedAgent
-from .tools import TOOLS, ToolDef, execute_tool_call
+from artifice.agent.client import Agent, AgentResponse
+from artifice.agent.simulated import EchoAgent, ScriptedAgent, SimulatedAgent
+from artifice.agent.tools.base import TOOLS, ToolDef, ToolCall, execute_tool_call
 
 if TYPE_CHECKING:
-    from ..config import ArtificeConfig
+    from artifice.core.config import ArtificeConfig
 
 __all__ = [
     "Agent",
@@ -31,25 +31,7 @@ logger = logging.getLogger(__name__)
 def create_agent(
     config: ArtificeConfig, on_connect: Callable | None = None
 ) -> Agent | SimulatedAgent | None:
-    """Instantiate an agent from the user's configuration.
-
-    Reads ``config.agent`` (the selected agent name) and
-    ``config.agents`` (the dict of agent definitions). Each definition
-    supports the following keys:
-
-    - ``provider``: ``"simulated"`` or any string understood by any-llm
-      (e.g. ``"openai"``, ``"moonshot"``). When omitted, ``model`` alone is
-      used and any-llm auto-detects the provider.
-    - ``model``: model identifier passed directly to any-llm.
-    - ``api_key``: API key string. Alternatively, set ``api_key_env`` to read
-      from an environment variable.
-    - ``api_key_env``: Name of the environment variable holding the API key.
-    - ``base_url``: Custom base URL for self-hosted or proxy endpoints.
-    - ``tools``: List of tool name patterns to enable (e.g. ``["*"]``,
-      ``["python", "shell"]``, ``["web_*"]``).  Supports fnmatch wildcards.
-    - ``use_tools``: (deprecated) Boolean; treated as ``tools: ["*"]`` when true.
-    - ``system_prompt``: Override the global system_prompt for this agent.
-    """
+    """Instantiate an agent from the user's configuration."""
     if not config.agents or not config.agent:
         error = "No agent selected in configuration"
         raise ValueError(error)

@@ -6,22 +6,20 @@ from typing import TYPE_CHECKING, Callable
 
 from textual.widget import Widget
 
-from .execution import (
-    ExecutionResult,
-    CodeExecutor,
-    ShellExecutor,
-    TmuxShellExecutor,
-)
-from .terminal.output import (
+from artifice.core.config import ArtificeConfig
+from artifice.execution.base import ExecutionResult
+from artifice.execution.callbacks import OutputCallbackHandler
+from artifice.execution.python import CodeExecutor
+from artifice.execution.shell import ShellExecutor, TmuxShellExecutor
+from artifice.ui.components.blocks.blocks import (
+    BaseBlock,
     CodeInputBlock,
     WidgetOutputBlock,
-    BaseBlock,
 )
-from .output_callbacks import OutputCallbackHandler
+from artifice.ui.components.output import TerminalOutput
 
 if TYPE_CHECKING:
-    from .config import ArtificeConfig
-    from .terminal.output import TerminalOutput
+    pass
 
 
 class ExecutionCoordinator:

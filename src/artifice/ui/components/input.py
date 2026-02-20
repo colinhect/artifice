@@ -13,12 +13,13 @@ from textual.widgets import Static, TextArea, LoadingIndicator
 from textual import events
 from textual_autocomplete import DropdownItem, TargetState
 
-from ..prompts import list_prompts, load_prompt, fuzzy_match
-from ..input_mode import InputMode
-from ..search_mode_manager import SearchModeManager
+from artifice.core.events import InputMode
+from artifice.core.history import History
+from artifice.core.prompts import fuzzy_match, list_prompts, load_prompt
+from artifice.ui.controllers.search import SearchModeManager
 
 if TYPE_CHECKING:
-    from ..history import History
+    pass
 
 
 class InputTextArea(TextArea):

@@ -5,12 +5,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable
 
-from .terminal.output import ThinkingOutputBlock
-from .chunk_buffer import ChunkBuffer
-from .fence_detector import StreamingFenceDetector
+from artifice.agent.streaming.buffer import ChunkBuffer
+from artifice.agent.streaming.detector import StreamingFenceDetector
+from artifice.ui.components.blocks.blocks import ThinkingOutputBlock
 
 if TYPE_CHECKING:
-    from .terminal.output import TerminalOutput
+    from artifice.ui.components.output import TerminalOutput
 
 logger = logging.getLogger(__name__)
 

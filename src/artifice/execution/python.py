@@ -8,7 +8,7 @@ from io import StringIO
 from queue import Queue
 from typing import Any, Callable
 
-from .common import ExecutionStatus, ExecutionResult
+from artifice.execution.base import ExecutionResult, ExecutionStatus
 
 
 class StreamCapture(StringIO):

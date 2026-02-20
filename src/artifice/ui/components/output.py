@@ -8,8 +8,8 @@ from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.message import Message
 
-from ..input import InputTextArea
-from .blocks import (
+from artifice.ui.components.input import InputTextArea
+from artifice.ui.components.blocks.blocks import (
     AgentInputBlock,
     AgentOutputBlock,
     BaseBlock,

@@ -8,7 +8,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable
 
-from .tools import ToolCall, get_schemas_for
+from artifice.agent.tools.base import ToolCall, get_schemas_for
 
 if TYPE_CHECKING:
     from any_llm.types.completion import ChatCompletionChunk
