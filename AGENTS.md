@@ -3,7 +3,7 @@
 ## Important Constraints
 
 ### Do Not Execute
-- **Never run the application directly** (`artifice` or `python src/artifice/terminal.py`)
+- **Never run the application directly** (`artifice` or `python -m artifice.app`)
 - The TUI interface requires terminal interaction that won't work in in AI agent environment
 - Test changes through unit tests instead
 
@@ -95,7 +95,6 @@ src/artifice/
 │
 ├── execution/               # Code execution layer
 │   ├── base.py             # ExecutionResult, ExecutionStatus
-│   ├── common.py           # Backward compatibility re-exports
 │   ├── python.py           # Python REPL executor
 │   ├── shell.py            # Shell + Tmux executors
 │   ├── callbacks.py        # Output callback handlers
@@ -111,17 +110,13 @@ src/artifice/
 │   │   ├── base.py         # ToolDef, ToolCall
 │   │   └── executors.py    # Tool implementations
 │   └── streaming/          # Stream handling
-│       ├── manager.py      # Stream coordination
-│       ├── buffer.py       # Chunk buffering
-│       └── detector.py     # Code fence detection
+│       └── streaming.py    # StreamManager, ChunkBuffer, StreamingFenceDetector
 │
 ├── ui/                      # User interface layer
 │   ├── widget.py           # Main terminal widget
 │   ├── components/         # Reusable UI components
 │   │   ├── blocks/         # Output blocks
-│   │   │   ├── blocks.py   # Block widget implementations
-│   │   │   ├── registry.py # BlockRenderer protocol and registry
-│   │   │   └── factory.py  # BlockFactory for creating blocks
+│   │   │   └── blocks.py   # Block widget implementations
 │   │   ├── input.py        # TerminalInput
 │   │   ├── output.py       # TerminalOutput
 │   │   └── status.py       # StatusIndicatorManager
@@ -132,10 +127,7 @@ src/artifice/
 │
 └── utils/                   # Shared utilities
     ├── text.py             # Text processing
-    ├── theme.py            # Theme utilities (create_artifice_theme)
-    └── fencing/            # Code fence parsing
-        ├── parser.py
-        └── state.py
+    └── theme.py            # Theme utilities (create_artifice_theme)
 ```
 
 ## Configuration
