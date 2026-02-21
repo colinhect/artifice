@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from pathlib import Path
 
 from textual.app import ComposeResult
@@ -17,9 +16,6 @@ from artifice.core.events import InputMode
 from artifice.core.history import History
 from artifice.core.prompts import fuzzy_match, list_prompts, load_prompt
 from artifice.ui.controllers.search import SearchModeManager
-
-if TYPE_CHECKING:
-    pass
 
 
 class InputTextArea(TextArea):

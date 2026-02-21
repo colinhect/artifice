@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
 from textual.widget import Widget
 
@@ -17,9 +17,6 @@ from artifice.ui.components.blocks.blocks import (
     WidgetOutputBlock,
 )
 from artifice.ui.components.output import TerminalOutput
-
-if TYPE_CHECKING:
-    pass
 
 
 class ExecutionCoordinator:

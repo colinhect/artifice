@@ -69,7 +69,3 @@ class Provider(ABC):
         """
         async for _ in self.stream_completion(messages, tools):
             pass
-
-    async def check_connection(self) -> bool:
-        """Check if the provider is reachable. Override if needed."""
-        return True

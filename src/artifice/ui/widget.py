@@ -110,7 +110,7 @@ class ArtificeTerminal(Widget):
                 config=self._config,
                 output=self.output,
                 schedule_fn=self.call_later,
-                context_tracker=self._mark_block_in_context,
+                context_tracker=self.mark_block_in_context,
             )
 
         # Status indicator manager
@@ -131,7 +131,7 @@ class ArtificeTerminal(Widget):
                 output=self.output,
                 call_later=self.call_later,
                 call_after_refresh=self.call_after_refresh,
-                batch_update=self._batch_update_ctx,
+                batch_update=self.batch_update,
                 streaming_fps=self._config.streaming_fps,
             )
 
@@ -174,11 +174,11 @@ class ArtificeTerminal(Widget):
                 terminal=self,
             )
 
-    def _batch_update_ctx(self):
+    def batch_update(self):
         """Return the app's batch_update context manager."""
         return self.app.batch_update()
 
-    def _set_send_user_commands_to_agent(self, value: bool) -> None:
+    def set_auto_send_enabled(self, value: bool) -> None:
         """Set auto-send to agent mode."""
         self._send_user_commands_to_agent = value
         if value:
@@ -186,15 +186,15 @@ class ArtificeTerminal(Widget):
         else:
             self.input.remove_class("in-context")
 
-    def _is_send_user_commands_to_agent(self) -> bool:
+    def is_auto_send_enabled(self) -> bool:
         """Check if auto-send to agent mode is enabled."""
         return self._send_user_commands_to_agent
 
-    def _get_config_attr(self, name: str) -> Any:
+    def get_config_value(self, name: str) -> Any:
         """Get a config attribute by name."""
         return getattr(self._config, name, None)
 
-    def _focus_input(self) -> None:
+    def focus_input(self) -> None:
         """Focus the input text area."""
         self.input.query_one("#code-input", InputTextArea).focus()
 
@@ -237,7 +237,7 @@ class ArtificeTerminal(Widget):
         )
         block.flush()
         if self._send_user_commands_to_agent:
-            self._mark_block_in_context(block)
+            self.mark_block_in_context(block)
         self.output.append_block(block)
 
     def on_mount(self) -> None:
@@ -275,7 +275,7 @@ class ArtificeTerminal(Widget):
         if event.is_agent_prompt:
             agent_input_block = AgentInputBlock(code)
             self.output.append_block(agent_input_block)
-            self._mark_block_in_context(agent_input_block)
+            self.mark_block_in_context(agent_input_block)
 
         async def do_execute():
             if event.is_agent_prompt:
@@ -297,7 +297,7 @@ class ArtificeTerminal(Widget):
 
         self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
 
-    def _mark_block_in_context(self, block: BaseBlock) -> None:
+    def mark_block_in_context(self, block: BaseBlock) -> None:
         """Mark a block as being in the agent's context."""
         if block not in self._context_blocks:
             self._context_blocks.append(block)
@@ -407,7 +407,7 @@ class ArtificeTerminal(Widget):
             )
 
             tc = _ToolCall(
-                id=block.tool_call_id, name=block._tool_name, args=block.tool_args
+                id=block.tool_call_id, name=block.tool_name, args=block.tool_args
             )
             result_text = await execute_tool_call(tc)
             if result_text is None:
@@ -429,7 +429,7 @@ class ArtificeTerminal(Widget):
             if not self._config.show_tool_output:
                 output_block.add_class("hide-tool-output")
             self.output.append_block(output_block)
-            self._mark_block_in_context(output_block)
+            self.mark_block_in_context(output_block)
 
             # Send result back to agent
             if self._send_user_commands_to_agent and self._agent is not None:
@@ -493,7 +493,7 @@ class ArtificeTerminal(Widget):
             self.input.add_class("in-context")
             for block in self.output.children:
                 if isinstance(block, BaseBlock) and block not in self._context_blocks:
-                    self._mark_block_in_context(block)
+                    self.mark_block_in_context(block)
         else:
             self.input.remove_class("in-context")
             self._clear_all_context_highlights()

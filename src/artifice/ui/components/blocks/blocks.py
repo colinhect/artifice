@@ -97,18 +97,6 @@ class CodeInputBlock(BaseBlock):
         """Get the mode for this code block (python or shell)."""
         return "shell" if self._language == "bash" else "python"
 
-    def cycle_language(self) -> None:
-        """Cycle to the next language (python -> bash -> python)."""
-        if self._language == "python":
-            self._language = "bash"
-        else:
-            self._language = "python"
-
-        # Update syntax highlighting
-        self._code.update(
-            highlight.highlight(self._original_code.strip(), language=self._language)
-        )
-
 
 class StreamingMarkdownBlock(BaseBlock):
     """Block that streams markdown content in real-time using Textual's MarkdownStream.

@@ -125,12 +125,6 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
             self.scroll_end(animate=False)
         return block
 
-    def remove_block(self, block: BaseBlock) -> None:
-        """Remove a block from the blocks list and the DOM."""
-        if block in self._blocks:
-            self._blocks.remove(block)
-        block.remove()
-
     def index_of(self, block: BaseBlock) -> int | None:
         """Return the index of a block, or None if not found."""
         try:

@@ -77,8 +77,8 @@ class AgentCoordinator:
         await self._apply_agent_response(detector, response)
 
         # After first agent interaction, enable auto-send mode
-        if not self._terminal._is_send_user_commands_to_agent():
-            self._terminal._set_send_user_commands_to_agent(True)
+        if not self._terminal.is_auto_send_enabled():
+            self._terminal.set_auto_send_enabled(True)
 
     async def send_execution_result_to_agent(
         self, code: str, language: str, output: str, error: str
@@ -128,7 +128,7 @@ class AgentCoordinator:
             self._stream.on_thinking_chunk(text)
 
         # Apply prompt prefix if configured
-        prompt_prefix = self._terminal._get_config_attr("prompt_prefix")
+        prompt_prefix = self._terminal.get_config_value("prompt_prefix")
         if prompt_prefix and prompt.strip():
             prompt = prompt_prefix + " " + prompt
 
@@ -145,7 +145,7 @@ class AgentCoordinator:
         self._status_manager.set_inactive()
         self._status_manager.update_agent_info(usage=getattr(response, "usage", None))
 
-        with self._terminal._batch_update_ctx():
+        with self._terminal.batch_update():
             await self._stream.finalize()
 
         self._stream.current_detector = None
@@ -155,7 +155,7 @@ class AgentCoordinator:
         # Create ToolCallBlocks directly for native tool calls
         logger.debug("Response has %d tool calls", len(response.tool_calls))
         if response.tool_calls:
-            with self._terminal._batch_update_ctx():
+            with self._terminal.batch_update():
                 first_tool_block = None
                 for tc in response.tool_calls:
                     logger.debug(
@@ -169,7 +169,7 @@ class AgentCoordinator:
                         tool_args=tc.args,
                     )
                     self._output.append_block(tool_block)
-                    self._terminal._mark_block_in_context(tool_block)
+                    self._terminal.mark_block_in_context(tool_block)
                     if first_tool_block is None:
                         first_tool_block = tool_block
 
@@ -186,9 +186,9 @@ class AgentCoordinator:
         self, detector: StreamingFenceDetector, response: AgentResponse
     ) -> None:
         """Mark context, handle errors, and finalize agent output blocks."""
-        with self._terminal._batch_update_ctx():
+        with self._terminal.batch_update():
             for block in detector.all_blocks:
-                self._terminal._mark_block_in_context(block)
+                self._terminal.mark_block_in_context(block)
 
             if detector.first_agent_block:
                 if response.error:

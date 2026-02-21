@@ -52,7 +52,7 @@ class NavigationController:
         """Navigate down: through output blocks, or from output to input."""
         if self._output.has_focus:
             if not self._output.highlight_next():
-                self._terminal._focus_input()
+                self._terminal.focus_input()
 
     def scroll_output_up(self) -> None:
         """Scroll the output window up by one page."""
@@ -64,7 +64,7 @@ class NavigationController:
 
     def focus_input(self) -> None:
         """Focus the input text area."""
-        self._terminal._focus_input()
+        self._terminal.focus_input()
 
     def highlight_block(self, block: BaseBlock) -> None:
         """Highlight a specific block in the output.
