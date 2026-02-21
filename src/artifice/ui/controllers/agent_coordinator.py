@@ -9,11 +9,11 @@ from typing import TYPE_CHECKING
 from artifice.ui.components.blocks.blocks import (
     ToolCallBlock,
 )
+from artifice.ui.components.status import StatusIndicatorManager
 
 if TYPE_CHECKING:
     from artifice.agent import Agent, AgentResponse, SimulatedAgent
-    from artifice.agent.streaming.detector import StreamingFenceDetector
-    from artifice.agent.streaming.manager import StreamManager
+    from artifice.agent.streaming import StreamingFenceDetector, StreamManager
     from artifice.ui.components.output import TerminalOutput
     from artifice.ui.widget import ArtificeTerminal
     from typing import Union
@@ -40,7 +40,7 @@ class AgentCoordinator:
         stream_manager: StreamManager,
         output: TerminalOutput,
         terminal: ArtificeTerminal,
-        status_manager,
+        status_manager: StatusIndicatorManager,
     ) -> None:
         """Initialize the agent coordinator.
 

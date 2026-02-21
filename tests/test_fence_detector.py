@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 import pytest
-from artifice.agent.streaming.detector import StreamingFenceDetector
+from artifice.agent.streaming import StreamingFenceDetector
 
 if TYPE_CHECKING:
     from typing import Protocol
@@ -94,7 +94,7 @@ class FakeOutput:
 @pytest.fixture(autouse=True)
 def _patch_block_types():
     """Patch isinstance targets so the detector recognizes our fakes."""
-    with patch("artifice.agent.streaming.detector.AgentOutputBlock", FakeAgentBlock):
+    with patch("artifice.agent.streaming.streaming.AgentOutputBlock", FakeAgentBlock):
         yield
 
 

@@ -18,7 +18,7 @@ from artifice.core.events import InputMode
 from artifice.core.history import History
 from artifice.core.prompts import load_prompt
 from artifice.agent import Agent, SimulatedAgent, create_agent
-from artifice.agent.streaming.manager import StreamManager
+from artifice.agent.streaming import StreamManager
 from artifice.execution import ExecutionResult, ExecutionStatus
 from artifice.execution.coordinator import ExecutionCoordinator
 from artifice.ui.components.input import TerminalInput, InputTextArea

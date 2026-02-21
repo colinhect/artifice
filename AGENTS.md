@@ -157,5 +157,5 @@ src/artifice/
 
 ### Agent & Execution
 - Agent: `from artifice.agent.client import Agent`
-- Streaming: `from artifice.agent.streaming.manager import StreamManager`
+- Streaming: `from artifice.agent.streaming import StreamManager`
 - Execution: `from artifice.execution.coordinator import ExecutionCoordinator`
