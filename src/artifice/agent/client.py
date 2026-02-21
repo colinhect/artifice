@@ -42,13 +42,9 @@ class Agent(ConversationManager):
 
     def __init__(
         self,
-        model: str | None = None,
+        provider: Provider,
         system_prompt: str | None = None,
         tools: list[str] | None = None,
-        provider: Provider | None = None,
-        api_key: str | None = None,
-        provider_name: str | None = None,
-        base_url: str | None = None,
         on_connect: Callable | None = None,
     ) -> None:
         super().__init__()
@@ -56,21 +52,7 @@ class Agent(ConversationManager):
         self.tools = tools
         self._on_connect = on_connect
         self._connected = False
-
-        if provider is not None:
-            self._provider = provider
-        elif model is not None:
-            from artifice.agent.providers.anyllm import AnyLLMProvider
-
-            self._provider = AnyLLMProvider(
-                model=model,
-                api_key=api_key,
-                provider=provider_name,
-                base_url=base_url,
-            )
-        else:
-            error = "Either 'provider' or 'model' must be provided"
-            raise ValueError(error)
+        self._provider = provider
 
     async def send(
         self,

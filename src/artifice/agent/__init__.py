@@ -91,12 +91,16 @@ def create_agent(
         provider if provider and provider.lower() != "simulated" else None
     )
 
-    return Agent(
+    provider_instance = AnyLLMProvider(
         model=model,
+        api_key=api_key,
+        provider=llm_provider,
+        base_url=base_url,
+    )
+
+    return Agent(
+        provider=provider_instance,
         system_prompt=system_prompt,
         tools=tools,
-        api_key=api_key,
-        provider_name=llm_provider,
-        base_url=base_url,
         on_connect=on_connect,
     )
