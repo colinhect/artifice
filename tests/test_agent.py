@@ -151,7 +151,6 @@ def test_registry_contains_expected_tools():
     assert "write" in TOOLS
     assert "web_search" in TOOLS
     assert "web_fetch" in TOOLS
-    assert "system_info" in TOOLS
 
 
 def test_get_all_schemas_returns_valid_list():
@@ -249,7 +248,6 @@ def test_tools_with_executors():
     assert TOOLS["glob"].executor is not None
     assert TOOLS["web_search"].executor is not None
     assert TOOLS["web_fetch"].executor is not None
-    assert TOOLS["system_info"].executor is not None
 
 
 # --- Tool executor tests ---

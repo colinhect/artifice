@@ -15,7 +15,7 @@ Artifice provides a unified interface for both building precise prompts and runn
 
 ### Tools
 
-- **System Tools** - Built-in tools for file operations (read_file, write_file, file_search), web operations (web_search, web_fetch), and system info (system_info)
+- **System Tools** - Built-in tools for file operations (read_file, write_file, file_search), web operations (web_search, web_fetch)
 - **Code Tools** - `python` and `shell` tools that execute code via the REPL
 
 ### User Interface

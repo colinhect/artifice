@@ -139,24 +139,6 @@ print(f"2 + 2 = {result}")
 The answer is 4. If you need more complex calculations, just let me know!\
 """
 
-_RESP_SYSADMIN = """\
-Let me check a few things about the system state.
-
-<system_info>categories=os,disk</system_info>
-
-<shell>command=ps aux --sort=-%mem | head -10</shell>
-
-| Resource | Warning Threshold | Critical Threshold |
-|----------|------------------|--------------------|
-| Disk     | 80%              | 95%                |
-| Memory   | 75%              | 90%                |
-| CPU      | 80% sustained    | 95% sustained      |
-
-> **Tip**: If disk usage is high, check for old log files with `du -sh /var/log/*` — they're often the culprit.
-
-Let me know what the output shows and I'll help you diagnose any issues.\
-"""
-
 _RESP_MARKDOWN_DEMO = """\
 Here's a showcase of different formatting options:
 
