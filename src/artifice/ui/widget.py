@@ -24,6 +24,7 @@ from artifice.execution.coordinator import ExecutionCoordinator
 from artifice.ui.components.input import TerminalInput, InputTextArea
 from artifice.ui.components.output import TerminalOutput
 from artifice.ui.components.blocks.blocks import (
+    AgentInputBlock,
     BaseBlock,
     CodeInputBlock,
     CodeOutputBlock,
@@ -50,7 +51,9 @@ class ArtificeTerminal(Widget):
         Binding("ctrl+l", "clear", "Clear", show=True),
         Binding("ctrl+o", "toggle_mode_markdown", "Toggle Markdown", show=True),
         Binding("ctrl+c", "cancel_execution", "Cancel", show=True),
-        Binding("ctrl+g", "toggle_send_user_commands_to_agent", "Toggle Agent", show=True),
+        Binding(
+            "ctrl+g", "toggle_send_user_commands_to_agent", "Toggle Agent", show=True
+        ),
         Binding("ctrl+n", "clear_agent_context", "Clear Context", show=True),
         Binding("alt+up", "navigate_up", "Navigate Up", show=True),
         Binding("alt+down", "navigate_down", "Navigate Down", show=True),
@@ -82,7 +85,9 @@ class ArtificeTerminal(Widget):
         super().__init__(name=name, id=id, classes=classes)
 
         self._config = app.config
-        self._send_user_commands_to_agent: bool = self._config.send_user_commands_to_agent
+        self._send_user_commands_to_agent: bool = (
+            self._config.send_user_commands_to_agent
+        )
 
         # Create history manager
         self._history = History(
@@ -291,6 +296,12 @@ class ArtificeTerminal(Widget):
         code = event.code
         self.input.clear()
 
+        # Immediately display the submitted input for responsiveness
+        if event.is_agent_prompt:
+            agent_input_block = AgentInputBlock(code)
+            self.output.append_block(agent_input_block)
+            self._mark_block_in_context(agent_input_block)
+
         async def do_execute():
             if event.is_agent_prompt:
                 await self._handle_agent_prompt(code)
@@ -302,7 +313,9 @@ class ArtificeTerminal(Widget):
                     await self._send_execution_result_to_agent(code, "bash", result)
             else:
                 result = await self._exec.execute(
-                    code, language="python", in_context=self._send_user_commands_to_agent
+                    code,
+                    language="python",
+                    in_context=self._send_user_commands_to_agent,
                 )
                 if self._send_user_commands_to_agent:
                     await self._send_execution_result_to_agent(code, "python", result)

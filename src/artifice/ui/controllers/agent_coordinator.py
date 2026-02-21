@@ -7,7 +7,6 @@ import logging
 from typing import TYPE_CHECKING, Any, Callable
 
 from artifice.ui.components.blocks.blocks import (
-    AgentInputBlock,
     ToolCallBlock,
 )
 
@@ -77,13 +76,10 @@ class AgentCoordinator:
     async def handle_agent_prompt(self, prompt: str) -> None:
         """Handle AI agent prompt with code block detection.
 
-        Creates an AgentInputBlock, streams the agent response, and
-        enables auto-send mode after first interaction.
+        Streams the agent response and enables auto-send mode after first interaction.
+        Note: The AgentInputBlock should already be created and displayed by the caller
+        for immediate responsiveness.
         """
-        agent_input_block = AgentInputBlock(prompt)
-        self._output.append_block(agent_input_block)
-        self._mark_block_in_context(agent_input_block)
-
         if self._agent is None:
             from artifice.ui.components.blocks.blocks import AgentOutputBlock
 
