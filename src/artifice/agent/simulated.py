@@ -129,6 +129,70 @@ But we should also think about _why_ `None` is appearing here. It could mean:
 Want me to apply the fix and add a test case for this edge case?\
 """
 
+_RESP_SYSADMIN = """\
+Let me check the system status.
+
+<shell>command=df -h</shell>
+
+<shell>command=free -h</shell>
+
+<shell>command=top -bn1 | head -15</shell>
+
+Here's what I'm seeing:
+
+### Disk Usage
+The disk usage looks reasonable. If you're running low, consider:
+- Clearing package caches (`apt clean`, `yum clean all`)
+- Removing old logs in `/var/log`
+- Finding large files with `du -sh /* | sort -h`
+
+### Memory
+Memory usage is within normal range. If you see high usage:
+- Check for memory leaks in long-running processes
+- Consider adding swap if needed
+
+### Top Processes
+The top output shows which processes are consuming the most resources. Let me know if you need me to investigate any specific process.\
+"""
+
+_RESP_GREP = """\
+Let me search for that pattern in the codebase.
+
+<grep>pattern=async def</grep>
+
+I'll look for all async function definitions. The results will show the file paths and line numbers where matches are found.
+
+If you need to narrow it down, I can also filter by file type:
+
+<grep>pattern=class.*Agent
+file_filter=*.py</grep>
+
+Let me know what specific pattern you want to search for.\
+"""
+
+_RESP_REPLACE = """\
+Let me make that replacement for you.
+
+<replace>path=src/example.py
+pattern=old_function
+replacement=new_function
+dry_run=true</replace>
+
+I'm starting with a dry run to show you what would change. Once you confirm, I can apply the actual replacement:
+
+<replace>path=src/example.py
+pattern=old_function
+replacement=new_function
+dry_run=false</replace>
+
+The key options for replace are:
+- `dry_run=true` — preview changes without writing
+- `dry_run=false` — apply the changes
+- `case_sensitive=false` — case-insensitive matching
+
+Would you like me to proceed with the replacement?\
+"""
+
 _RESP_CALCULATE = """\
 Let me calculate that for you.
 
@@ -354,6 +418,22 @@ _DEFAULT_SCENARIOS: list[dict] = [
             "I'll use web_fetch to retrieve and summarize the page."
         ),
     },
+    {
+        "pattern": r"grep|search.*pattern|search.*code|find.*pattern|regex",
+        "response": _RESP_GREP,
+        "thinking": (
+            "The user wants to search for a pattern in the codebase. "
+            "I'll use grep to find matching lines with file and line number."
+        ),
+    },
+    {
+        "pattern": r"replace|substitute|rename.*variable|change.*to",
+        "response": _RESP_REPLACE,
+        "thinking": (
+            "The user wants to replace text in a file. I'll use the replace tool "
+            "with a dry run first to preview the changes."
+        ),
+    },
 ]
 
 _DEFAULT_RESPONSE = (
@@ -365,6 +445,8 @@ _DEFAULT_RESPONSE = (
     "- **Code review** — suggesting refactors and improvements\n"
     "- **System admin** — checking disk, memory, and system info\n"
     "- **File operations** — reading, writing, and searching for files\n"
+    "- **Code search** — grep for patterns across files\n"
+    "- **Text replacement** — find and replace in files\n"
     "- **Web research** — searching the web and fetching page content\n\n"
     "Just describe what you're working on and I'll dive in."
 )

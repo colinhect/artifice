@@ -1,0 +1,8 @@
+id,name,value,category,active
+1,Widget A,29.99,electronics,true
+2,Gadget B,49.99,electronics,true
+3,Tool C,15.50,hardware,false
+4,Supply D,8.25,consumables,true
+5,Part E,12.00,hardware,true
+6,Item F,99.99,electronics,true
+7,Material G,5.50,consumables,false
