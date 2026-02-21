@@ -348,17 +348,6 @@ async def test_execute_glob_no_matches(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_execute_system_info():
-    """Test system_info executor returns OS and cwd info."""
-    tc = ToolCall(id="1", name="system_info", args={"categories": ["os", "cwd"]})
-    result = await execute_tool_call(tc)
-
-    assert result is not None
-    assert "OS:" in result
-    assert "Working directory:" in result
-
-
-@pytest.mark.asyncio
 async def test_execute_tool_call_returns_none_for_code_tools():
     """Test that execute_tool_call returns None for python/shell (no executor)."""
     tc = ToolCall(id="1", name="python", args={"code": "print('hi')"})

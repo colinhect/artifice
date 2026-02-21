@@ -14,32 +14,34 @@ import os
 import platform
 import re
 import shutil
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
-
 async def execute_read(args: dict[str, Any]) -> str:
     """Read file contents, optionally with offset and limit."""
-    path = os.path.expanduser(args["path"])
+    path = Path(args["path"]).expanduser().resolve()
     offset = args.get("offset", 0)
     limit = args.get("limit")
 
     logger.debug("Reading file: %s (offset=%d, limit=%s)", path, offset, limit)
 
-    if not os.path.isfile(path):
+    if not path.is_file():
         logger.warning("File not found: %s", path)
         return f"Error: File not found: {path}"
 
     try:
-        with open(path, encoding="utf-8") as f:
-            lines = f.readlines()
+        content = path.read_text(encoding="utf-8")
     except PermissionError:
         logger.warning("Permission denied: %s", path)
         return f"Error: Permission denied: {path}"
     except Exception as e:
         logger.error("Error reading file %s: %s", path, e)
         return f"Error reading file: {e}"
+
+    lines = content.splitlines(keepends=True)
 
     if offset:
         lines = lines[offset:]
@@ -56,17 +58,14 @@ async def execute_read(args: dict[str, Any]) -> str:
 
 async def execute_write(args: dict[str, Any]) -> str:
     """Write content to a file, creating directories as needed."""
-    path = os.path.expanduser(args["path"])
+    path = Path(args["path"]).expanduser().resolve()
     content = args["content"]
 
     logger.debug("Writing %d bytes to: %s", len(content), path)
 
     try:
-        parent = os.path.dirname(path)
-        if parent:
-            os.makedirs(parent, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
         logger.debug("Successfully wrote to: %s", path)
         return f"Wrote {len(content)} bytes to {path}"
     except Exception as e:
@@ -77,11 +76,11 @@ async def execute_write(args: dict[str, Any]) -> str:
 async def execute_glob(args: dict[str, Any]) -> str:
     """Search for files matching a glob pattern."""
     pattern = args["pattern"]
-    path = os.path.expanduser(args.get("path", "."))
+    path = Path(args.get("path", ".")).expanduser().resolve()
 
     logger.debug("Searching for files: pattern=%s, path=%s", pattern, path)
 
-    full_pattern = os.path.join(path, pattern)
+    full_pattern = str(path / pattern)
 
     loop = asyncio.get_running_loop()
     try:
@@ -107,7 +106,7 @@ async def execute_glob(args: dict[str, Any]) -> str:
 async def execute_grep(args: dict[str, Any]) -> str:
     """Search for regex patterns in files."""
     pattern = args["pattern"]
-    path = os.path.expanduser(args.get("path", "."))
+    path = Path(args.get("path", ".")).expanduser().resolve()
     file_filter = args.get("file_filter", "*")
     case_sensitive = args.get("case_sensitive", True)
     context_before = args.get("context_before", 0)
@@ -127,19 +126,17 @@ async def execute_grep(args: dict[str, Any]) -> str:
     except re.error as e:
         return f"Error: Invalid regex pattern: {e}"
 
-    results = []
     max_files = 50
     max_matches = 200
 
-    loop = asyncio.get_running_loop()
-
-    async def search_file(filepath: str) -> list[str]:
+    def search_file(filepath: Path) -> list[str]:
+        """Search a single file for pattern matches (sync function)."""
         file_results = []
         try:
-            with open(filepath, encoding="utf-8", errors="replace") as f:
-                lines = f.readlines()
+            content = filepath.read_text(encoding="utf-8", errors="replace")
+            lines = content.splitlines(keepends=True)
         except Exception:
-            return []
+            return file_results
 
         for i, line in enumerate(lines):
             if compiled_pattern.search(line):
@@ -150,28 +147,31 @@ async def execute_grep(args: dict[str, Any]) -> str:
                 # Add context after
                 for j in range(1, context_after + 1):
                     if i + j < len(lines):
-                        file_results.append(f"  {line_num + j}: {lines[i + j].rstrip()}")
+                        file_results.append(
+                            f"  {line_num + j}: {lines[i + j].rstrip()}"
+                        )
 
         return file_results
 
-    async def process_directory():
-        search_pattern = os.path.join(path, "**", file_filter)
-        files = glob.glob(search_pattern, recursive=True)
-        files = [f for f in files if os.path.isfile(f)]
+    def process_directory() -> list[str]:
+        """Process all files in directory (runs in executor)."""
+        search_pattern = str(path / "**" / file_filter)
+        files = [f for f in glob.glob(search_pattern, recursive=True) if Path(f).is_file()]
 
         all_results = []
         for filepath in files[:max_files]:
-            file_results = await search_file(filepath)
+            file_results = search_file(Path(filepath))
             if file_results:
-                rel_path = os.path.relpath(filepath, path)
+                rel_path = Path(filepath).relative_to(path)
                 all_results.append(f"{rel_path}:")
                 all_results.extend(file_results)
                 if len(all_results) >= max_matches:
                     return all_results[:max_matches]
         return all_results
 
+    loop = asyncio.get_running_loop()
     try:
-        results = await loop.run_in_executor(None, asyncio.run, process_directory())
+        results = await loop.run_in_executor(None, process_directory)
     except Exception as e:
         logger.error("Error during grep: %s", e)
         return f"Error during grep: {e}"
@@ -187,7 +187,7 @@ async def execute_grep(args: dict[str, Any]) -> str:
 
 async def execute_replace(args: dict[str, Any]) -> str:
     """Replace string occurrences in files with regex support."""
-    path = os.path.expanduser(args["path"])
+    path = Path(args["path"]).expanduser().resolve()
     pattern = args["pattern"]
     replacement = args["replacement"]
     case_sensitive = args.get("case_sensitive", True)
@@ -202,12 +202,11 @@ async def execute_replace(args: dict[str, Any]) -> str:
         dry_run,
     )
 
-    if not os.path.isfile(path):
+    if not path.is_file():
         return f"Error: File not found: {path}"
 
     try:
-        with open(path, encoding="utf-8") as f:
-            original_content = f.read()
+        original_content = path.read_text(encoding="utf-8")
     except PermissionError:
         return f"Error: Permission denied: {path}"
     except Exception as e:
@@ -225,28 +224,43 @@ async def execute_replace(args: dict[str, Any]) -> str:
         return f"No matches found for '{pattern}' in {path}"
 
     if dry_run:
+        # Generate a more accurate diff using line-by-line comparison
+        # with match position information
         diff_lines = []
-        old_lines = original_content.splitlines()
-        new_lines = new_content.splitlines()
 
-        for i, (old_line, new_line) in enumerate(zip(old_lines, new_lines)):
-            if old_line != new_line:
-                diff_lines.append(f"  Line {i + 1}:")
-                diff_lines.append(f"  - {old_line}")
-                diff_lines.append(f"  + {new_line}")
+        # Find all match positions in original content
+        matches = list(compiled_pattern.finditer(original_content))
 
-        if len(diff_lines) > 50:
-            diff_lines = diff_lines[:50]
-            diff_lines.append("  ... (truncated)")
+        if matches:
+            # Build a simple unified-style diff
+            diff_lines.append(f"DRY RUN: {count} replacement(s) would be made to {path}:")
+            diff_lines.append("")
 
-        return (
-            f"DRY RUN: {count} replacement(s) would be made to {path}:\n\n"
-            + "\n".join(diff_lines)
-        )
+            # Show context around each match
+            for idx, match in enumerate(matches[:10]):  # Limit to first 10 matches
+                start_pos = match.start()
+                end_pos = match.end()
+
+                # Get context around the match
+                context_start = max(0, start_pos - 30)
+                context_end = min(len(original_content), end_pos + 30)
+
+                before = original_content[context_start:start_pos]
+                matched = original_content[start_pos:end_pos]
+                after = original_content[end_pos:context_end]
+
+                diff_lines.append(f"  Match {idx + 1} at position {start_pos}:")
+                diff_lines.append(f"    - {repr(before)}{repr(matched)}{repr(after)}")
+                diff_lines.append(f"    + {repr(before)}{repr(replacement)}{repr(after)}")
+                diff_lines.append("")
+
+            if count > 10:
+                diff_lines.append(f"  ... and {count - 10} more replacement(s)")
+
+        return "\n".join(diff_lines)
 
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(new_content)
+        path.write_text(new_content, encoding="utf-8")
         logger.debug("Replaced %d occurrences in: %s", count, path)
         return f"Replaced {count} occurrence(s) in {path}"
     except Exception as e:
@@ -259,6 +273,16 @@ async def execute_web_fetch(args: dict[str, Any]) -> str:
     import urllib.request
 
     url = args["url"]
+
+    # Validate URL
+    try:
+        parsed = urlparse(url)
+        if not parsed.scheme or parsed.scheme not in ("http", "https"):
+            return f"Error: Invalid URL scheme '{parsed.scheme}'. Only http and https are supported."
+        if not parsed.netloc:
+            return f"Error: Invalid URL: missing network location (domain)."
+    except Exception as e:
+        return f"Error: Invalid URL: {e}"
 
     logger.debug("Fetching URL: %s", url)
 
@@ -296,6 +320,40 @@ async def execute_web_search(args: dict[str, Any]) -> str:
     encoded = urllib.parse.urlencode({"q": query})
     url = f"https://html.duckduckgo.com/html/?{encoded}"
 
+    def parse_dduckgo_html(html: str) -> list[tuple[str, str]]:
+        """Parse DuckDuckGo HTML results with multiple pattern attempts."""
+        results = []
+
+        # Try the primary pattern first
+        pattern = r'<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)</a>'
+        for match in re.finditer(pattern, html, re.DOTALL):
+            href = match.group(1)
+            title = re.sub(r"<[^>]+>", "", match.group(2)).strip()
+            if href and title:
+                results.append((title, href))
+
+        # If no results, try alternative pattern (different HTML structure)
+        if not results:
+            pattern = r'<a[^>]+href="([^"]*)"[^>]*class="[^"]*result[^"]*"[^>]*>(.*?)</a>'
+            for match in re.finditer(pattern, html, re.DOTALL):
+                href = match.group(1)
+                title = re.sub(r"<[^>]+>", "", match.group(2)).strip()
+                if href and title and len(title) > 2:
+                    results.append((title, href))
+
+        # Final fallback: try to find any result link
+        if not results:
+            pattern = r'<a[^>]+href="(https?://[^"]+)"[^>]*>([^<]+)</a>'
+            seen = set()
+            for match in re.finditer(pattern, html):
+                href = match.group(1)
+                title = match.group(2).strip()
+                if href.startswith("http") and title and href not in seen:
+                    seen.add(href)
+                    results.append((title, href))
+
+        return results
+
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Artifice/1.0"})
         loop = asyncio.get_running_loop()
@@ -305,74 +363,16 @@ async def execute_web_search(args: dict[str, Any]) -> str:
         )
         html = response.read().decode("utf-8", errors="replace")
 
-        results = []
-        pattern = r'<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)</a>'
-        for match in re.finditer(pattern, html):
-            href = match.group(1)
-            title = re.sub(r"<[^>]+>", "", match.group(2)).strip()
-            if href and title:
-                results.append(f"- {title}\n  {href}")
+        results = parse_dduckgo_html(html)
 
         if not results:
             logger.debug("No search results for: %s", query)
             return f"No results found for '{query}'"
 
         logger.debug("Found %d search results for: %s", len(results), query)
-        return f"Search results for '{query}':\n\n" + "\n\n".join(results[:10])
+        formatted = [f"- {title}\n  {href}" for title, href in results[:10]]
+        return f"Search results for '{query}':\n\n" + "\n\n".join(formatted)
     except Exception as e:
         logger.error("Error searching web for '%s': %s", query, e)
         return f"Error searching: {e}"
 
-
-async def execute_system_info(args: dict[str, Any]) -> str:
-    """Get system information for requested categories."""
-    categories = args.get("categories", ["os", "env", "cwd"])
-
-    sections = []
-
-    if "os" in categories:
-        sections.append(
-            f"OS: {platform.system()} {platform.release()}\n"
-            f"Platform: {platform.platform()}\n"
-            f"Python: {platform.python_version()}\n"
-            f"Architecture: {platform.machine()}"
-        )
-
-    if "cwd" in categories:
-        sections.append(f"Working directory: {os.getcwd()}")
-
-    if "env" in categories:
-        safe_vars = [
-            "HOME",
-            "USER",
-            "SHELL",
-            "TERM",
-            "PATH",
-            "LANG",
-            "EDITOR",
-            "VIRTUAL_ENV",
-        ]
-        env_lines = []
-        for var in safe_vars:
-            val = os.environ.get(var)
-            if val:
-                env_lines.append(f"  {var}={val}")
-        if env_lines:
-            sections.append("Environment:\n" + "\n".join(env_lines))
-
-    if "disk" in categories:
-        try:
-            usage = shutil.disk_usage(".")
-            total_gb = usage.total / (1024**3)
-            free_gb = usage.free / (1024**3)
-            used_gb = usage.used / (1024**3)
-            sections.append(
-                f"Disk usage (current mount):\n"
-                f"  Total: {total_gb:.1f} GB\n"
-                f"  Used:  {used_gb:.1f} GB\n"
-                f"  Free:  {free_gb:.1f} GB"
-            )
-        except Exception:
-            pass
-
-    return "\n\n".join(sections) if sections else "No information categories specified."

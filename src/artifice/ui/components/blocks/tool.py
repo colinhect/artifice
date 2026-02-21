@@ -2,11 +2,28 @@
 
 from __future__ import annotations
 
+import json
+
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.widgets import Static
 
 from artifice.ui.components.blocks.input import CodeInputBlock
+
+
+def _format_value(value) -> str:
+    """Format a parameter value for display."""
+    if isinstance(value, str):
+        if len(value) > 60:
+            return f'"{value[:57]}..."'
+        return f'"{value}"'
+    elif isinstance(value, (dict, list)):
+        formatted = json.dumps(value, indent=None)
+        if len(formatted) > 60:
+            return formatted[:57] + "..."
+        return formatted
+    else:
+        return str(value)
 
 
 class ToolCallBlock(CodeInputBlock):
@@ -41,6 +58,7 @@ class ToolCallBlock(CodeInputBlock):
         self._tool_name = name
         self.tool_args: dict = tool_args or {}
         self._label = Static(name, classes="tool-name")
+        self._params_container = Vertical(classes="tool-params")
 
     @property
     def tool_name(self) -> str:
@@ -49,6 +67,14 @@ class ToolCallBlock(CodeInputBlock):
 
     def compose(self) -> ComposeResult:
         yield self._label
+        if self.tool_args:
+            with self._params_container:
+                for key, value in self.tool_args.items():
+                    param_line = Static(
+                        f"  {key}: {_format_value(value)}",
+                        classes="tool-param",
+                    )
+                    yield param_line
         with Horizontal():
             with self._status_container:
                 yield self._loading_indicator

@@ -286,6 +286,26 @@ CodeInputBlock .prompt-indicator {
 }
 
 /* --------------------------------------------------------------------------
+   Tool Call Block
+   -------------------------------------------------------------------------- */
+ToolCallBlock .tool-name {
+    color: $primary;
+    text-style: bold;
+    margin-bottom: 0;
+}
+
+ToolCallBlock .tool-params {
+    color: $foreground 75%;
+    margin-bottom: 0;
+    padding-left: 0;
+}
+
+ToolCallBlock .tool-param {
+    padding: 0;
+    margin: 0;
+}
+
+/* --------------------------------------------------------------------------
    Code Output Block
    -------------------------------------------------------------------------- */
 CodeOutputBlock.hide-tool-output {

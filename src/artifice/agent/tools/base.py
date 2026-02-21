@@ -10,7 +10,6 @@ from artifice.agent.tools.executors import (
     execute_grep,
     execute_read,
     execute_replace,
-    execute_system_info,
     execute_web_fetch,
     execute_web_search,
     execute_write,
@@ -266,19 +265,6 @@ tool(
     description="Fetch the contents of a URL.",
     params={"url": {"type": "string", "description": "URL to fetch."}},
     executor=execute_web_fetch,
-)
-
-tool(
-    name="system_info",
-    description="Get system information.",
-    params={
-        "categories": {
-            "type": "array",
-            "items": {"type": "string", "enum": ["os", "env", "cwd", "disk"]},
-            "description": "Categories of system info to retrieve.",
-        },
-    },
-    executor=execute_system_info,
 )
 
 
