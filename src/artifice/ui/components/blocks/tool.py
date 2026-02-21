@@ -59,6 +59,8 @@ class ToolCallBlock(CodeInputBlock):
         self.tool_args: dict = tool_args or {}
         self._label = Static(name, classes="tool-name")
         self._params_container = Vertical(classes="tool-params")
+        if tool_args:
+            self._code.update("")
 
     @property
     def tool_name(self) -> str:
@@ -66,7 +68,11 @@ class ToolCallBlock(CodeInputBlock):
         return self._tool_name
 
     def compose(self) -> ComposeResult:
-        yield self._label
+        with Horizontal():
+            with self._status_container:
+                yield self._loading_indicator
+                yield self._status_icon
+            yield self._label
         if self.tool_args:
             with self._params_container:
                 for key, value in self.tool_args.items():
@@ -75,8 +81,4 @@ class ToolCallBlock(CodeInputBlock):
                         classes="tool-param",
                     )
                     yield param_line
-        with Horizontal():
-            with self._status_container:
-                yield self._loading_indicator
-                yield self._status_icon
             yield self._code
