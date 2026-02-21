@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Callable
 
 from textual.widget import Widget
@@ -17,6 +18,8 @@ from artifice.ui.components.blocks.blocks import (
     WidgetOutputBlock,
 )
 from artifice.ui.components.output import TerminalOutput
+
+logger = logging.getLogger(__name__)
 
 
 class ExecutionCoordinator:
@@ -132,6 +135,7 @@ class ExecutionCoordinator:
             code_input_block: Existing block to update status on. If None, one is created.
             in_context: Whether the output should be marked as in agent context.
         """
+        logger.debug("Executing %s code (%d chars)", language, len(code))
         if code_input_block is None:
             code_input_block = CodeInputBlock(
                 code, language=language, show_loading=True, in_context=in_context

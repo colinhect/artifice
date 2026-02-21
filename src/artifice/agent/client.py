@@ -147,6 +147,7 @@ class Agent(ConversationManager):
 
         if not self._connected:
             self._connected = True
+            logger.debug("First successful connection to provider")
             if self._on_connect:
                 self._on_connect("connected")
 

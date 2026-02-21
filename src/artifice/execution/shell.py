@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 import tempfile
@@ -14,6 +15,8 @@ from artifice.execution.base_executor import BaseExecutor
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+logger = logging.getLogger(__name__)
 
 
 _OSC_RE = re.compile(r"\x1b\].*?(?:\x1b\\|\x07)")
@@ -65,6 +68,7 @@ class ShellExecutor(BaseExecutor):
         Returns:
             ExecutionResult with status (SUCCESS/ERROR), output, and any errors.
         """
+        logger.debug("Executing shell command: %s", command[:200])
         return await self._execute_simple(command, on_output, on_error)
 
     async def _execute_simple(
@@ -118,6 +122,7 @@ class ShellExecutor(BaseExecutor):
             result.status = (
                 ExecutionStatus.SUCCESS if returncode == 0 else ExecutionStatus.ERROR
             )
+            logger.debug("Shell command completed with returncode %d", returncode)
 
         except asyncio.CancelledError:
             result.status = ExecutionStatus.ERROR
@@ -133,6 +138,7 @@ class ShellExecutor(BaseExecutor):
                     await process.wait()
             raise
         except Exception as e:
+            logger.error("Shell command failed: %s", e)
             result.status = ExecutionStatus.ERROR
             result.exception = e
             error_text = (
@@ -199,11 +205,14 @@ class TmuxShellExecutor(BaseExecutor):
         Returns:
             Tuple of (is_valid, error_message).
         """
+        logger.debug("Validating tmux session: %s", self.target)
         rc, _, err = await self._run_tmux(
             "has-session", "-t", self.target.split(":")[0]
         )
         if rc != 0:
+            logger.warning("tmux session not found: %s", err.strip())
             return False, f"tmux session not found: {err.strip()}"
+        logger.debug("tmux session validated: %s", self.target)
         return True, ""
 
     async def _create_temp_file(self) -> str:
@@ -307,6 +316,7 @@ class TmuxShellExecutor(BaseExecutor):
         self, message: str, on_error: Callable[[str], None] | None, code: str
     ) -> ExecutionResult:
         """Create a timeout error result."""
+        logger.warning("Command timed out: %s", code[:100])
         result = ExecutionResult(code=code, status=ExecutionStatus.ERROR)
         result.error = message
         if on_error:
@@ -346,6 +356,7 @@ class TmuxShellExecutor(BaseExecutor):
         Returns:
             ExecutionResult with status (SUCCESS/ERROR), output, and any errors.
         """
+        logger.debug("Executing tmux command in %s: %s", self.target, command[:200])
         result = ExecutionResult(code=command, status=ExecutionStatus.RUNNING)
         tmpfile = None
 
@@ -388,17 +399,21 @@ class TmuxShellExecutor(BaseExecutor):
                 result.status = (
                     ExecutionStatus.SUCCESS if exit_code == 0 else ExecutionStatus.ERROR
                 )
+                logger.debug("Tmux command completed with exit_code %d", exit_code)
             else:
                 # Assume success when prompt appears if not checking exit code
                 result.status = ExecutionStatus.SUCCESS
+                logger.debug("Tmux command completed (no exit code check)")
 
         except asyncio.CancelledError:
+            logger.debug("Tmux command cancelled: %s", command[:100])
             result.status = ExecutionStatus.ERROR
             result.error = "\n[Execution cancelled]\n"
             if on_error:
                 on_error(result.error)
             raise
         except Exception as e:
+            logger.error("Tmux command failed: %s", e)
             result.status = ExecutionStatus.ERROR
             result.exception = e
             error_text = (

@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import asyncio
 import glob
+import logging
 import os
 import platform
 import shutil
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 async def execute_read_file(args: dict[str, Any]) -> str:
@@ -21,15 +24,20 @@ async def execute_read_file(args: dict[str, Any]) -> str:
     offset = args.get("offset", 0)
     limit = args.get("limit")
 
+    logger.debug("Reading file: %s (offset=%d, limit=%s)", path, offset, limit)
+
     if not os.path.isfile(path):
+        logger.warning("File not found: %s", path)
         return f"Error: File not found: {path}"
 
     try:
         with open(path, encoding="utf-8") as f:
             lines = f.readlines()
     except PermissionError:
+        logger.warning("Permission denied: %s", path)
         return f"Error: Permission denied: {path}"
     except Exception as e:
+        logger.error("Error reading file %s: %s", path, e)
         return f"Error reading file: {e}"
 
     if offset:
@@ -50,14 +58,18 @@ async def execute_write_file(args: dict[str, Any]) -> str:
     path = os.path.expanduser(args["path"])
     content = args["content"]
 
+    logger.debug("Writing %d bytes to: %s", len(content), path)
+
     try:
         parent = os.path.dirname(path)
         if parent:
             os.makedirs(parent, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
+        logger.debug("Successfully wrote to: %s", path)
         return f"Wrote {len(content)} bytes to {path}"
     except Exception as e:
+        logger.error("Error writing file %s: %s", path, e)
         return f"Error writing file: {e}"
 
 
@@ -65,6 +77,8 @@ async def execute_file_search(args: dict[str, Any]) -> str:
     """Search for files matching a glob pattern."""
     pattern = args["pattern"]
     path = os.path.expanduser(args.get("path", "."))
+
+    logger.debug("Searching for files: pattern=%s, path=%s", pattern, path)
 
     full_pattern = os.path.join(path, pattern)
 
@@ -74,11 +88,14 @@ async def execute_file_search(args: dict[str, Any]) -> str:
             None, lambda: sorted(glob.glob(full_pattern, recursive=True))
         )
     except Exception as e:
+        logger.error("Error searching files: %s", e)
         return f"Error searching: {e}"
 
     if not matches:
+        logger.debug("No files found matching pattern: %s", pattern)
         return f"No files matching '{pattern}' in {path}"
 
+    logger.debug("Found %d files matching pattern: %s", len(matches), pattern)
     max_results = 100
     result = "\n".join(matches[:max_results])
     if len(matches) > max_results:
@@ -91,6 +108,8 @@ async def execute_web_fetch(args: dict[str, Any]) -> str:
     import urllib.request
 
     url = args["url"]
+
+    logger.debug("Fetching URL: %s", url)
 
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Artifice/1.0"})
@@ -108,8 +127,10 @@ async def execute_web_fetch(args: dict[str, Any]) -> str:
         max_chars = 50_000
         if len(text) > max_chars:
             text = text[:max_chars] + f"\n... (truncated, {len(text)} total chars)"
+        logger.debug("Fetched %d chars from: %s", len(text), url)
         return text
     except Exception as e:
+        logger.error("Error fetching URL %s: %s", url, e)
         return f"Error fetching URL: {e}"
 
 
@@ -120,6 +141,8 @@ async def execute_web_search(args: dict[str, Any]) -> str:
     import urllib.request
 
     query = args["query"]
+    logger.debug("Web search: %s", query)
+
     encoded = urllib.parse.urlencode({"q": query})
     url = f"https://html.duckduckgo.com/html/?{encoded}"
 
@@ -141,10 +164,13 @@ async def execute_web_search(args: dict[str, Any]) -> str:
                 results.append(f"- {title}\n  {href}")
 
         if not results:
+            logger.debug("No search results for: %s", query)
             return f"No results found for '{query}'"
 
+        logger.debug("Found %d search results for: %s", len(results), query)
         return f"Search results for '{query}':\n\n" + "\n\n".join(results[:10])
     except Exception as e:
+        logger.error("Error searching web for '%s': %s", query, e)
         return f"Error searching: {e}"
 
 

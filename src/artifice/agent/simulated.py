@@ -548,12 +548,15 @@ class SimulatedAgent(ConversationManager):
         for s in self.scenarios:
             pattern = s.get("pattern")
             if pattern and re.search(pattern, prompt, re.IGNORECASE):
+                logger.debug("Matched scenario with pattern: %s", pattern)
                 return s
         sequential = [s for s in self.scenarios if not s.get("pattern")]
         if self.current_scenario_index < len(sequential):
             s = sequential[self.current_scenario_index]
             self.current_scenario_index += 1
+            logger.debug("Using sequential scenario %d", self.current_scenario_index)
             return s
+        logger.debug("No matching scenario found")
         return None
 
     async def send(
@@ -563,6 +566,7 @@ class SimulatedAgent(ConversationManager):
         on_thinking_chunk: Callable | None = None,
     ) -> AgentResponse:
         """Send a prompt and return a simulated response."""
+        logger.debug("SimulatedAgent.send: %s", prompt[:100] if prompt else "(empty)")
         if self._on_connect:
             self._on_connect("connected")
             self._on_connect = None
@@ -596,6 +600,7 @@ class SimulatedAgent(ConversationManager):
             self.add_assistant_message(prose)
         if tool_calls:
             self.set_pending_tool_calls(tool_calls)
+            logger.debug("SimulatedAgent returning %d tool calls", len(tool_calls))
 
         return AgentResponse(
             text=prose,

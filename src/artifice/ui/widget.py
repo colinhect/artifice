@@ -249,6 +249,7 @@ class ArtificeTerminal(Widget):
 
     def on_mount(self) -> None:
         """Initialize the terminal on mount."""
+        logger.debug("ArtificeTerminal mounted")
         self._status_manager.update_agent_info()
         if (
             self._system_prompt_path is not None
@@ -263,6 +264,7 @@ class ArtificeTerminal(Widget):
         try:
             await coro
         except asyncio.CancelledError:
+            logger.debug("Task cancelled")
             block = CodeOutputBlock(render_markdown=False)
             self.output.append_block(block)
             block.append_error("\n[Cancelled]\n")
@@ -459,6 +461,7 @@ class ArtificeTerminal(Widget):
     def action_cancel_execution(self) -> None:
         """Cancel the currently executing code or AI prompt."""
         if self._current_task and not self._current_task.done():
+            logger.debug("Cancelling current task")
             self._current_task.cancel()
             self._current_task = None
 
@@ -516,6 +519,7 @@ class ArtificeTerminal(Widget):
 
     def action_clear_agent_context(self) -> None:
         """Clear the agent's conversation context."""
+        logger.debug("Clearing agent context")
         if self._agent is not None:
             self._agent.clear()
         self._clear_all_context_highlights()

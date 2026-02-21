@@ -47,6 +47,13 @@ class AnyLLMProvider(Provider):
         """Stream completion from any-llm."""
         from any_llm import acompletion
 
+        logger.debug(
+            "Starting stream_completion: model=%s, provider=%s, tools=%s",
+            self.model,
+            self._provider,
+            len(tools) if tools else 0,
+        )
+
         kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": messages,

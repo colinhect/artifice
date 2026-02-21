@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import sys
 import threading
 from io import StringIO
@@ -15,6 +16,8 @@ from artifice.execution.errors import execution_error_handler
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+logger = logging.getLogger(__name__)
 
 
 class StreamCapture(StringIO):
@@ -83,6 +86,7 @@ class CodeExecutor(BaseExecutor):
         Returns:
             ExecutionResult with status, output, and any errors.
         """
+        logger.debug("Executing Python code: %s", code[:200])
         on_output = on_output or self.on_output
         on_error = on_error or self.on_error
 
@@ -101,6 +105,10 @@ class CodeExecutor(BaseExecutor):
                 ExecutionStatus.SUCCESS
                 if not captured_stderr
                 else ExecutionStatus.ERROR
+            )
+            logger.debug(
+                "Python execution completed with status %s",
+                result.status.name,
             )
 
         return result
@@ -132,6 +140,7 @@ class CodeExecutor(BaseExecutor):
             )
             return await exec_task
         except asyncio.CancelledError:
+            logger.debug("Python execution cancelled")
             exec_task.cancel()
             raise
 
@@ -224,7 +233,7 @@ class CodeExecutor(BaseExecutor):
                     captured_stderr.getvalue(),
                 )
             except Exception as e:
-                # Any error - capture traceback in stderr
+                logger.debug("Python execution error: %s", e)
                 captured_stderr.write(str(e))
                 return None, captured_stdout.getvalue(), captured_stderr.getvalue()
             finally:

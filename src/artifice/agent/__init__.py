@@ -83,13 +83,9 @@ def create_agent(
             api_key = os.environ.get(env_var)
 
     system_prompt = definition.get("system_prompt", config.system_prompt)
-
-    # Parse tools list (new format) with backward compat for use_tools bool
     tools: list[str] | None = definition.get("tools")
-    if tools is None and definition.get("use_tools"):
-        tools = ["*"]
-
     base_url: str | None = definition.get("base_url")
+
     # provider here is the any-llm provider override (not "simulated")
     llm_provider: str | None = (
         provider if provider and provider.lower() != "simulated" else None
