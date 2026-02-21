@@ -114,6 +114,19 @@ class History:
         self._indices[mode] = index
         return result
 
+    def get_history(self, mode: str) -> list[str]:
+        """Get history entries for the specified mode.
+
+        Args:
+            mode: The mode ("python", "ai", or "shell").
+
+        Returns:
+            List of history entries for the mode.
+        """
+        if mode not in self._histories:
+            return []
+        return self._histories[mode].copy()
+
     def clear(self) -> None:
         """Clear all history."""
         for mode in self.MODES:

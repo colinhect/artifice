@@ -118,7 +118,7 @@ class TestSingleBlockStreaming:
         await d.finish()
         assert len(d.all_blocks) == 1
         assert isinstance(d.all_blocks[0], FakeAgentBlock)
-        assert "Hello world" in d.all_blocks[0]._text
+        assert "Hello world" in d.all_blocks[0]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_text_with_code_fences(self):
@@ -132,9 +132,9 @@ class TestSingleBlockStreaming:
         assert len(d.all_blocks) == 1
         block = d.all_blocks[0]
         assert isinstance(block, FakeAgentBlock)
-        assert "```python" in block._text
-        assert "print('hello')" in block._text
-        assert "Done" in block._text
+        assert "```python" in block._text  # type: ignore
+        assert "print('hello')" in block._text  # type: ignore
+        assert "Done" in block._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_multiple_code_fences(self):
@@ -147,11 +147,11 @@ class TestSingleBlockStreaming:
         # Should still only have one block
         assert len(d.all_blocks) == 1
         block = d.all_blocks[0]
-        assert "First:" in block._text
-        assert "```python" in block._text
-        assert "Second:" in block._text
-        assert "```bash" in block._text
-        assert "End" in block._text
+        assert "First:" in block._text  # type: ignore
+        assert "```python" in block._text  # type: ignore
+        assert "Second:" in block._text  # type: ignore
+        assert "```bash" in block._text  # type: ignore
+        assert "End" in block._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_angle_bracket_in_prose(self):
@@ -162,7 +162,7 @@ class TestSingleBlockStreaming:
         await d.finish()
 
         assert len(d.all_blocks) == 1
-        assert "x < 5" in d.all_blocks[0]._text
+        assert "x < 5" in d.all_blocks[0]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_empty_lines_in_text(self):
@@ -175,8 +175,8 @@ class TestSingleBlockStreaming:
         # Should still only have one block
         assert len(d.all_blocks) == 1
         block = d.all_blocks[0]
-        assert "Paragraph one." in block._text
-        assert "Paragraph two." in block._text
+        assert "Paragraph one." in block._text  # type: ignore
+        assert "Paragraph two." in block._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_streaming_multiple_chunks(self):
@@ -189,7 +189,7 @@ class TestSingleBlockStreaming:
         await d.finish()
 
         assert len(d.all_blocks) == 1
-        assert "First chunk second chunk third chunk" in d.all_blocks[0]._text
+        assert "First chunk second chunk third chunk" in d.all_blocks[0]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_block_finalized_on_finish(self):
@@ -200,8 +200,8 @@ class TestSingleBlockStreaming:
         await d.finish()
 
         block = d.all_blocks[0]
-        assert block._finished
-        assert block._success
+        assert block._finished  # type: ignore
+        assert block._success  # type: ignore
 
 
 class TestHeaderSplitting:
@@ -217,11 +217,11 @@ class TestHeaderSplitting:
 
         assert len(d.all_blocks) == 2
         # First block should have intro text
-        assert "Intro text" in d.all_blocks[0]._text
-        assert "# Section Header" not in d.all_blocks[0]._text
+        assert "Intro text" in d.all_blocks[0]._text  # type: ignore
+        assert "# Section Header" not in d.all_blocks[0]._text  # type: ignore
         # Second block should start with the header
-        assert d.all_blocks[1]._text.startswith("# Section Header")
-        assert "More content" in d.all_blocks[1]._text
+        assert d.all_blocks[1]._text.startswith("# Section Header")  # type: ignore
+        assert "More content" in d.all_blocks[1]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_header_at_start_no_split(self):
@@ -233,8 +233,8 @@ class TestHeaderSplitting:
 
         # Should only have one block
         assert len(d.all_blocks) == 1
-        assert d.all_blocks[0]._text.startswith("# First Header")
-        assert "Some content" in d.all_blocks[0]._text
+        assert d.all_blocks[0]._text.startswith("# First Header")  # type: ignore
+        assert "Some content" in d.all_blocks[0]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_multiple_headers_create_multiple_blocks(self):
@@ -247,13 +247,13 @@ class TestHeaderSplitting:
         await d.finish()
 
         assert len(d.all_blocks) == 4  # Intro + 3 headers
-        assert "Intro" in d.all_blocks[0]._text
-        assert d.all_blocks[1]._text.startswith("# Header 1")
-        assert "Content 1" in d.all_blocks[1]._text
-        assert d.all_blocks[2]._text.startswith("## Header 2")
-        assert "Content 2" in d.all_blocks[2]._text
-        assert d.all_blocks[3]._text.startswith("### Header 3")
-        assert "Content 3" in d.all_blocks[3]._text
+        assert "Intro" in d.all_blocks[0]._text  # type: ignore
+        assert d.all_blocks[1]._text.startswith("# Header 1")  # type: ignore
+        assert "Content 1" in d.all_blocks[1]._text  # type: ignore
+        assert d.all_blocks[2]._text.startswith("## Header 2")  # type: ignore
+        assert "Content 2" in d.all_blocks[2]._text  # type: ignore
+        assert d.all_blocks[3]._text.startswith("### Header 3")  # type: ignore
+        assert "Content 3" in d.all_blocks[3]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_different_header_levels(self):
@@ -266,12 +266,12 @@ class TestHeaderSplitting:
         await d.finish()
 
         assert len(d.all_blocks) == 7  # Intro + 6 headers
-        assert d.all_blocks[1]._text.startswith("# H1")
-        assert d.all_blocks[2]._text.startswith("## H2")
-        assert d.all_blocks[3]._text.startswith("### H3")
-        assert d.all_blocks[4]._text.startswith("#### H4")
-        assert d.all_blocks[5]._text.startswith("##### H5")
-        assert d.all_blocks[6]._text.startswith("###### H6")
+        assert d.all_blocks[1]._text.startswith("# H1")  # type: ignore
+        assert d.all_blocks[2]._text.startswith("## H2")  # type: ignore
+        assert d.all_blocks[3]._text.startswith("### H3")  # type: ignore
+        assert d.all_blocks[4]._text.startswith("#### H4")  # type: ignore
+        assert d.all_blocks[5]._text.startswith("##### H5")  # type: ignore
+        assert d.all_blocks[6]._text.startswith("###### H6")  # type: ignore
 
     @pytest.mark.asyncio
     async def test_seven_hashes_not_header(self):
@@ -283,7 +283,7 @@ class TestHeaderSplitting:
 
         # Should remain in one block
         assert len(d.all_blocks) == 1
-        assert "####### Not a header" in d.all_blocks[0]._text
+        assert "####### Not a header" in d.all_blocks[0]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_header_at_end_of_line_is_detected(self):
@@ -296,8 +296,8 @@ class TestHeaderSplitting:
         await d.finish()
 
         assert len(d.all_blocks) == 2
-        assert "Intro text" in d.all_blocks[0]._text
-        assert d.all_blocks[1]._text.startswith("# Header")
+        assert "Intro text" in d.all_blocks[0]._text  # type: ignore
+        assert d.all_blocks[1]._text.startswith("# Header")  # type: ignore
 
     @pytest.mark.asyncio
     async def test_header_without_space_not_header(self):
@@ -309,7 +309,7 @@ class TestHeaderSplitting:
 
         # Should remain in one block
         assert len(d.all_blocks) == 1
-        assert "###text not header" in d.all_blocks[0]._text
+        assert "###text not header" in d.all_blocks[0]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_header_at_stream_end(self):
@@ -321,8 +321,8 @@ class TestHeaderSplitting:
         await d.finish()
 
         assert len(d.all_blocks) == 2
-        assert "Intro text" in d.all_blocks[0]._text
-        assert d.all_blocks[1]._text.startswith("# Final Header")
+        assert "Intro text" in d.all_blocks[0]._text  # type: ignore
+        assert d.all_blocks[1]._text.startswith("# Final Header")  # type: ignore
 
 
 class TestEdgeCases:
@@ -337,7 +337,7 @@ class TestEdgeCases:
 
         # Should have one empty block that was finalized
         assert len(d.all_blocks) == 1
-        assert d.all_blocks[0]._finished
+        assert d.all_blocks[0]._finished  # type: ignore
 
     @pytest.mark.asyncio
     async def test_only_whitespace(self):
@@ -348,7 +348,7 @@ class TestEdgeCases:
         await d.finish()
 
         assert len(d.all_blocks) == 1
-        assert "   \n\n   " in d.all_blocks[0]._text
+        assert "   \n\n   " in d.all_blocks[0]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_very_long_text(self):
@@ -361,7 +361,7 @@ class TestEdgeCases:
         await d.finish()
 
         assert len(d.all_blocks) == 1
-        assert long_text in d.all_blocks[0]._text
+        assert long_text in d.all_blocks[0]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_special_characters(self):
@@ -375,11 +375,11 @@ class TestEdgeCases:
 
         # Should have 2 blocks (header and subheader)
         assert len(d.all_blocks) == 2
-        assert "# Header" in d.all_blocks[0]._text
-        assert d.all_blocks[1]._text.startswith("## Subheader")
-        assert "- List item" in d.all_blocks[1]._text
-        assert "**bold**" in d.all_blocks[1]._text
-        assert "`code`" in d.all_blocks[1]._text
+        assert "# Header" in d.all_blocks[0]._text  # type: ignore
+        assert d.all_blocks[1]._text.startswith("## Subheader")  # type: ignore
+        assert "- List item" in d.all_blocks[1]._text  # type: ignore
+        assert "**bold**" in d.all_blocks[1]._text  # type: ignore
+        assert "`code`" in d.all_blocks[1]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_unicode_text(self):
@@ -391,7 +391,7 @@ class TestEdgeCases:
         await d.feed(unicode_text)
         await d.finish()
 
-        assert unicode_text in d.all_blocks[0]._text
+        assert unicode_text in d.all_blocks[0]._text  # type: ignore
 
     @pytest.mark.asyncio
     async def test_header_with_only_hashes(self):
@@ -402,5 +402,5 @@ class TestEdgeCases:
         await d.finish()
 
         assert len(d.all_blocks) == 2
-        assert "Intro" in d.all_blocks[0]._text
-        assert d.all_blocks[1]._text.startswith("#")
+        assert "Intro" in d.all_blocks[0]._text  # type: ignore
+        assert d.all_blocks[1]._text.startswith("#")  # type: ignore

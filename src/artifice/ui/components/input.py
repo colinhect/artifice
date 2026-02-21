@@ -374,12 +374,7 @@ class TerminalInput(Static):
 
             # Get history for current mode
             mode_name = self.mode.value.name
-            if mode_name == "ai":
-                history_list = self._history._ai_history
-            elif mode_name == "shell":
-                history_list = self._history._shell_history
-            else:
-                history_list = self._history._python_history
+            history_list = self._history.get_history(mode_name)
 
             # Filter and reverse (most recent first)
             def truncate_multiline(item: str) -> str:
