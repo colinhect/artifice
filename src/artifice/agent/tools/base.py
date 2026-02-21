@@ -74,6 +74,7 @@ TOOLS: dict[str, ToolDef] = {}
 
 
 def _register(tool: ToolDef) -> ToolDef:
+    """Register a tool in the global TOOLS dict. Internal use only."""
     TOOLS[tool.name] = tool
     return tool
 
@@ -136,171 +137,87 @@ async def execute_tool_call(tool_call: ToolCall) -> str | None:
     return None
 
 
-# ---------------------------------------------------------------------------
-# Tool registrations
-# ---------------------------------------------------------------------------
-
-# --- Code-execution tools (no executor — handled by terminal widget) ---
-
-_register(
-    ToolDef(
-        name="python",
-        description="Execute Python code in the user's REPL session.",
-        parameters={
-            "type": "object",
-            "required": ["code"],
-            "properties": {"code": {"type": "string"}},
-        },
-        display_language="python",
-        display_arg="code",
-    )
+tool(
+    name="python",
+    description="Execute Python code in the user's REPL session.",
+    params={"code": {"type": "string"}},
+    language="python",
 )
 
-_register(
-    ToolDef(
-        name="shell",
-        description="Execute a shell command in the user's terminal session.",
-        parameters={
-            "type": "object",
-            "required": ["command"],
-            "properties": {"command": {"type": "string"}},
-        },
-        display_language="bash",
-        display_arg="command",
-    )
+tool(
+    name="shell",
+    description="Execute a shell command in the user's terminal session.",
+    params={"command": {"type": "string"}},
+    language="bash",
 )
 
-# --- Tools with direct executors ---
-
-_register(
-    ToolDef(
-        name="read_file",
-        description="Read the contents of a file.",
-        parameters={
-            "type": "object",
-            "required": ["path"],
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "Absolute or relative file path.",
-                },
-                "offset": {
-                    "type": "integer",
-                    "description": "Line number to start reading from (0-based).",
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Maximum number of lines to read.",
-                },
-            },
+tool(
+    name="read_file",
+    description="Read the contents of a file.",
+    params={
+        "path": {"type": "string", "description": "Absolute or relative file path."},
+        "offset": {
+            "type": "integer",
+            "description": "Line number to start reading from (0-based).",
         },
-        display_language="text",
-        display_arg="path",
-        executor=execute_read_file,
-    )
+        "limit": {"type": "integer", "description": "Maximum number of lines to read."},
+    },
+    required=["path"],
+    executor=execute_read_file,
 )
 
-_register(
-    ToolDef(
-        name="write_file",
-        description="Write or create a file with the given content.",
-        parameters={
-            "type": "object",
-            "required": ["path", "content"],
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "Absolute or relative file path.",
-                },
-                "content": {
-                    "type": "string",
-                    "description": "Content to write to the file.",
-                },
-            },
-        },
-        display_language="text",
-        display_arg="path",
-        executor=execute_write_file,
-    )
+tool(
+    name="write_file",
+    description="Write or create a file with the given content.",
+    params={
+        "path": {"type": "string", "description": "Absolute or relative file path."},
+        "content": {"type": "string", "description": "Content to write to the file."},
+    },
+    executor=execute_write_file,
 )
 
-_register(
-    ToolDef(
-        name="file_search",
-        description="Search for files matching a glob pattern.",
-        parameters={
-            "type": "object",
-            "required": ["pattern"],
-            "properties": {
-                "pattern": {
-                    "type": "string",
-                    "description": "Glob pattern (supports ** for recursive).",
-                },
-                "path": {
-                    "type": "string",
-                    "description": "Directory to search in (default: current directory).",
-                },
-            },
+tool(
+    name="file_search",
+    description="Search for files matching a glob pattern.",
+    params={
+        "pattern": {
+            "type": "string",
+            "description": "Glob pattern (supports ** for recursive).",
         },
-        display_language="text",
-        display_arg="pattern",
-        executor=execute_file_search,
-    )
+        "path": {
+            "type": "string",
+            "description": "Directory to search in (default: current directory).",
+        },
+    },
+    required=["pattern"],
+    executor=execute_file_search,
 )
 
-_register(
-    ToolDef(
-        name="web_search",
-        description="Search the web for information.",
-        parameters={
-            "type": "object",
-            "required": ["query"],
-            "properties": {
-                "query": {"type": "string", "description": "Search query."},
-            },
-        },
-        display_language="text",
-        display_arg="query",
-        executor=execute_web_search,
-    )
+tool(
+    name="web_search",
+    description="Search the web for information.",
+    params={"query": {"type": "string", "description": "Search query."}},
+    executor=execute_web_search,
 )
 
-_register(
-    ToolDef(
-        name="web_fetch",
-        description="Fetch the contents of a URL.",
-        parameters={
-            "type": "object",
-            "required": ["url"],
-            "properties": {
-                "url": {"type": "string", "description": "URL to fetch."},
-            },
-        },
-        display_language="text",
-        display_arg="url",
-        executor=execute_web_fetch,
-    )
+tool(
+    name="web_fetch",
+    description="Fetch the contents of a URL.",
+    params={"url": {"type": "string", "description": "URL to fetch."}},
+    executor=execute_web_fetch,
 )
 
-_register(
-    ToolDef(
-        name="system_info",
-        description="Get system information.",
-        parameters={
-            "type": "object",
-            "required": ["categories"],
-            "properties": {
-                "categories": {
-                    "type": "array",
-                    "items": {"type": "string", "enum": ["os", "env", "cwd", "disk"]},
-                    "description": "Categories of system info to retrieve.",
-                },
-            },
+tool(
+    name="system_info",
+    description="Get system information.",
+    params={
+        "categories": {
+            "type": "array",
+            "items": {"type": "string", "enum": ["os", "env", "cwd", "disk"]},
+            "description": "Categories of system info to retrieve.",
         },
-        display_language="text",
-        display_arg="categories",
-        executor=execute_system_info,
-    )
+    },
+    executor=execute_system_info,
 )
 
 
