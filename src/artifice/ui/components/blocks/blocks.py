@@ -1,7 +1,4 @@
-"""Output block widgets for the terminal display.
-
-This module is deprecated. Import from artifice.ui.components.blocks instead.
-"""
+"""Output block widgets for the terminal display."""
 
 from __future__ import annotations
 

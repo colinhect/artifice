@@ -17,7 +17,14 @@ from textual.widgets import LoadingIndicator, Static
 from artifice.core.events import InputMode
 from artifice.core.history import History
 from artifice.core.prompts import load_prompt
-from artifice.agent import Agent, SimulatedAgent, create_agent
+from artifice.agent import (
+    Agent,
+    SimulatedAgent,
+    ToolCall,
+    TOOLS,
+    create_agent,
+    execute_tool_call,
+)
 from artifice.agent.streaming import StreamManager
 from artifice.execution import ExecutionResult, ExecutionStatus
 from artifice.execution.coordinator import ExecutionCoordinator
@@ -341,8 +348,6 @@ class ArtificeTerminal(Widget):
 
         # Check if this is a tool call with a direct executor (read_file, etc.)
         if isinstance(block, ToolCallBlock) and block.tool_args:
-            from artifice.agent.tools.base import TOOLS
-
             tool_def = TOOLS.get(block.tool_name)
             if tool_def and tool_def.executor:
                 self._execute_tool_with_executor(block)
@@ -401,12 +406,7 @@ class ArtificeTerminal(Widget):
         state: dict = {"sent_to_agent": False}
 
         async def do_execute():
-            from artifice.agent.tools.base import (
-                ToolCall as _ToolCall,
-                execute_tool_call,
-            )
-
-            tc = _ToolCall(
+            tc = ToolCall(
                 id=block.tool_call_id, name=block.tool_name, args=block.tool_args
             )
             result_text = await execute_tool_call(tc)

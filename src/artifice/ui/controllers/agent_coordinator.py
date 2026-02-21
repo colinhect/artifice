@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from artifice.ui.components.blocks.blocks import (
+    AgentOutputBlock,
     ToolCallBlock,
 )
 from artifice.ui.components.status import StatusIndicatorManager
@@ -66,8 +67,6 @@ class AgentCoordinator:
         for immediate responsiveness.
         """
         if self._agent is None:
-            from artifice.ui.components.blocks.blocks import AgentOutputBlock
-
             agent_output_block = AgentOutputBlock("No AI agent configured.")
             self._output.append_block(agent_output_block)
             agent_output_block.mark_failed()
