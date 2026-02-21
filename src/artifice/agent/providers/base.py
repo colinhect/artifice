@@ -63,7 +63,6 @@ class Provider(ABC):
         Yields:
             StreamChunk objects containing content, reasoning, usage, etc.
         """
-        ...
 
     @abstractmethod
     async def complete(
@@ -80,7 +79,6 @@ class Provider(ABC):
         Returns:
             ProviderResponse with text, tool_calls, thinking, and usage
         """
-        ...
 
     async def check_connection(self) -> bool:
         """Check if the provider is reachable. Override if needed."""

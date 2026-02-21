@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from artifice.execution.base import (
-    ExecutionResult as ExecutionResult,
-    ExecutionStatus as ExecutionStatus,
-)
+from artifice.execution.base import ExecutionResult, ExecutionStatus
 
 __all__ = ["ExecutionResult", "ExecutionStatus"]

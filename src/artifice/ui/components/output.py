@@ -106,15 +106,6 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
         Binding("ctrl+o", "toggle_block_markdown", "Toggle Markdown", show=True),
     ]
 
-    def __init__(
-        self,
-        *,
-        name: str | None = None,
-        id: str | None = None,
-        classes: str | None = None,
-    ) -> None:
-        super().__init__(name=name, id=id, classes=classes)
-
     def append_block(self, block: BaseBlock, scroll: bool = True):
         self._blocks.append(block)
         self.mount(block)

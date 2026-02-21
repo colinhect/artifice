@@ -26,7 +26,7 @@ class StreamingFenceDetector:
     and the previous block is finalized.
     """
 
-    def __init__(self, output: TerminalOutput, pause_after_code: bool = False) -> None:
+    def __init__(self, output: TerminalOutput) -> None:
         self._output = output
         self._factory = BlockFactory(output)
         self._started = False
@@ -149,12 +149,6 @@ class StreamingFenceDetector:
 
     def resume(self) -> None:
         """No-op: resume is not needed in the simplified version."""
-        pass
-
-    @property
-    def is_paused(self) -> bool:
-        """Always returns False - no pause functionality in simplified version."""
-        return False
 
     @property
     def last_code_block(self) -> None:

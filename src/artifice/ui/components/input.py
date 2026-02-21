@@ -180,8 +180,6 @@ class TerminalInput(Static):
     class SubmitRequested(Message):
         """Internal message from TextArea requesting submission."""
 
-        pass
-
     class SetMode(Message):
         """Message requesting a mode switch."""
 
@@ -192,27 +190,17 @@ class TerminalInput(Static):
     class CycleMode(Message):
         """Message requesting to cycle through modes."""
 
-        pass
-
     class HistoryPrevious(Message):
         """Message requesting previous history item."""
-
-        pass
 
     class HistoryNext(Message):
         """Message requesting next history item."""
 
-        pass
-
     class HistorySearchRequested(Message):
         """Message requesting history search interface."""
 
-        pass
-
     class PromptSearchRequested(Message):
         """Message requesting prompt template search interface."""
-
-        pass
 
     class PromptSelected(Message):
         """Message sent when a prompt template is selected via / command."""

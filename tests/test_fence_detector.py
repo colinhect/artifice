@@ -406,19 +406,6 @@ class TestEdgeCases:
         assert d.all_blocks[1]._text.startswith("#")
 
     @pytest.mark.asyncio
-    async def test_no_pause_functionality(self):
-        """is_paused always returns False."""
-        d, out = make_detector()
-        d.start()
-        await d.feed("Some text with headers\n# Header\nMore")
-
-        # Should never be paused
-        assert not d.is_paused
-
-        await d.finish()
-        assert not d.is_paused
-
-    @pytest.mark.asyncio
     async def test_last_code_block_none(self):
         """last_code_block always returns None."""
         d, out = make_detector()

@@ -25,7 +25,7 @@ class BlockRenderer(Protocol):
         Returns:
             True if this renderer can create blocks for this content type
         """
-        ...
+        ...  # pylint: disable=unnecessary-ellipsis
 
     def create_block(self, content: str, **kwargs) -> BaseBlock:
         """Create a block widget for the given content.
@@ -37,7 +37,7 @@ class BlockRenderer(Protocol):
         Returns:
             A configured BaseBlock instance ready to be mounted
         """
-        ...
+        ...  # pylint: disable=unnecessary-ellipsis
 
 
 class BlockRegistry:

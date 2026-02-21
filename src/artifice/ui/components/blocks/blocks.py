@@ -159,7 +159,6 @@ class StreamingMarkdownBlock(BaseBlock):
 
     def flush(self) -> None:
         """No-op for streaming markdown - updates happen immediately via append."""
-        pass
 
     def finalize_streaming(self) -> None:
         """End streaming - mark as complete."""
@@ -177,9 +176,7 @@ class StreamingMarkdownBlock(BaseBlock):
 class AgentOutputBlock(StreamingMarkdownBlock):
     """Block for AI agent output with real-time markdown streaming."""
 
-    def __init__(
-        self, output: str = "", activity: bool = True, render_markdown: bool = True
-    ) -> None:
+    def __init__(self, output: str = "", activity: bool = True) -> None:
         # render_markdown parameter kept for API compatibility but always True
         super().__init__(initial_text=output, activity=activity)
 
