@@ -7,7 +7,9 @@ from typing import Any, Awaitable, Callable
 
 from artifice.agent.tools.executors import (
     execute_glob,
+    execute_grep,
     execute_read,
+    execute_replace,
     execute_system_info,
     execute_web_fetch,
     execute_web_search,
@@ -191,6 +193,65 @@ tool(
     },
     required=["pattern"],
     executor=execute_glob,
+)
+
+tool(
+    name="grep",
+    description="Search for regex patterns in files.",
+    params={
+        "pattern": {
+            "type": "string",
+            "description": "Regular expression pattern to search for.",
+        },
+        "path": {
+            "type": "string",
+            "description": "Directory to search in (default: current directory).",
+        },
+        "file_filter": {
+            "type": "string",
+            "description": "Glob pattern to filter files (default: *).",
+        },
+        "case_sensitive": {
+            "type": "boolean",
+            "description": "Whether the search is case sensitive (default: true).",
+        },
+        "context_before": {
+            "type": "integer",
+            "description": "Number of lines of context before each match (default: 0).",
+        },
+        "context_after": {
+            "type": "integer",
+            "description": "Number of lines of context after each match (default: 0).",
+        },
+    },
+    required=["pattern"],
+    executor=execute_grep,
+)
+
+tool(
+    name="replace",
+    description="Replace string occurrences in files with regex support.",
+    params={
+        "path": {"type": "string", "description": "Absolute or relative file path."},
+        "pattern": {
+            "type": "string",
+            "description": "Regular expression pattern to match.",
+        },
+        "replacement": {
+            "type": "string",
+            "description": "Replacement string (supports backreferences).",
+        },
+        "case_sensitive": {
+            "type": "boolean",
+            "description": "Whether the search is case sensitive (default: true).",
+        },
+        "dry_run": {
+            "type": "boolean",
+            "description": "If true, only show what would be changed without writing (default: true).",
+        },
+    },
+    required=["path", "pattern", "replacement"],
+    executor=execute_replace,
 )
 
 tool(

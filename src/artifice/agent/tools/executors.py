@@ -12,6 +12,7 @@ import glob
 import logging
 import os
 import platform
+import re
 import shutil
 from typing import Any
 
@@ -103,6 +104,156 @@ async def execute_glob(args: dict[str, Any]) -> str:
     return result
 
 
+async def execute_grep(args: dict[str, Any]) -> str:
+    """Search for regex patterns in files."""
+    pattern = args["pattern"]
+    path = os.path.expanduser(args.get("path", "."))
+    file_filter = args.get("file_filter", "*")
+    case_sensitive = args.get("case_sensitive", True)
+    context_before = args.get("context_before", 0)
+    context_after = args.get("context_after", 0)
+
+    logger.debug(
+        "Grep: pattern=%s, path=%s, filter=%s, case_sensitive=%s",
+        pattern,
+        path,
+        file_filter,
+        case_sensitive,
+    )
+
+    try:
+        regex_flags = 0 if case_sensitive else re.IGNORECASE
+        compiled_pattern = re.compile(pattern, regex_flags)
+    except re.error as e:
+        return f"Error: Invalid regex pattern: {e}"
+
+    results = []
+    max_files = 50
+    max_matches = 200
+
+    loop = asyncio.get_running_loop()
+
+    async def search_file(filepath: str) -> list[str]:
+        file_results = []
+        try:
+            with open(filepath, encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+        except Exception:
+            return []
+
+        for i, line in enumerate(lines):
+            if compiled_pattern.search(line):
+                line_num = i + 1
+                content = line.rstrip("\n")
+                file_results.append(f"  {line_num}: {content}")
+
+                # Add context after
+                for j in range(1, context_after + 1):
+                    if i + j < len(lines):
+                        file_results.append(f"  {line_num + j}: {lines[i + j].rstrip()}")
+
+        return file_results
+
+    async def process_directory():
+        search_pattern = os.path.join(path, "**", file_filter)
+        files = glob.glob(search_pattern, recursive=True)
+        files = [f for f in files if os.path.isfile(f)]
+
+        all_results = []
+        for filepath in files[:max_files]:
+            file_results = await search_file(filepath)
+            if file_results:
+                rel_path = os.path.relpath(filepath, path)
+                all_results.append(f"{rel_path}:")
+                all_results.extend(file_results)
+                if len(all_results) >= max_matches:
+                    return all_results[:max_matches]
+        return all_results
+
+    try:
+        results = await loop.run_in_executor(None, asyncio.run, process_directory())
+    except Exception as e:
+        logger.error("Error during grep: %s", e)
+        return f"Error during grep: {e}"
+
+    if not results:
+        return f"No matches found for '{pattern}' in {path}"
+
+    output = "\n".join(results)
+    if len(results) >= max_matches:
+        output += f"\n... (max {max_matches} matches reached)"
+    return output
+
+
+async def execute_replace(args: dict[str, Any]) -> str:
+    """Replace string occurrences in files with regex support."""
+    path = os.path.expanduser(args["path"])
+    pattern = args["pattern"]
+    replacement = args["replacement"]
+    case_sensitive = args.get("case_sensitive", True)
+    dry_run = args.get("dry_run", True)
+
+    logger.debug(
+        "Replace: pattern=%s, replacement=%s, path=%s, case_sensitive=%s, dry_run=%s",
+        pattern,
+        replacement,
+        path,
+        case_sensitive,
+        dry_run,
+    )
+
+    if not os.path.isfile(path):
+        return f"Error: File not found: {path}"
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            original_content = f.read()
+    except PermissionError:
+        return f"Error: Permission denied: {path}"
+    except Exception as e:
+        return f"Error reading file: {e}"
+
+    try:
+        regex_flags = 0 if case_sensitive else re.IGNORECASE
+        compiled_pattern = re.compile(pattern, regex_flags)
+    except re.error as e:
+        return f"Error: Invalid regex pattern: {e}"
+
+    new_content, count = compiled_pattern.subn(replacement, original_content)
+
+    if count == 0:
+        return f"No matches found for '{pattern}' in {path}"
+
+    if dry_run:
+        diff_lines = []
+        old_lines = original_content.splitlines()
+        new_lines = new_content.splitlines()
+
+        for i, (old_line, new_line) in enumerate(zip(old_lines, new_lines)):
+            if old_line != new_line:
+                diff_lines.append(f"  Line {i + 1}:")
+                diff_lines.append(f"  - {old_line}")
+                diff_lines.append(f"  + {new_line}")
+
+        if len(diff_lines) > 50:
+            diff_lines = diff_lines[:50]
+            diff_lines.append("  ... (truncated)")
+
+        return (
+            f"DRY RUN: {count} replacement(s) would be made to {path}:\n\n"
+            + "\n".join(diff_lines)
+        )
+
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        logger.debug("Replaced %d occurrences in: %s", count, path)
+        return f"Replaced {count} occurrence(s) in {path}"
+    except Exception as e:
+        logger.error("Error writing file %s: %s", path, e)
+        return f"Error writing file: {e}"
+
+
 async def execute_web_fetch(args: dict[str, Any]) -> str:
     """Fetch contents of a URL."""
     import urllib.request
@@ -136,7 +287,6 @@ async def execute_web_fetch(args: dict[str, Any]) -> str:
 
 async def execute_web_search(args: dict[str, Any]) -> str:
     """Search the web using DuckDuckGo HTML."""
-    import re
     import urllib.parse
     import urllib.request
 

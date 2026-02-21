@@ -12,7 +12,9 @@ from artifice.agent.tools.base import (
 )
 from artifice.agent.tools.executors import (
     execute_glob,
+    execute_grep,
     execute_read,
+    execute_replace,
     execute_system_info,
     execute_web_fetch,
     execute_web_search,
@@ -27,7 +29,9 @@ __all__ = [
     "get_all_schemas",
     "get_schemas_for",
     "execute_glob",
+    "execute_grep",
     "execute_read",
+    "execute_replace",
     "execute_system_info",
     "execute_web_fetch",
     "execute_web_search",
