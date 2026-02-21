@@ -519,13 +519,21 @@ def _parse_tag_args(name: str, content: str) -> dict:
     if current_key is not None:
         args[current_key] = "\n".join(current_lines)
 
-    # Convert array-typed parameters from comma-separated strings
+    # Convert typed parameters from strings
     if tool_def and args:
         schema_props = tool_def.parameters.get("properties", {})
         for key, val in args.items():
             prop = schema_props.get(key, {})
-            if prop.get("type") == "array" and isinstance(val, str):
+            prop_type = prop.get("type")
+            if prop_type == "array" and isinstance(val, str):
                 args[key] = [v.strip() for v in val.split(",")]
+            elif prop_type == "boolean" and isinstance(val, str):
+                args[key] = val.lower() in ("true", "1", "yes")
+            elif prop_type == "integer" and isinstance(val, str):
+                try:
+                    args[key] = int(val)
+                except ValueError:
+                    pass
 
     return args
 
