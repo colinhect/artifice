@@ -20,6 +20,8 @@ Artifice provides a unified interface for both building precise prompts and runn
 - **Block Navigation** - Navigate, edit, and re-execute previous inputs
 - **Multiline Input** - Write complex code with proper formatting
 - **Command History** - Persistent history across sessions with search
+- **Full Prompt Visibility** - All prompts used in completion requests are visible 
+- **Full Prompt Control** - Ability to edit all parts of the prompts such as the output of a tool call (not implemented)
 
 ## Installation
 

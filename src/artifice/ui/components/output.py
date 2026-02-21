@@ -220,12 +220,5 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     def on_focus(self) -> None:
         """When focusing on TerminalOutput, highlight the last CodeInputBlock."""
         if self._blocks and self._highlighted_index is None:
-            # Find the last CodeInputBlock
-            for i in range(len(self._blocks) - 1, -1, -1):
-                if isinstance(self._blocks[i], CodeInputBlock):
-                    self._highlighted_index = i
-                    self._update_highlight()
-                    return
-            # Fallback: highlight the last block if no CodeInputBlock found
             self._highlighted_index = len(self._blocks) - 1
             self._update_highlight()
