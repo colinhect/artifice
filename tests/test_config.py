@@ -189,6 +189,36 @@ def test_show_tool_output_config(tmp_path, monkeypatch):
     assert config.show_tool_output is False
 
 
+def test_performance_settings_defaults():
+    """Test that performance settings have correct default values."""
+    config = ArtificeConfig()
+    assert config.streaming_fps == 60
+    assert config.shell_poll_interval == 0.02
+    assert config.python_executor_sleep == 0.005
+
+
+def test_performance_settings_custom(tmp_path, monkeypatch):
+    """Test loading custom performance settings."""
+    config_dir = tmp_path / "artifice"
+    config_dir.mkdir()
+    init_file = config_dir / "init.yaml"
+
+    yaml_content = {
+        "streaming_fps": 30,
+        "shell_poll_interval": 0.05,
+        "python_executor_sleep": 0.01,
+    }
+    init_file.write_text(yaml.dump(yaml_content))
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    config, error = load_config()
+
+    assert error is None
+    assert config.streaming_fps == 30
+    assert config.shell_poll_interval == 0.05
+    assert config.python_executor_sleep == 0.01
+
+
 def test_multiline_yaml_strings(tmp_path, monkeypatch):
     """Test that multiline YAML strings work correctly."""
     config_dir = tmp_path / "artifice"

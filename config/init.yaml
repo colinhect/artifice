@@ -46,3 +46,19 @@ shell_markdown: false
 # TMUX integration
 tmux_target: "session:window.pane"
 tmux_prompt_pattern: '^\S+@\S+:\S+\$ '
+
+# Performance Settings
+# Adjust these values to fine-tune responsiveness vs. CPU usage
+# Lower values = more responsive but higher CPU usage
+
+# Streaming FPS: Target frames per second for UI updates during AI response streaming
+# Default: 60 (16.6ms between updates) | Conservative: 30 (33ms)
+streaming_fps: 60
+
+# Shell poll interval: Seconds between checks for shell command output
+# Default: 0.02 (20ms) | Conservative: 0.05 (50ms)
+shell_poll_interval: 0.02
+
+# Python executor sleep: Seconds to sleep between output checks during Python execution
+# Default: 0.005 (5ms) | Conservative: 0.01 (10ms)
+python_executor_sleep: 0.005

@@ -81,6 +81,9 @@ Copy `config/init.yaml` to `~/.config/artifice/init.yaml` and customize. Key set
 - **system_prompt** - Custom system prompt for the AI agent
 - **tmux_target** - Target tmux pane for shell command execution (e.g. `session:window.pane`)
 - **send_user_commands_to_agent** - Automatically send execution results back to the agent
+- **streaming_fps** - Performance: Target FPS for streaming UI updates (default: 60)
+- **shell_poll_interval** - Performance: Shell command polling interval in seconds (default: 0.02)
+- **python_executor_sleep** - Performance: Python execution sleep interval in seconds (default: 0.005)
 
 See `config/init.yaml` for the full list of options.
 

@@ -51,9 +51,7 @@ class ExecutionCoordinator:
                 poll_interval=config.shell_poll_interval,
             )
         else:
-            self._shell_executor = ShellExecutor(
-                poll_interval=config.shell_poll_interval
-            )
+            self._shell_executor = ShellExecutor()
 
         # Set shell init script from config (only applicable to ShellExecutor)
         if config.shell_init_script and isinstance(self._shell_executor, ShellExecutor):
