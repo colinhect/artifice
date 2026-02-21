@@ -89,7 +89,7 @@ class AgentCoordinator:
             return
 
         detector, response = await self._stream_agent_response(self._agent, prompt)
-        self._apply_agent_response(detector, response)
+        await self._apply_agent_response(detector, response)
 
         # After first agent interaction, enable auto-send mode
         if not self._is_send_user_commands_to_agent():
@@ -117,7 +117,7 @@ class AgentCoordinator:
             + "\n"
         )
         detector, response = await self._stream_agent_response(self._agent, prompt)
-        self._apply_agent_response(detector, response)
+        await self._apply_agent_response(detector, response)
 
     async def _stream_agent_response(
         self, agent: AnyAgent, prompt: str
@@ -154,14 +154,14 @@ class AgentCoordinator:
             )
         except asyncio.CancelledError:
             self._status_manager.set_inactive()
-            self._stream.finalize()
+            await self._stream.finalize()
             self._stream.current_detector = None
             raise
         self._status_manager.set_inactive()
         self._status_manager.update_agent_info(usage=getattr(response, "usage", None))
 
         with self._batch_update():
-            self._stream.finalize()
+            await self._stream.finalize()
 
         self._stream.current_detector = None
         # Scroll after finalization — Markdown widgets may have changed content height
@@ -199,7 +199,7 @@ class AgentCoordinator:
 
         return detector, response
 
-    def _apply_agent_response(
+    async def _apply_agent_response(
         self, detector: StreamingFenceDetector, response: AgentResponse
     ) -> None:
         """Mark context, handle errors, and finalize agent output blocks."""
@@ -209,7 +209,7 @@ class AgentCoordinator:
 
             if detector.first_agent_block:
                 if response.error:
-                    detector.first_agent_block.append(
+                    await detector.first_agent_block.append(
                         f"\n**Error:** {response.error}\n"
                     )
                     detector.first_agent_block.flush()
@@ -251,4 +251,4 @@ class AgentCoordinator:
         """Continue the conversation after pending tool calls are resolved."""
         if self._agent is not None and not self._agent.has_pending_tool_calls:
             detector, response = await self._stream_agent_response(self._agent, "")
-            self._apply_agent_response(detector, response)
+            await self._apply_agent_response(detector, response)

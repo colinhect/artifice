@@ -376,9 +376,38 @@ ThinkingOutputBlock {
     transition: color 0.15s, border-color 0.15s;
 }
 
+ThinkingOutputBlock Markdown {
+    color: $foreground 60%;
+}
+
+ThinkingOutputBlock Markdown MarkdownBlock {
+    color: $foreground 60%;
+}
+
+ThinkingOutputBlock Markdown MarkdownFence {
+    color: $foreground 60%;
+}
+
+ThinkingOutputBlock Markdown MarkdownTable {
+    color: $foreground 60%;
+}
+
+ThinkingOutputBlock Markdown MarkdownH1,
+ThinkingOutputBlock Markdown MarkdownH2,
+ThinkingOutputBlock Markdown MarkdownH3,
+ThinkingOutputBlock Markdown MarkdownH4,
+ThinkingOutputBlock Markdown MarkdownH5,
+ThinkingOutputBlock Markdown MarkdownH6 {
+    color: $foreground 60%;
+}
+
 /* --------------------------------------------------------------------------
    Buffered Output Block
    -------------------------------------------------------------------------- */
+BufferedOutputBlock Markdown MarkdownBlock:first-child {
+    margin-top: 0;
+}
+
 BufferedOutputBlock Markdown MarkdownBlock:last-child {
     margin-bottom: 0;
 }
@@ -393,7 +422,27 @@ BufferedOutputBlock Markdown MarkdownTable {
 
 BufferedOutputBlock Markdown MarkdownH1 {
     text-align: left;
+    margin-top: 0;
 }
+
+/* --------------------------------------------------------------------------
+   Streaming Markdown Blocks (AgentOutputBlock, ThinkingOutputBlock)
+   -------------------------------------------------------------------------- */
+StreamingMarkdownBlock Markdown MarkdownBlock:first-child {
+    margin-top: 0;
+    margin-bottom: 1;
+}
+
+StreamingMarkdownBlock Markdown MarkdownBlock:last-child {
+    margin-bottom: 0;
+}
+
+/*
+StreamingMarkdownBlock Markdown MarkdownFence {
+    margin: 0;
+}
+*/
+
 
 /* --------------------------------------------------------------------------
    Widget Output Block

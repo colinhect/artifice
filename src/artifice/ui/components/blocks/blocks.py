@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from textual import highlight
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -105,6 +107,90 @@ class CodeInputBlock(BaseBlock):
         )
 
 
+class StreamingMarkdownBlock(BaseBlock):
+    """Block that streams markdown content in real-time using Textual's MarkdownStream.
+
+    Uses the Markdown widget with streaming support for real-time rendering
+    as content arrives from the LLM.
+    """
+
+    def __init__(self, initial_text: str = "", activity: bool = True) -> None:
+        super().__init__()
+        self._status_indicator = Static("", classes="status-indicator")
+        self._streaming = activity
+        self._markdown_widget: Markdown | None = None
+        self._markdown_stream = None
+        self._accumulated_text: str = initial_text
+        self._stream_ready: bool = False
+        self.add_class("in-context")
+
+        if not activity:
+            self.mark_success()
+
+    def compose(self) -> ComposeResult:
+        with Horizontal():
+            yield self._status_indicator
+            # Create markdown widget with initial content if any
+            if self._accumulated_text:
+                self._markdown_widget = Markdown(self._accumulated_text)
+            else:
+                self._markdown_widget = Markdown("")
+            yield self._markdown_widget
+
+    def on_mount(self) -> None:
+        """Get the markdown stream once the widget is mounted."""
+        if self._markdown_widget is not None:
+            self._markdown_stream = self._markdown_widget.get_stream(
+                self._markdown_widget
+            )
+            self._stream_ready = True
+            # Flush any accumulated text that arrived before mount
+            if self._accumulated_text:
+                asyncio.create_task(self._markdown_stream.write(self._accumulated_text))
+
+    async def append(self, text: str) -> None:
+        """Append text to the streaming markdown.
+
+        Accumulates text and writes to the markdown stream when ready.
+        """
+        self._accumulated_text += text
+        if self._stream_ready and self._markdown_stream is not None:
+            await self._markdown_stream.write(text)
+
+    def flush(self) -> None:
+        """No-op for streaming markdown - updates happen immediately via append."""
+        pass
+
+    def finalize_streaming(self) -> None:
+        """End streaming - mark as complete."""
+        if not self._streaming:
+            return
+        self._streaming = False
+
+    def mark_success(self) -> None:
+        self._status_indicator.styles.display = "block"
+
+    def mark_failed(self) -> None:
+        self._status_indicator.styles.display = "block"
+
+
+class AgentOutputBlock(StreamingMarkdownBlock):
+    """Block for AI agent output with real-time markdown streaming."""
+
+    def __init__(
+        self, output: str = "", activity: bool = True, render_markdown: bool = True
+    ) -> None:
+        # render_markdown parameter kept for API compatibility but always True
+        super().__init__(initial_text=output, activity=activity)
+
+
+class ThinkingOutputBlock(StreamingMarkdownBlock):
+    """Block for AI thinking content. Styled distinctly via CSS."""
+
+    def __init__(self, activity: bool = True) -> None:
+        super().__init__(activity=activity)
+
+
 class BufferedOutputBlock(BaseBlock):
     """Base class for output blocks with buffered text and markdown toggle.
 
@@ -117,7 +203,7 @@ class BufferedOutputBlock(BaseBlock):
     _STATIC_CSS_CLASS: str = ""
     _MARKDOWN_CSS_CLASS: str = ""
 
-    def __init__(self, output="", render_markdown=False) -> None:
+    def __init__(self, output: str = "", render_markdown: bool = False) -> None:
         super().__init__()
         self._output_str: str = output
         self._render_markdown = render_markdown
@@ -160,7 +246,9 @@ class CodeOutputBlock(BufferedOutputBlock):
     _STATIC_CSS_CLASS = "code-output"
     _MARKDOWN_CSS_CLASS = "markdown-output"
 
-    def __init__(self, output="", render_markdown=False, in_context=False) -> None:
+    def __init__(
+        self, output: str = "", render_markdown: bool = False, in_context: bool = False
+    ) -> None:
         super().__init__(output=output, render_markdown=render_markdown)
         self._status_indicator = Static(classes="status-indicator")
         self._has_error = False
@@ -176,11 +264,11 @@ class CodeOutputBlock(BufferedOutputBlock):
     def on_mount(self) -> None:
         self._markdown.styles.display = "none"
 
-    def append_output(self, output) -> None:
+    def append_output(self, output: str) -> None:
         self._output_str += output
         self._dirty = True
 
-    def append_error(self, output) -> None:
+    def append_error(self, output: str) -> None:
         self.append_output(output)
         self.mark_failed()
 
@@ -211,7 +299,7 @@ class WidgetOutputBlock(BaseBlock):
 
 
 class AgentInputBlock(BaseBlock):
-    def __init__(self, prompt: str, in_context=False, **kwargs) -> None:
+    def __init__(self, prompt: str, in_context: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._status_indicator = Static(">", classes="status-indicator status-success")
         self._prompt = Static(prompt, classes="prompt")
@@ -234,77 +322,11 @@ class AgentInputBlock(BaseBlock):
         return "ai"
 
 
-class AgentOutputBlock(BufferedOutputBlock):
-    _STATIC_CSS_CLASS = "text-output"
-    _MARKDOWN_CSS_CLASS = "agent-output"
-
-    def __init__(self, output="", activity=True, render_markdown=True) -> None:
-        super().__init__(output=output, render_markdown=render_markdown)
-        self._status_indicator = Static("", classes="status-indicator")
-        self._streaming = activity
-        self.add_class("in-context")
-
-        if not activity:
-            self.mark_success()
-
-    def compose(self) -> ComposeResult:
-        with self._contents:
-            yield self._status_indicator
-            yield self._output
-            yield self._markdown
-
-    def on_mount(self) -> None:
-        """Switch to Markdown immediately for already-finished blocks (e.g. context)."""
-        self._markdown.styles.display = "none"
-        if not self._streaming and self._render_markdown:
-            self._switch_to_markdown()
-
-    def append(self, response) -> None:
-        self._output_str += response
-        self._dirty = True
-
-    def finalize_streaming(self) -> None:
-        """End streaming: flush any remaining text, then swap to Markdown if enabled."""
-        if not self._streaming:
-            return  # Already finalized (e.g. split mid-stream on empty line)
-        self._streaming = False
-        if self._dirty:
-            self.flush()
-        if self._render_markdown:
-            self._switch_to_markdown()
-
-    def toggle_markdown(self) -> None:
-        """Toggle markdown rendering using display swaps."""
-        self._render_markdown = not self._render_markdown
-        if self._render_markdown:
-            if not self._markdown_loaded:
-                self._markdown_loaded = True
-                self._markdown.update(self._output_str.strip())
-            self._output.styles.display = "none"
-            self._markdown.styles.display = "block"
-        else:
-            self._markdown.styles.display = "none"
-            self._output.styles.display = "block"
-
-    def mark_success(self) -> None:
-        self._status_indicator.styles.display = "block"
-
-    def mark_failed(self) -> None:
-        self._status_indicator.styles.display = "block"
-
-
-class ThinkingOutputBlock(AgentOutputBlock):
-    """Block for AI thinking content. Styled distinctly via CSS."""
-
-    def __init__(self, output="(thinking) ", activity=True) -> None:
-        super().__init__(output=output, activity=activity, render_markdown=False)
-
-
 class SystemBlock(BufferedOutputBlock):
     _STATIC_CSS_CLASS = "system-output"
     _MARKDOWN_CSS_CLASS = "system-markdown-output"
 
-    def __init__(self, output="", render_markdown=True) -> None:
+    def __init__(self, output: str = "", render_markdown: bool = True) -> None:
         super().__init__(output=output, render_markdown=render_markdown)
         self._status_indicator = Static(">", classes="status-indicator status-success")
 

@@ -1,8 +1,7 @@
-"""Tests for StreamingFenceDetector - the markdown fence parser.
+"""Tests for StreamingFenceDetector - header-based streaming splitter.
 
 Uses lightweight fakes instead of real Textual widgets to test
-the parsing state machine in isolation. We patch the isinstance
-targets in the terminal module so the detector recognizes our fakes.
+that content splits on markdown headers.
 """
 
 from __future__ import annotations
@@ -11,16 +10,12 @@ from typing import TYPE_CHECKING
 from unittest.mock import patch
 import pytest
 from artifice.agent.streaming.detector import StreamingFenceDetector
-from artifice.utils.fencing import FenceState
 
 if TYPE_CHECKING:
     from typing import Protocol
 
     class HasText(Protocol):
         _text: str
-
-    class HasRemoved(Protocol):
-        _removed: bool
 
     class HasOutputStr(Protocol):
         _output_str: str
@@ -50,7 +45,8 @@ class FakeAgentBlock(FakeBlock):
         super().__init__()
         self._streaming = True
 
-    def append(self, text):
+    async def append(self, text):
+        """Async append to match the real block's async interface."""
         self._text += text
         self._output_str += text
 
@@ -67,25 +63,6 @@ class FakeAgentBlock(FakeBlock):
         if not self._streaming:
             return
         self._streaming = False
-        self._finished = True
-
-
-class FakeCodeBlock(FakeBlock):
-    """Fake CodeInputBlock that just stores code."""
-
-    def __init__(self, code="", language="python"):
-        super().__init__()
-        self._code = code
-        self._language = language
-        self._command_number = 0
-
-    def get_code(self):
-        return self._code
-
-    def update_code(self, code):
-        self._code = code
-
-    def finish_streaming(self):
         self._finished = True
 
 
@@ -111,10 +88,7 @@ class FakeOutput:
 @pytest.fixture(autouse=True)
 def _patch_block_types():
     """Patch isinstance targets so the detector recognizes our fakes."""
-    with (
-        patch("artifice.agent.streaming.detector.AgentOutputBlock", FakeAgentBlock),
-        patch("artifice.agent.streaming.detector.CodeInputBlock", FakeCodeBlock),
-    ):
+    with patch("artifice.agent.streaming.detector.AgentOutputBlock", FakeAgentBlock):
         yield
 
 
@@ -123,391 +97,342 @@ def make_detector():
     output = FakeOutput()
     detector = StreamingFenceDetector(output)  # type: ignore
     detector._make_prose_block = lambda activity: FakeAgentBlock(activity=activity)  # type: ignore
-    detector._make_code_block = lambda code, lang: FakeCodeBlock(code, language=lang)  # type: ignore
     return detector, output
 
 
-class TestProseOnly:
-    def test_prose_only(self):
-        """Plain text without fences produces a single prose block."""
+class TestSingleBlockStreaming:
+    """Tests for the base single-block streaming behavior."""
+
+    @pytest.mark.asyncio
+    async def test_prose_only(self):
+        """Plain text without headers produces a single prose block."""
         d, out = make_detector()
         d.start()
-        d.feed("Hello world, no code here.")
-        d.finish()
+        await d.feed("Hello world, no headers here.")
+        await d.finish()
         assert len(d.all_blocks) == 1
         assert isinstance(d.all_blocks[0], FakeAgentBlock)
         assert "Hello world" in d.all_blocks[0]._text
 
-    def test_angle_bracket_in_prose(self):
+    @pytest.mark.asyncio
+    async def test_text_with_code_fences(self):
+        """Code fences are streamed as regular text, not split into blocks."""
+        d, out = make_detector()
+        d.start()
+        await d.feed("Here is code:\n```python\nprint('hello')\n```\nDone")
+        await d.finish()
+
+        # Should only have one block with all the text
+        assert len(d.all_blocks) == 1
+        block = d.all_blocks[0]
+        assert isinstance(block, FakeAgentBlock)
+        assert "```python" in block._text
+        assert "print('hello')" in block._text
+        assert "Done" in block._text
+
+    @pytest.mark.asyncio
+    async def test_multiple_code_fences(self):
+        """Multiple code fences stay in the single block as text."""
+        d, out = make_detector()
+        d.start()
+        await d.feed("First:\n```python\nx = 1\n```\nSecond:\n```bash\nls\n```\nEnd")
+        await d.finish()
+
+        # Should still only have one block
+        assert len(d.all_blocks) == 1
+        block = d.all_blocks[0]
+        assert "First:" in block._text
+        assert "```python" in block._text
+        assert "Second:" in block._text
+        assert "```bash" in block._text
+        assert "End" in block._text
+
+    @pytest.mark.asyncio
+    async def test_angle_bracket_in_prose(self):
         """< and > in prose should remain as prose text."""
         d, out = make_detector()
         d.start()
-        d.feed("x < 5 and y > 3")
-        d.finish()
+        await d.feed("x < 5 and y > 3")
+        await d.finish()
 
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 0
-        assert "x < 5" in d.all_blocks[0]._text  # type: ignore
+        assert len(d.all_blocks) == 1
+        assert "x < 5" in d.all_blocks[0]._text
 
-
-class TestMarkdownFences:
-    """Tests for markdown code fence support (```language)."""
-
-    def test_simple_python_fence(self):
-        """```python fence creates a python code block."""
+    @pytest.mark.asyncio
+    async def test_empty_lines_in_text(self):
+        """Empty lines in prose should NOT split into multiple blocks."""
         d, out = make_detector()
         d.start()
-        d.feed("Here is code:\n```python\nprint('hello')\n```\nDone")
-        d.finish()
+        await d.feed("Paragraph one.\n\nParagraph two.")
+        await d.finish()
 
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert "print('hello')" in code_blocks[0]._code
-        assert code_blocks[0]._language == "python"
+        # Should still only have one block
+        assert len(d.all_blocks) == 1
+        block = d.all_blocks[0]
+        assert "Paragraph one." in block._text
+        assert "Paragraph two." in block._text
 
-    def test_simple_bash_fence(self):
-        """```bash fence creates a bash code block."""
+    @pytest.mark.asyncio
+    async def test_streaming_multiple_chunks(self):
+        """Multiple feed() calls accumulate into single block."""
         d, out = make_detector()
         d.start()
-        d.feed("Run this:\n```bash\nls -la\n```\nDone")
-        d.finish()
+        await d.feed("First chunk")
+        await d.feed(" second chunk")
+        await d.feed(" third chunk")
+        await d.finish()
 
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert "ls -la" in code_blocks[0]._code
-        assert code_blocks[0]._language == "bash"
+        assert len(d.all_blocks) == 1
+        assert "First chunk second chunk third chunk" in d.all_blocks[0]._text
 
-    def test_shell_fence_maps_to_bash(self):
-        """```shell fence should create a bash code block."""
+    @pytest.mark.asyncio
+    async def test_block_finalized_on_finish(self):
+        """Block is finalized when finish() is called."""
         d, out = make_detector()
         d.start()
-        d.feed("```shell\necho hi\n```")
-        d.finish()
+        await d.feed("Some text")
+        await d.finish()
 
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert code_blocks[0]._language == "bash"
+        block = d.all_blocks[0]
+        assert block._finished
+        assert block._success
 
-    def test_fence_without_language(self):
-        """``` without language should default to bash."""
+
+class TestHeaderSplitting:
+    """Tests for header-based block splitting."""
+
+    @pytest.mark.asyncio
+    async def test_single_header_creates_new_block(self):
+        """A markdown header splits content into two blocks."""
         d, out = make_detector()
         d.start()
-        d.feed("```\nsome command\n```")
-        d.finish()
+        await d.feed("Intro text\n# Section Header\nMore content")
+        await d.finish()
 
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert code_blocks[0]._language == "bash"
+        assert len(d.all_blocks) == 2
+        # First block should have intro text
+        assert "Intro text" in d.all_blocks[0]._text
+        assert "# Section Header" not in d.all_blocks[0]._text
+        # Second block should start with the header
+        assert d.all_blocks[1]._text.startswith("# Section Header")
+        assert "More content" in d.all_blocks[1]._text
 
-    def test_empty_lines_in_fence_dont_split(self):
-        """Empty lines inside a fence should NOT split into multiple blocks."""
+    @pytest.mark.asyncio
+    async def test_header_at_start_no_split(self):
+        """If text starts with a header, it's in the first block."""
         d, out = make_detector()
         d.start()
-        d.feed("```python\ndef foo():\n    pass\n\ndef bar():\n    pass\n```")
-        d.finish()
+        await d.feed("# First Header\nSome content")
+        await d.finish()
 
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert "def foo():" in code_blocks[0]._code
-        assert "def bar():" in code_blocks[0]._code
+        # Should only have one block
+        assert len(d.all_blocks) == 1
+        assert d.all_blocks[0]._text.startswith("# First Header")
+        assert "Some content" in d.all_blocks[0]._text
 
-    def test_multiple_fences(self):
-        """Multiple fences in one response."""
+    @pytest.mark.asyncio
+    async def test_multiple_headers_create_multiple_blocks(self):
+        """Multiple headers create multiple blocks."""
         d, out = make_detector()
         d.start()
-        d.feed("First:\n```python\nx = 1\n```\nSecond:\n```bash\nls\n```\nEnd")
-        d.finish()
-
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 2
-        assert code_blocks[0]._language == "python"
-        assert code_blocks[1]._language == "bash"
-        assert "x = 1" in code_blocks[0]._code
-        assert "ls" in code_blocks[1]._code
-
-    def test_fence_with_prose_before_and_after(self):
-        """Fences create separate blocks from surrounding prose."""
-        d, out = make_detector()
-        d.start()
-        d.feed("Before\n```python\ncode\n```\nAfter")
-        d.finish()
-
-        prose_blocks = [
-            b
-            for b in d.all_blocks
-            if isinstance(b, FakeAgentBlock) and b._text.strip()  # type: ignore
-        ]
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert any("Before" in b._text for b in prose_blocks)  # type: ignore
-        assert any("After" in b._text for b in prose_blocks)  # type: ignore
-
-    def test_fence_split_across_chunks(self):
-        """Fence split across feed() calls should work."""
-        d, out = make_detector()
-        d.start()
-        d.feed("Text\n```py")
-        d.feed("thon\nco")
-        d.feed("de\n```")
-        d.finish()
-
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert "code" in code_blocks[0]._code
-
-    def test_backticks_create_code_blocks(self):
-        """Markdown code fences should create code blocks."""
-        d, out = make_detector()
-        d.start()
-        d.feed("Use ```python\ncode\n```\nfor formatting")
-        d.finish()
-
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert "code" in code_blocks[0]._code
-        assert code_blocks[0]._language == "python"
-
-
-class TestBackticksInCodeBlocks:
-    """Test that backticks in strings/comments within code don't close fences."""
-
-    def test_triple_backticks_in_string(self):
-        """Triple backticks in a string literal should not close the fence."""
-        d, out = make_detector()
-        d.start()
-        d.feed(
-            'Here is code:\n```python\ntext = "Use ```python for code blocks"\nprint(text)\n```\nDone'
+        await d.feed(
+            "Intro\n# Header 1\nContent 1\n## Header 2\nContent 2\n### Header 3\nContent 3"
         )
-        d.finish()
+        await d.finish()
 
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert 'text = "Use ```python' in code_blocks[0]._code
-        assert "print(text)" in code_blocks[0]._code
+        assert len(d.all_blocks) == 4  # Intro + 3 headers
+        assert "Intro" in d.all_blocks[0]._text
+        assert d.all_blocks[1]._text.startswith("# Header 1")
+        assert "Content 1" in d.all_blocks[1]._text
+        assert d.all_blocks[2]._text.startswith("## Header 2")
+        assert "Content 2" in d.all_blocks[2]._text
+        assert d.all_blocks[3]._text.startswith("### Header 3")
+        assert "Content 3" in d.all_blocks[3]._text
 
-    def test_triple_backticks_in_comment(self):
-        """Triple backticks in a comment should not close the fence."""
+    @pytest.mark.asyncio
+    async def test_different_header_levels(self):
+        """All markdown header levels (H1-H6) trigger splitting."""
         d, out = make_detector()
         d.start()
-        d.feed(
-            '```python\n# Use ```python to start a code block\nprint("hello")\n```\nDone'
+        await d.feed(
+            "Intro\n# H1\nA\n## H2\nB\n### H3\nC\n#### H4\nD\n##### H5\nE\n###### H6\nF"
         )
-        d.finish()
+        await d.finish()
 
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert "# Use ```python" in code_blocks[0]._code
-        assert 'print("hello")' in code_blocks[0]._code
+        assert len(d.all_blocks) == 7  # Intro + 6 headers
+        assert d.all_blocks[1]._text.startswith("# H1")
+        assert d.all_blocks[2]._text.startswith("## H2")
+        assert d.all_blocks[3]._text.startswith("### H3")
+        assert d.all_blocks[4]._text.startswith("#### H4")
+        assert d.all_blocks[5]._text.startswith("##### H5")
+        assert d.all_blocks[6]._text.startswith("###### H6")
 
-    def test_triple_backticks_in_multiline_string(self):
-        """Triple backticks in a multiline string should not close the fence."""
+    @pytest.mark.asyncio
+    async def test_seven_hashes_not_header(self):
+        """Seven # characters is not a valid header."""
         d, out = make_detector()
         d.start()
-        d.feed('```python\nhelp_text = """\nUse ```python\nfor code\n"""\n```\nDone')
-        d.finish()
+        await d.feed("Intro\n####### Not a header\nMore")
+        await d.finish()
 
-        code_blocks = [b for b in d.all_blocks if isinstance(b, FakeCodeBlock)]
-        assert len(code_blocks) == 1
-        assert "```python" in code_blocks[0]._code
-        assert "help_text" in code_blocks[0]._code
+        # Should remain in one block
+        assert len(d.all_blocks) == 1
+        assert "####### Not a header" in d.all_blocks[0]._text
 
-
-class TestWhitespaceStripping:
-    def test_whitespace_after_closing_fence_stripped(self):
-        """Whitespace after closing ``` should be stripped from the next prose block."""
-        d, _ = make_detector()
-        d.start()
-        d.feed("```bash\nx = 1\n```\nNext text")
-        d.finish()
-
-        prose_blocks = [
-            b
-            for b in d.all_blocks
-            if isinstance(b, FakeAgentBlock) and b._text.strip()  # type: ignore
-        ]
-        after_code = [b for b in prose_blocks if "Next text" in b._text]  # type: ignore
-        assert len(after_code) == 1
-        assert after_code[0]._text.startswith("Next")  # type: ignore
-
-    def test_no_stripping_within_prose(self):
-        """Normal whitespace within prose should not be affected."""
-        d, _ = make_detector()
-        d.start()
-        d.feed("Line one\n\nLine two")
-        d.finish()
-
-        # Should have split into multiple blocks on the empty line, as normal
-        prose_blocks = [
-            b
-            for b in d.all_blocks
-            if isinstance(b, FakeAgentBlock) and b._text.strip()  # type: ignore
-        ]
-        assert any("Line one" in b._text for b in prose_blocks)  # type: ignore
-        assert any("Line two" in b._text for b in prose_blocks)  # type: ignore
-
-
-class TestRealTimeBlockFinalization:
-    def test_empty_line_finalizes_block_immediately(self):
-        """Block completed by empty line is finalized (not just marked success) mid-stream."""
-        d, _ = make_detector()
-        d.start()
-        d.feed("Paragraph one.\n\n")
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock)]
-        assert len(prose_blocks) >= 1
-        first_block = prose_blocks[0]
-        assert first_block._finished, (
-            "Block split by empty line should be finalized immediately"
-        )
-        assert first_block._success
-
-    def test_second_block_still_streaming_after_split(self):
-        """After an empty-line split, the new block is still streaming."""
-        d, _ = make_detector()
-        d.start()
-        d.feed("Para one.\n\nPara two.")
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock)]
-        assert len(prose_blocks) >= 2
-        second_block = prose_blocks[-1]
-        assert not second_block._finished, (
-            "Current streaming block should not be finalized yet"
-        )
-
-    def test_finalize_streaming_idempotent(self):
-        """Calling finalize_streaming() twice on the same block is safe."""
-        d, _ = make_detector()
-        d.start()
-        d.feed("Para one.\n\nPara two.")
-        d.finish()
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock)]
-        assert all(b._finished for b in prose_blocks)
-
-    def test_multiple_empty_lines_finalize_each_block(self):
-        """Each paragraph split creates a new finalized block in real-time."""
-        d, _ = make_detector()
-        d.start()
-        d.feed("Para one.\n\nPara two.\n\nPara three.")
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock)]
-        finalized = [b for b in prose_blocks if b._finished]
-        assert len(finalized) == 2
-        assert "Para one." in finalized[0]._text
-        assert "Para two." in finalized[1]._text
-
-
-class TestEmptyBlocks:
-    def test_empty_prose_before_code_is_removed(self):
-        """If the response starts immediately with a fence, the empty prose is removed."""
+    @pytest.mark.asyncio
+    async def test_header_at_end_of_line_is_detected(self):
+        """A header at the end of a line (before newline) should split."""
         d, out = make_detector()
         d.start()
-        d.feed("```python\nx = 1\n```")
-        d.finish()
+        await d.feed("Intro text")
+        await d.feed("\n# Header\n")
+        await d.feed("More content")
+        await d.finish()
 
-        assert d.first_agent_block is None  # Was removed since it was empty
+        assert len(d.all_blocks) == 2
+        assert "Intro text" in d.all_blocks[0]._text
+        assert d.all_blocks[1]._text.startswith("# Header")
 
-    def test_empty_trailing_prose_removed(self):
-        """Empty prose block after last code fence should be removed."""
+    @pytest.mark.asyncio
+    async def test_header_without_space_not_header(self):
+        """###text is not a header (needs space after #)."""
         d, out = make_detector()
         d.start()
-        d.feed("```python\nx = 1\n```")
-        d.finish()
+        await d.feed("Intro\n###text not header\nMore")
+        await d.finish()
 
-        non_removed = [b for b in d.all_blocks if not b._removed]  # type: ignore
-        for b in non_removed:
-            if isinstance(b, FakeAgentBlock):
-                assert b._text.strip()  # type: ignore
+        # Should remain in one block
+        assert len(d.all_blocks) == 1
+        assert "###text not header" in d.all_blocks[0]._text
 
-    def test_empty_first_agent_block_removed_in_finish(self):
-        """first_agent_block should be set to None if it's empty at finish()."""
+    @pytest.mark.asyncio
+    async def test_header_at_stream_end(self):
+        """Header at the very end of stream (no trailing newline)."""
         d, out = make_detector()
         d.start()
-        assert d.first_agent_block is not None
-        # Don't feed any text, just finish
-        d.finish()
-        assert d.first_agent_block is None
+        await d.feed("Intro text\n")
+        await d.feed("# Final Header")
+        await d.finish()
+
+        assert len(d.all_blocks) == 2
+        assert "Intro text" in d.all_blocks[0]._text
+        assert d.all_blocks[1]._text.startswith("# Final Header")
 
 
-class TestStateTransitions:
-    def test_state_starts_as_prose(self):
-        d, _ = make_detector()
-        assert d._parser.current_state == FenceState.PROSE
+class TestEdgeCases:
+    """Edge case tests for streaming behavior."""
 
-    def test_fence_transitions_to_code(self):
-        d, _ = make_detector()
-        d.start()
-        d.feed("```python\n")
-        assert d._parser.current_state == FenceState.CODE
-
-    def test_closing_fence_transitions_to_prose(self):
-        d, _ = make_detector()
-        d.start()
-        d.feed("```python\ncode\n```")
-        assert d._parser.current_state == FenceState.PROSE
-
-
-class TestPauseAfterCodeBlock:
-    def make_pausing_detector(self):
-        """Create a detector with pause_after_code enabled."""
-        output = FakeOutput()
-        detector = StreamingFenceDetector(output, pause_after_code=True)  # type: ignore
-        detector._make_prose_block = lambda activity: FakeAgentBlock(  # type: ignore
-            activity=activity
-        )
-        detector._make_code_block = lambda code, lang: FakeCodeBlock(  # type: ignore
-            code, language=lang
-        )
-        return detector, output
-
-    def test_pauses_after_code_block(self):
-        """Detector pauses after a code fence closes."""
-        d, out = self.make_pausing_detector()
-        d.start()
-        d.feed("Hello\n```python\nx=1\n```\nAfter code")
-        assert d.is_paused
-        assert d._remainder == "After code"
-
-    def test_last_code_block_set(self):
-        """last_code_block is set to the block that triggered the pause."""
-        d, out = self.make_pausing_detector()
-        d.start()
-        d.feed("Hello\n```python\nx=1\n```\nrest")
-        assert d.last_code_block is not None
-        assert isinstance(d.last_code_block, FakeCodeBlock)
-        assert "x=1" in d.last_code_block._code
-
-    def test_resume_feeds_remainder(self):
-        """resume() processes the saved remainder text."""
-        d, out = self.make_pausing_detector()
-        d.start()
-        d.feed("Hello\n```python\nx=1\n```\nAfter text")
-        assert d.is_paused
-
-        d.resume()
-        assert not d.is_paused
-        prose_blocks = [b for b in d.all_blocks if isinstance(b, FakeAgentBlock)]
-        combined = "".join(b._text for b in prose_blocks)  # type: ignore
-        assert "After text" in combined
-
-    def test_resume_with_second_code_block(self):
-        """resume() pauses again if remainder contains another code block."""
-        d, out = self.make_pausing_detector()
-        d.start()
-        d.feed("Hello\n```python\nfirst\n```\nMiddle\n```bash\nls\n```\nEnd")
-        assert d.is_paused
-
-        d.resume()
-        # Should pause again on second code block
-        assert d.is_paused
-
-    def test_no_pause_without_flag(self):
-        """Default detector (no pause_after_code) does not pause."""
+    @pytest.mark.asyncio
+    async def test_empty_stream(self):
+        """Empty stream should still create a block."""
         d, out = make_detector()
         d.start()
-        d.feed("Hello\n```python\nx=1\n```\nAfter")
+        await d.finish()
+
+        # Should have one empty block that was finalized
+        assert len(d.all_blocks) == 1
+        assert d.all_blocks[0]._finished
+
+    @pytest.mark.asyncio
+    async def test_only_whitespace(self):
+        """Whitespace-only stream."""
+        d, out = make_detector()
+        d.start()
+        await d.feed("   \n\n   ")
+        await d.finish()
+
+        assert len(d.all_blocks) == 1
+        assert "   \n\n   " in d.all_blocks[0]._text
+
+    @pytest.mark.asyncio
+    async def test_very_long_text(self):
+        """Long text streams into single block."""
+        d, out = make_detector()
+        d.start()
+
+        long_text = "x" * 10000
+        await d.feed(long_text)
+        await d.finish()
+
+        assert len(d.all_blocks) == 1
+        assert long_text in d.all_blocks[0]._text
+
+    @pytest.mark.asyncio
+    async def test_special_characters(self):
+        """Special markdown characters are preserved."""
+        d, out = make_detector()
+        d.start()
+
+        special = "# Header\n## Subheader\n- List item\n**bold**\n_italic_\n`code`"
+        await d.feed(special)
+        await d.finish()
+
+        # Should have 2 blocks (header and subheader)
+        assert len(d.all_blocks) == 2
+        assert "# Header" in d.all_blocks[0]._text
+        assert d.all_blocks[1]._text.startswith("## Subheader")
+        assert "- List item" in d.all_blocks[1]._text
+        assert "**bold**" in d.all_blocks[1]._text
+        assert "`code`" in d.all_blocks[1]._text
+
+    @pytest.mark.asyncio
+    async def test_unicode_text(self):
+        """Unicode text is preserved."""
+        d, out = make_detector()
+        d.start()
+
+        unicode_text = "Hello 世界 🌍 ñ"
+        await d.feed(unicode_text)
+        await d.finish()
+
+        assert unicode_text in d.all_blocks[0]._text
+
+    @pytest.mark.asyncio
+    async def test_header_with_only_hashes(self):
+        """Just # or ## is a valid header."""
+        d, out = make_detector()
+        d.start()
+        await d.feed("Intro\n#\nMore content")
+        await d.finish()
+
+        assert len(d.all_blocks) == 2
+        assert "Intro" in d.all_blocks[0]._text
+        assert d.all_blocks[1]._text.startswith("#")
+
+    @pytest.mark.asyncio
+    async def test_no_pause_functionality(self):
+        """is_paused always returns False."""
+        d, out = make_detector()
+        d.start()
+        await d.feed("Some text with headers\n# Header\nMore")
+
+        # Should never be paused
         assert not d.is_paused
 
-    def test_pause_after_fence(self):
-        """Pause after code block works with markdown fences."""
-        d, out = self.make_pausing_detector()
+        await d.finish()
+        assert not d.is_paused
+
+    @pytest.mark.asyncio
+    async def test_last_code_block_none(self):
+        """last_code_block always returns None."""
+        d, out = make_detector()
         d.start()
-        d.feed("Hello\n```python\nx=1\n```\nAfter")
-        assert d.is_paused
-        assert "After" in d._remainder
+        await d.feed("Some text with code fences")
+
+        assert d.last_code_block is None
+
+        await d.finish()
+        assert d.last_code_block is None
+
+    @pytest.mark.asyncio
+    async def test_resume_is_noop(self):
+        """resume() does nothing in simplified version."""
+        d, out = make_detector()
+        d.start()
+        await d.feed("Some text\n")  # Add newline so text is flushed immediately
+
+        # Should not raise or cause issues
+        d.resume()
+
+        # Text should still be there
+        assert "Some text" in d.all_blocks[0]._text

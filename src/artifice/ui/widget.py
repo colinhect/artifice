@@ -26,7 +26,6 @@ from artifice.ui.components.output import TerminalOutput
 from artifice.ui.components.blocks.blocks import (
     AgentInputBlock,
     BaseBlock,
-    CodeInputBlock,
     CodeOutputBlock,
     SystemBlock,
     ToolCallBlock,
@@ -133,7 +132,6 @@ class ArtificeTerminal(Widget):
                 call_later=self.call_later,
                 call_after_refresh=self.call_after_refresh,
                 batch_update=self._batch_update_ctx,
-                on_pause=self._on_stream_paused,
             )
 
         def on_connect(_):
@@ -206,23 +204,6 @@ class ArtificeTerminal(Widget):
         """Focus the input text area."""
         self.input.query_one("#code-input", InputTextArea).focus()
 
-    def _on_stream_paused(self) -> None:
-        """Called by StreamManager when the detector pauses on a code block."""
-        # Cancel the provider task to stop streaming
-        if self._current_task and not self._current_task.done():
-            self._current_task.cancel()
-        # Highlight the code block that just completed
-        detector = self._stream.current_detector
-        if detector:
-            code_block = detector.last_code_block
-            if code_block is not None:
-                idx = self.output.index_of(code_block)
-                if idx is not None:
-                    previous = self.output._highlighted_index
-                    self.output._highlighted_index = idx
-                    self.output._update_highlight(previous)
-                    self.output.focus()
-
     def compose(self) -> ComposeResult:
         with Vertical():
             yield self.output
@@ -280,11 +261,10 @@ class ArtificeTerminal(Widget):
         try:
             await coro
         except asyncio.CancelledError:
-            if not self._stream.is_paused:
-                block = CodeOutputBlock(render_markdown=False)
-                self.output.append_block(block)
-                block.append_error("\n[Cancelled]\n")
-                block.flush()
+            block = CodeOutputBlock(render_markdown=False)
+            self.output.append_block(block)
+            block.append_error("\n[Cancelled]\n")
+            block.flush()
             raise
         finally:
             self._current_task = None
@@ -363,14 +343,6 @@ class ArtificeTerminal(Widget):
     ) -> None:
         """Handle block execution: execute code from a block."""
         block = event.block
-
-        # If stream is paused and this is the paused code block, use the pause handler
-        detector = self._stream.current_detector
-        if self._stream.is_paused and detector and block is detector.last_code_block:
-            self._current_task = asyncio.create_task(
-                self._run_cancellable(self._execute_paused_code_block())
-            )
-            return
 
         # Check if this is a tool call with a direct executor (read_file, etc.)
         if isinstance(block, ToolCallBlock) and block.tool_args:
@@ -479,58 +451,6 @@ class ArtificeTerminal(Widget):
         self._current_task = asyncio.create_task(
             self._run_cancellable(do_execute(), finally_callback=cleanup)
         )
-
-    def _resume_stream(self) -> None:
-        """Resume streaming after a pause-on-code-block."""
-        self._stream.resume()
-        self._status_manager.update_agent_info()
-
-    async def _execute_paused_code_block(self) -> None:
-        """Execute the code block that triggered the pause, then resume."""
-        detector = self._stream.current_detector
-        if not detector:
-            self._resume_stream()
-            return
-        code_block = detector.last_code_block
-        if code_block is None or not isinstance(code_block, CodeInputBlock):
-            self._resume_stream()
-            return
-        code = code_block.get_code()
-        mode = code_block.get_mode()
-        language = "bash" if mode == "shell" else "python"
-        result = await self._exec.execute(
-            code,
-            language=language,
-            code_input_block=code_block,
-            in_context=self._send_user_commands_to_agent,
-        )
-        self._resume_stream()
-        if self._send_user_commands_to_agent:
-            await self._send_execution_result_to_agent(code, language, result)
-
-    def on_key(self, event) -> None:
-        """Handle key events, including pause-state shortcuts."""
-        if not self._stream.is_paused:
-            return
-        if event.key == "enter":
-            event.prevent_default()
-            event.stop()
-            asyncio.create_task(self._execute_paused_code_block())
-        elif event.key == "s":
-            event.prevent_default()
-            event.stop()
-            self._resume_stream()
-        elif event.key == "c":
-            event.prevent_default()
-            event.stop()
-            self._stream.is_paused = False
-            self.agent_status.update("")
-            detector = self._stream.current_detector
-            if detector:
-                detector._remainder = ""
-                detector.finish()
-                self._stream.current_detector = None
-            self.action_cancel_execution()
 
     def action_clear(self) -> None:
         """Clear the output."""

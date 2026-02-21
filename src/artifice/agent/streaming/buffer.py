@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 
 
@@ -64,7 +65,10 @@ class ChunkBuffer:
             text = self._buffer
             self._buffer = ""
             self._last_drain_time = time.monotonic()
-            self._drain(text)
+            result = self._drain(text)
+            # If drain is async, schedule it as a task
+            if inspect.iscoroutine(result):
+                asyncio.create_task(result)
 
     def flush_sync(self) -> None:
         """Drain any remaining buffered text immediately."""
@@ -73,7 +77,10 @@ class ChunkBuffer:
             text = self._buffer
             self._buffer = ""
             self._last_drain_time = time.monotonic()
-            self._drain(text)
+            result = self._drain(text)
+            # If drain is async, schedule it as a task
+            if inspect.iscoroutine(result):
+                asyncio.create_task(result)
 
     @property
     def pending(self) -> bool:
