@@ -49,14 +49,16 @@ Artifice is a minimal AI agent harness with a terminal interface. It provides a 
 
 ### 1. Agent Layer (`artifice/agent/`)
 
-- **Agent**: Manages conversation history and LLM calls via any-llm
-- **Tool system**: Python/shell tools with OpenAI-style function calling
-- **Streaming**: `StreamManager` buffers chunks, detects code fences, and coordinates with UI
+- **Agent**: Manages conversation history and LLM calls via any-llm, inherits from ConversationManager
+- **ConversationManager**: Mixin managing message history, pending tool calls, and conversation state
+- **Tool system**: Python/shell tools with OpenAI-style function calling; tools with executors run directly, others use code execution path
+- **Streaming**: `StreamManager` buffers chunks, detects markdown headers, and coordinates with UI
+- **Thinking**: `ThinkingOutputBlock` displays reasoning content separately from main response
 
 ### 2. Execution Layer (`artifice/execution/`)
 
 - **ExecutionCoordinator**: Central hub for all code execution
-- **CodeExecutor**: Interactive Python REPL with persistent state
+- **CodeExecutor**: Interactive Python REPL with persistent global state
 - **ShellExecutor**: Direct shell command execution
 - **TmuxShellExecutor**: Shell via tmux pane (preserves state/env)
 
@@ -65,7 +67,8 @@ Artifice is a minimal AI agent harness with a terminal interface. It provides a 
 - **ArtificeTerminal**: Main widget composing input/output/history
 - **TerminalInput**: Multiline input with mode switching (`>`, `]`, `$`)
 - **TerminalOutput**: Block-based output (markdown, code, widgets)
-- **Blocks**: `CodeInputBlock`, `CodeOutputBlock`, `ThinkingOutputBlock`
+- **Blocks**: `CodeInputBlock`, `CodeOutputBlock`, `ThinkingOutputBlock`, `ToolCallBlock`, `SystemBlock`, `AgentInputBlock`
+- **Controllers**: `AgentCoordinator` manages agent flow, `NavigationController` handles navigation
 
 ### 4. Core (`artifice/core/`)
 
@@ -105,18 +108,18 @@ User Input → ArtificeTerminal ──────> Input Mode?
 
 The agent streams tokens continuously:
 
-1. **StreamManager** buffers incoming chunks
-2. **FenceDetector** detects code fences (```) in the stream
-3. When code detected: pause streaming → execute code → resume
+1. **StreamManager** buffers incoming chunks with configurable FPS
+2. **StreamingFenceDetector** splits text on markdown headers (not code fences)
+3. When a header is detected: creates new `AgentOutputBlock` for new section
 4. **ThinkingOutputBlock** displays reasoning content separately
+5. Agent responses are rendered incrementally as headers appear
 
 ```
-LLM Stream → ChunkBuffer → FenceDetector ─┬─> UI (live text)
-                                          │
-                                          └─> Code detected
-                                              → Pause
-                                              → Execute
-                                              → Resume
+LLM Stream → ChunkBuffer → StreamingFenceDetector ─┬─> UI (live text with headers)
+                                                   │
+                                                   └─> New header detected
+                                                       → Create new block
+                                                       → Continue streaming
 ```
 
 ## Configuration
@@ -134,8 +137,8 @@ Command-line args override config values.
 
 | Mode | Trigger | Executor | Use Case |
 |------|---------|----------|----------|
-| AI | `>` | Agent via any-llm | Prompting LLM |
-| Python | `]` | CodeExecutor | Interactive Python |
+| AI | `>` | Agent via any-llm | Prompting LLM, tool calls |
+| Python | `]` | CodeExecutor | Interactive Python REPL |
 | Shell | `$` | Shell/Tmux | Shell commands |
 
 ## Testing
@@ -156,3 +159,5 @@ Command-line args override config values.
 2. **Why async?** Streaming requires non-blocking I/O throughout
 3. **Why tmux?** Shell state (env, cwd) persists across commands
 4. **Why block-based UI?** Enables navigation, re-execution, context tracking
+5. **Why markdown headers for streaming?** Simpler than code fence detection; provides natural section boundaries
+6. **Why conversation mixin?** Separates conversation management from agent-specific logic for reusability
