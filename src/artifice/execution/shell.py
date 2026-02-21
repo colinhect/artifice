@@ -10,6 +10,7 @@ import traceback
 from typing import TYPE_CHECKING
 
 from artifice.execution.base import ExecutionResult, ExecutionStatus
+from artifice.execution.base_executor import BaseExecutor
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -29,7 +30,7 @@ def strip_ansi_escapes(text: str) -> str:
     return text
 
 
-class ShellExecutor:
+class ShellExecutor(BaseExecutor):
     """Executes shell commands asynchronously with streaming output.
 
     Stdout and stderr are streamed concurrently with real-time callbacks.
@@ -38,7 +39,13 @@ class ShellExecutor:
     Only execute commands from trusted sources.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        on_output: Callable[[str], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
+        timeout: float | None = None,
+    ) -> None:
+        super().__init__(on_output=on_output, on_error=on_error, timeout=timeout)
         self.working_directory = os.getcwd()
         self.init_script: str | None = None
 
@@ -138,7 +145,7 @@ class ShellExecutor:
         return result
 
 
-class TmuxShellExecutor:
+class TmuxShellExecutor(BaseExecutor):
     """Executes commands by sending them to an existing tmux session.
 
     Output is captured via `tmux pipe-pane` streaming to a temp file.
@@ -156,7 +163,11 @@ class TmuxShellExecutor:
         prompt_pattern: str = r"^\\$ ",
         check_exit_code: bool = False,
         poll_interval: float = 0.02,
+        on_output: Callable[[str], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
+        timeout: float | None = None,
     ) -> None:
+        super().__init__(on_output=on_output, on_error=on_error, timeout=timeout)
         self.target = target
         self.prompt_re = re.compile(prompt_pattern, re.MULTILINE)
         self.check_exit_code = check_exit_code

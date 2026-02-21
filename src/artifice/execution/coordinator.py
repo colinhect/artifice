@@ -63,6 +63,27 @@ class ExecutionCoordinator:
         """Reset the Python executor state."""
         self._executor.reset()
 
+    def _get_execution_settings(self, language: str) -> tuple[bool, bool]:
+        """Get markdown and code block settings for language.
+
+        Args:
+            language: The execution language ("python" or "bash")
+
+        Returns:
+            Tuple of (markdown_enabled, use_code_block)
+        """
+        if language == "bash":
+            markdown_enabled = self.shell_markdown_enabled
+            use_code_block = (
+                self._config.tmux_output_code_block
+                if isinstance(self._shell_executor, TmuxShellExecutor)
+                else self._config.shell_output_code_block
+            )
+        else:
+            markdown_enabled = self.python_markdown_enabled
+            use_code_block = self._config.python_output_code_block
+        return markdown_enabled, use_code_block
+
     def _make_output_callbacks(
         self,
         markdown_enabled: bool,
@@ -117,17 +138,7 @@ class ExecutionCoordinator:
             )
             self._output.append_block(code_input_block)
 
-        # Determine markdown and code block settings
-        if language == "bash":
-            markdown_enabled = self.shell_markdown_enabled
-            use_code_block = (
-                self._config.tmux_output_code_block
-                if isinstance(self._shell_executor, TmuxShellExecutor)
-                else self._config.shell_output_code_block
-            )
-        else:
-            markdown_enabled = self.python_markdown_enabled
-            use_code_block = self._config.python_output_code_block
+        markdown_enabled, use_code_block = self._get_execution_settings(language)
 
         on_output, on_error, flush_output = self._make_output_callbacks(
             markdown_enabled, in_context, use_code_block

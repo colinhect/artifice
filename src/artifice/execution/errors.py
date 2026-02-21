@@ -1,36 +1,42 @@
-"""Execution error handling utilities."""
-
 from __future__ import annotations
 
 import asyncio
 import traceback
+from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Callable
+from typing import TYPE_CHECKING
 
 from artifice.execution.base import ExecutionResult, ExecutionStatus
 
+if TYPE_CHECKING:
+    from typing import Any
+
 
 @contextmanager
-def execution_error_context(
-    result: ExecutionResult, on_error: Callable[[str], None] | None = None
-):
-    """Context manager for standardized execution error handling.
-
-    Handles asyncio.CancelledError and general exceptions consistently,
-    updating the ExecutionResult and calling the optional error callback.
+def execution_error_handler(
+    result: ExecutionResult,
+    on_error: Callable[[str], None] | None = None,
+) -> Any:
+    """Context manager for consistent execution error handling.
 
     Args:
-        result: The ExecutionResult to update on error.
-        on_error: Optional callback for error messages.
+        result: The ExecutionResult to modify on errors
+        on_error: Optional callback to invoke with error messages
 
     Yields:
-        None
+        The result object for use within the context
 
-    Raises:
-        asyncio.CancelledError: Re-raised after handling.
+    Example:
+        def execute(self, code: str) -> ExecutionResult:
+            result = ExecutionResult()
+            with execution_error_handler(result, self.on_error):
+                # execution logic here
+                result.output = output
+                result.status = ExecutionStatus.SUCCESS
+            return result
     """
     try:
-        yield
+        yield result
     except asyncio.CancelledError:
         result.status = ExecutionStatus.ERROR
         result.error = "\n[Execution cancelled]\n"
