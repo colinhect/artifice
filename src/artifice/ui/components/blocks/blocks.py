@@ -373,6 +373,11 @@ class ToolCallBlock(CodeInputBlock):
         self.tool_args: dict = tool_args or {}
         self._label = Static(name, classes="tool-name")
 
+    @property
+    def tool_name(self) -> str:
+        """Get the tool name."""
+        return self._tool_name
+
     def compose(self) -> ComposeResult:
         yield self._label
         with Horizontal():

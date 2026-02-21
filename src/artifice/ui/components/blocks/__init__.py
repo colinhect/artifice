@@ -13,13 +13,11 @@ from artifice.ui.components.blocks.blocks import (
     ToolCallBlock,
     WidgetOutputBlock,
 )
-from artifice.ui.components.blocks.factory import BlockFactory
 
 __all__ = [
     "AgentInputBlock",
     "AgentOutputBlock",
     "BaseBlock",
-    "BlockFactory",
     "CodeInputBlock",
     "CodeOutputBlock",
     "SystemBlock",

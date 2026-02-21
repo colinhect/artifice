@@ -72,6 +72,17 @@ class HighlightableContainerMixin:
             return self._blocks[self._highlighted_index]
         return None
 
+    def highlight_block_at(self, index: int) -> None:
+        """Highlight the block at the given index."""
+        previous = self._highlighted_index
+        self._highlighted_index = index
+        self._update_highlight(previous)
+
+    @property
+    def has_blocks(self) -> bool:
+        """Check if there are any blocks."""
+        return bool(self._blocks)
+
     def on_blur(self) -> None:
         """When unfocusing, unhighlight the highlighted block."""
         previous_index = self._highlighted_index

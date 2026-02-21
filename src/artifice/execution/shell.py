@@ -11,6 +11,20 @@ from typing import Callable
 from artifice.execution.base import ExecutionResult, ExecutionStatus
 
 
+_OSC_RE = re.compile(r"\x1b\].*?(?:\x1b\\|\x07)")
+_CSI_RE = re.compile(r"\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]")
+_OTHER_ESC_RE = re.compile(r"\x1b[()#].|\x1b[=>]")
+
+
+def strip_ansi_escapes(text: str) -> str:
+    """Strip ANSI/OSC escape sequences and carriage returns from terminal output."""
+    text = _OSC_RE.sub("", text)
+    text = _CSI_RE.sub("", text)
+    text = _OTHER_ESC_RE.sub("", text)
+    text = text.replace("\r", "")
+    return text
+
+
 class ShellExecutor:
     """Executes shell commands asynchronously with streaming output.
 
@@ -20,23 +34,9 @@ class ShellExecutor:
     Only execute commands from trusted sources.
     """
 
-    # ANSI escape patterns shared with TmuxShellExecutor
-    _OSC_RE = re.compile(r"\x1b\].*?(?:\x1b\\|\x07)")
-    _CSI_RE = re.compile(r"\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]")
-    _OTHER_ESC_RE = re.compile(r"\x1b[()#].|\x1b[=>]")
-
     def __init__(self) -> None:
         self.working_directory = os.getcwd()
         self.init_script: str | None = None
-
-    @classmethod
-    def _strip_escapes(cls, text: str) -> str:
-        """Strip ANSI/OSC escape sequences and carriage returns from terminal output."""
-        text = cls._OSC_RE.sub("", text)
-        text = cls._CSI_RE.sub("", text)
-        text = cls._OTHER_ESC_RE.sub("", text)
-        text = text.replace("\r", "")
-        return text
 
     async def execute(
         self,
@@ -84,7 +84,7 @@ class ShellExecutor:
                     if not line:
                         break
                     text = line.decode("utf-8", errors="replace")
-                    text = self._strip_escapes(text)
+                    text = strip_ansi_escapes(text)
                     lines_list.append(text)
                     if text and callback:
                         callback(text)
@@ -161,21 +161,6 @@ class TmuxShellExecutor:
         self.prompt_re = re.compile(prompt_pattern, re.MULTILINE)
         self.check_exit_code = check_exit_code
 
-    @staticmethod
-    def _strip_escapes(text: str) -> str:
-        """Strip ANSI/OSC escape sequences and carriage returns from terminal output."""
-        # OSC sequences: ESC ] ... (ST or BEL)
-        text = re.sub(r"\x1b\].*?(?:\x1b\\|\x07)", "", text)
-        # CSI sequences: ESC [ ... letter
-        text = re.sub(r"\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]", "", text)
-        # Other escape sequences (but not ESC followed by arbitrary chars)
-        # Only strip: ESC followed by specific single-char sequences
-        text = re.sub(r"\x1b[()#].", "", text)  # Character set selection
-        text = re.sub(r"\x1b[=>]", "", text)  # Keypad modes
-        # Strip carriage returns
-        text = text.replace("\r", "")
-        return text
-
     async def _run_tmux(self, *args: str) -> tuple[int, str, str]:
         """Run a tmux command and return (returncode, stdout, stderr)."""
         proc = await asyncio.create_subprocess_exec(
@@ -194,7 +179,7 @@ class TmuxShellExecutor:
     def _read_content(self, tmpfile: str) -> str:
         """Read and clean the pipe-pane output file."""
         with open(tmpfile, "r", errors="replace") as f:
-            return self._strip_escapes(f.read())
+            return strip_ansi_escapes(f.read())
 
     async def execute(
         self,

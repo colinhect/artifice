@@ -348,7 +348,7 @@ class ArtificeTerminal(Widget):
         if isinstance(block, ToolCallBlock) and block.tool_args:
             from artifice.agent.tools.base import TOOLS
 
-            tool_def = TOOLS.get(block._tool_name)
+            tool_def = TOOLS.get(block.tool_name)
             if tool_def and tool_def.executor:
                 self._execute_tool_with_executor(block)
                 return

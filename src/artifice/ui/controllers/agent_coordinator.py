@@ -192,9 +192,7 @@ class AgentCoordinator:
             if first_tool_block is not None:
                 idx = self._output.index_of(first_tool_block)
                 if idx is not None:
-                    previous = self._output._highlighted_index
-                    self._output._highlighted_index = idx
-                    self._output._update_highlight(previous)
+                    self._output.highlight_block_at(idx)
                     self._output.focus()
 
         return detector, response

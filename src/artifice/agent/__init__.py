@@ -10,7 +10,6 @@ from artifice.agent.client import Agent, AgentResponse
 from artifice.agent.providers import (
     AnyLLMProvider,
     Provider,
-    ProviderResponse,
     StreamChunk,
     TokenUsage,
 )
@@ -29,7 +28,6 @@ __all__ = [
     "EchoAgent",
     "execute_tool_call",
     "Provider",
-    "ProviderResponse",
     "ScriptedAgent",
     "SimulatedAgent",
     "StreamChunk",

@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable
-
-if TYPE_CHECKING:
-    from artifice.agent.tools.base import ToolCall
+from typing import Any, AsyncIterator, Callable
 
 
 @dataclass
@@ -25,16 +22,6 @@ class StreamChunk:
     reasoning: str | None = None
     usage: TokenUsage | None = None
     tool_calls: list[dict] = field(default_factory=list)
-
-
-@dataclass
-class ProviderResponse:
-    """Complete response from the LLM."""
-
-    text: str
-    tool_calls: list[ToolCall] = field(default_factory=list)
-    thinking: str | None = None
-    usage: TokenUsage | None = None
 
 
 class Provider(ABC):
@@ -64,21 +51,22 @@ class Provider(ABC):
             StreamChunk objects containing content, reasoning, usage, etc.
         """
 
-    @abstractmethod
     async def complete(
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-    ) -> ProviderResponse:
-        """Send messages and return complete response.
+    ) -> None:
+        """Send messages and complete the request.
+
+        This method is primarily used for connection testing. Streaming
+        via stream_completion() is the recommended approach for normal use.
 
         Args:
             messages: List of message dicts
             tools: Optional list of tool schemas
-
-        Returns:
-            ProviderResponse with text, tool_calls, thinking, and usage
         """
+        async for _ in self.stream_completion(messages, tools):
+            pass
 
     async def check_connection(self) -> bool:
         """Check if the provider is reachable. Override if needed."""

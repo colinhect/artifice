@@ -8,34 +8,34 @@ class TestHistoryAdd:
     def test_add_python(self, tmp_history_file):
         h = History(history_file=tmp_history_file)
         h.add("print('hello')", "python")
-        assert h._python_history == ["print('hello')"]
-        assert h._ai_history == []
-        assert h._shell_history == []
+        assert h._histories["python"] == ["print('hello')"]
+        assert h._histories["ai"] == []
+        assert h._histories["shell"] == []
 
     def test_add_ai(self, tmp_history_file):
         h = History(history_file=tmp_history_file)
         h.add("explain this code", "ai")
-        assert h._ai_history == ["explain this code"]
+        assert h._histories["ai"] == ["explain this code"]
 
     def test_add_shell(self, tmp_history_file):
         h = History(history_file=tmp_history_file)
         h.add("ls -la", "shell")
-        assert h._shell_history == ["ls -la"]
+        assert h._histories["shell"] == ["ls -la"]
 
     def test_max_size_enforcement(self, tmp_history_file):
         h = History(history_file=tmp_history_file, max_history_size=3)
         for i in range(5):
             h.add(f"cmd{i}", "python")
-        assert len(h._python_history) == 3
-        assert h._python_history == ["cmd2", "cmd3", "cmd4"]
+        assert len(h._histories["python"]) == 3
+        assert h._histories["python"] == ["cmd2", "cmd3", "cmd4"]
 
     def test_add_resets_navigation_index(self, tmp_history_file):
         h = History(history_file=tmp_history_file)
         h.add("cmd1", "python")
         h.navigate_back("python", "")
-        assert h._python_history_index != -1
+        assert h._indices["python"] != -1
         h.add("cmd2", "python")
-        assert h._python_history_index == -1
+        assert h._indices["python"] == -1
 
 
 class TestNavigateBack:
@@ -130,21 +130,21 @@ class TestPersistence:
         h.save()
 
         h2 = History(history_file=tmp_history_file)
-        assert h2._python_history == ["py_cmd"]
-        assert h2._ai_history == ["ai_cmd"]
-        assert h2._shell_history == ["sh_cmd"]
+        assert h2._histories["python"] == ["py_cmd"]
+        assert h2._histories["ai"] == ["ai_cmd"]
+        assert h2._histories["shell"] == ["sh_cmd"]
 
     def test_load_corrupted_json(self, tmp_history_file):
         with open(tmp_history_file, "w") as f:
             f.write("{invalid json!!!")
 
         h = History(history_file=tmp_history_file)
-        assert h._python_history == []
-        assert h._ai_history == []
+        assert h._histories["python"] == []
+        assert h._histories["ai"] == []
 
     def test_load_nonexistent_file(self, tmp_path):
         h = History(history_file=tmp_path / "does_not_exist.json")
-        assert h._python_history == []
+        assert h._histories["python"] == []
 
     def test_save_respects_max_size(self, tmp_history_file):
         h = History(history_file=tmp_history_file, max_history_size=2)
@@ -171,9 +171,9 @@ class TestClear:
         h.add("ai", "ai")
         h.add("sh", "shell")
         h.clear()
-        assert h._python_history == []
-        assert h._ai_history == []
-        assert h._shell_history == []
-        assert h._python_history_index == -1
-        assert h._ai_history_index == -1
-        assert h._shell_history_index == -1
+        assert h._histories["python"] == []
+        assert h._histories["ai"] == []
+        assert h._histories["shell"] == []
+        assert h._indices["python"] == -1
+        assert h._indices["ai"] == -1
+        assert h._indices["shell"] == -1

@@ -48,7 +48,7 @@ class NavigationController:
         from artifice.ui.components.input import InputTextArea
 
         input_area = self._input.query_one("#code-input", InputTextArea)
-        if input_area.has_focus and self._output._blocks:
+        if input_area.has_focus and self._output.has_blocks:
             self._output.focus()
         elif self._output.has_focus:
             self._output.highlight_previous()
@@ -79,9 +79,7 @@ class NavigationController:
         """
         idx = self._output.index_of(block)
         if idx is not None:
-            previous = self._output._highlighted_index
-            self._output._highlighted_index = idx
-            self._output._update_highlight(previous)
+            self._output.highlight_block_at(idx)
             self._output.focus()
 
     def on_stream_paused(self, code_block: BaseBlock | None) -> None:

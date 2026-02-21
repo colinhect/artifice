@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import logging
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, cast
+from typing import Any, AsyncIterator, Callable, cast
 
 from artifice.agent.providers.base import (
     Provider,
-    ProviderResponse,
     StreamChunk,
     TokenUsage,
 )
-
-if TYPE_CHECKING:
-    from artifice.agent.tools.base import ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -128,62 +123,6 @@ class AnyLLMProvider(Provider):
                 )
 
             yield stream_chunk
-
-    async def complete(
-        self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]] | None = None,
-    ) -> ProviderResponse:
-        """Complete request and aggregate response."""
-        text = ""
-        thinking = ""
-        usage: TokenUsage | None = None
-        raw_tool_calls: list[dict] = []
-
-        async for chunk in self.stream_completion(messages, tools):
-            if chunk.usage:
-                usage = chunk.usage
-            if chunk.content:
-                text += chunk.content
-            if chunk.reasoning:
-                thinking += chunk.reasoning
-            if chunk.tool_calls:
-                for tc in chunk.tool_calls:
-                    idx = tc["index"]
-                    while len(raw_tool_calls) <= idx:
-                        raw_tool_calls.append(
-                            {
-                                "id": "",
-                                "type": "function",
-                                "function": {"name": "", "arguments": ""},
-                            }
-                        )
-                    rtc = raw_tool_calls[idx]
-                    if tc["id"]:
-                        rtc["id"] += tc["id"]
-                    if tc["function"]["name"]:
-                        rtc["function"]["name"] += tc["function"]["name"]
-                    if tc["function"]["arguments"]:
-                        rtc["function"]["arguments"] += tc["function"]["arguments"]
-
-        # Parse tool calls
-        from artifice.agent.tools.base import ToolCall
-
-        tool_calls: list[ToolCall] = []
-        for rtc in raw_tool_calls:
-            name = rtc["function"]["name"]
-            try:
-                args = json.loads(rtc["function"]["arguments"])
-            except json.JSONDecodeError:
-                args = {}
-            tool_calls.append(ToolCall(id=rtc["id"], name=name, args=args))
-
-        return ProviderResponse(
-            text=text,
-            tool_calls=tool_calls,
-            thinking=thinking or None,
-            usage=usage,
-        )
 
     async def check_connection(self) -> bool:
         """Check connectivity by attempting a minimal request."""

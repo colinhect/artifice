@@ -7,10 +7,8 @@ The header line is the first content in the new block, and the previous one is f
 from __future__ import annotations
 
 import re
-from typing import Any
 
-from artifice.ui.components.blocks.blocks import AgentOutputBlock
-from artifice.ui.components.blocks.factory import BlockFactory
+from artifice.ui.components.blocks.blocks import AgentOutputBlock, BaseBlock
 from artifice.ui.components.output import TerminalOutput
 
 
@@ -28,28 +26,13 @@ class StreamingFenceDetector:
 
     def __init__(self, output: TerminalOutput) -> None:
         self._output = output
-        self._factory = BlockFactory(output)
+        self.all_blocks: list[BaseBlock] = []
+        self.first_agent_block: AgentOutputBlock | None = None
         self._started = False
         self._current_block: AgentOutputBlock | None = None
-        self._incomplete_line: str = ""  # Buffer for line being built
-        self._block_has_content: bool = False  # Track if current block has content
-
-        # Factory method for block creation (can be overridden for testing)
+        self._incomplete_line: str = ""
+        self._block_has_content: bool = False
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
-
-    @property
-    def all_blocks(self) -> list[Any]:
-        """All blocks created by this detector."""
-        return self._factory.all_blocks  # type: ignore[return-value]
-
-    @property
-    def first_agent_block(self) -> AgentOutputBlock | None:
-        """The first agent output block."""
-        return self._factory.first_agent_block
-
-    @first_agent_block.setter
-    def first_agent_block(self, value: AgentOutputBlock | None) -> None:
-        self._factory.first_agent_block = value
 
     def start(self) -> None:
         """Create the initial AgentOutputBlock for streaming.
@@ -60,14 +43,14 @@ class StreamingFenceDetector:
             return
         self._started = True
         self._current_block = self._create_and_mount_prose(activity=True)
-        self._factory.first_agent_block = self._current_block
+        self.first_agent_block = self._current_block
         self._block_has_content = False
 
     def _create_and_mount_prose(self, activity: bool = True) -> AgentOutputBlock:
         """Create a prose block using the factory or test override."""
         block = self._make_prose_block(activity)
         self._output.append_block(block, scroll=False)
-        self._factory.all_blocks.append(block)
+        self.all_blocks.append(block)
         return block
 
     def _is_header_line(self, line: str) -> bool:
