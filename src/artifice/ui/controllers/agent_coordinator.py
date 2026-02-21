@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING
 
 from artifice.ui.components.blocks.blocks import (
     ToolCallBlock,
@@ -14,8 +14,8 @@ if TYPE_CHECKING:
     from artifice.agent import Agent, AgentResponse, SimulatedAgent
     from artifice.agent.streaming.detector import StreamingFenceDetector
     from artifice.agent.streaming.manager import StreamManager
-    from artifice.ui.components.blocks.blocks import BaseBlock
     from artifice.ui.components.output import TerminalOutput
+    from artifice.ui.widget import ArtificeTerminal
     from typing import Union
 
     AnyAgent = Union[Agent, SimulatedAgent]
@@ -39,12 +39,7 @@ class AgentCoordinator:
         agent: AnyAgent | None,
         stream_manager: StreamManager,
         output: TerminalOutput,
-        batch_update_fn: Callable,
-        call_after_refresh_fn: Callable,
-        mark_block_in_context_fn: Callable[[BaseBlock], None],
-        set_send_user_commands_to_agent_fn: Callable[[bool], None],
-        is_send_user_commands_to_agent_fn: Callable[[], bool],
-        get_config_attr_fn: Callable[[str], Any],
+        terminal: ArtificeTerminal,
         status_manager,
     ) -> None:
         """Initialize the agent coordinator.
@@ -53,23 +48,13 @@ class AgentCoordinator:
             agent: The AI agent instance (or None if not configured)
             stream_manager: Manager for streaming chunks and detectors
             output: The terminal output widget for displaying blocks
-            batch_update_fn: Function to get batch_update context manager
-            call_after_refresh_fn: Function to schedule work after refresh
-            mark_block_in_context_fn: Function to mark blocks as in-context
-            set_send_user_commands_to_agent_fn: Function to set auto-send mode
-            is_send_user_commands_to_agent_fn: Function to check auto-send mode
-            get_config_attr_fn: Function to get config attributes
+            terminal: The main terminal widget (provides callbacks via methods)
             status_manager: Status indicator manager for updating UI
         """
         self._agent = agent
         self._stream = stream_manager
         self._output = output
-        self._batch_update = batch_update_fn
-        self._call_after_refresh = call_after_refresh_fn
-        self._mark_block_in_context = mark_block_in_context_fn
-        self._set_send_user_commands_to_agent = set_send_user_commands_to_agent_fn
-        self._is_send_user_commands_to_agent = is_send_user_commands_to_agent_fn
-        self._get_config_attr = get_config_attr_fn
+        self._terminal = terminal
         self._status_manager = status_manager
         self._current_task: asyncio.Task | None = None
 
@@ -92,8 +77,8 @@ class AgentCoordinator:
         await self._apply_agent_response(detector, response)
 
         # After first agent interaction, enable auto-send mode
-        if not self._is_send_user_commands_to_agent():
-            self._set_send_user_commands_to_agent(True)
+        if not self._terminal._is_send_user_commands_to_agent():
+            self._terminal._set_send_user_commands_to_agent(True)
 
     async def send_execution_result_to_agent(
         self, code: str, language: str, output: str, error: str
@@ -143,7 +128,7 @@ class AgentCoordinator:
             self._stream.on_thinking_chunk(text)
 
         # Apply prompt prefix if configured
-        prompt_prefix = self._get_config_attr("prompt_prefix")
+        prompt_prefix = self._terminal._get_config_attr("prompt_prefix")
         if prompt_prefix and prompt.strip():
             prompt = prompt_prefix + " " + prompt
 
@@ -160,17 +145,17 @@ class AgentCoordinator:
         self._status_manager.set_inactive()
         self._status_manager.update_agent_info(usage=getattr(response, "usage", None))
 
-        with self._batch_update():
+        with self._terminal._batch_update_ctx():
             await self._stream.finalize()
 
         self._stream.current_detector = None
         # Scroll after finalization — Markdown widgets may have changed content height
-        self._call_after_refresh(lambda: self._output.scroll_end(animate=True))
+        self._terminal.call_after_refresh(lambda: self._output.scroll_end(animate=True))
 
         # Create ToolCallBlocks directly for native tool calls
         logger.debug("Response has %d tool calls", len(response.tool_calls))
         if response.tool_calls:
-            with self._batch_update():
+            with self._terminal._batch_update_ctx():
                 first_tool_block = None
                 for tc in response.tool_calls:
                     logger.debug(
@@ -184,7 +169,7 @@ class AgentCoordinator:
                         tool_args=tc.args,
                     )
                     self._output.append_block(tool_block)
-                    self._mark_block_in_context(tool_block)
+                    self._terminal._mark_block_in_context(tool_block)
                     if first_tool_block is None:
                         first_tool_block = tool_block
 
@@ -201,9 +186,9 @@ class AgentCoordinator:
         self, detector: StreamingFenceDetector, response: AgentResponse
     ) -> None:
         """Mark context, handle errors, and finalize agent output blocks."""
-        with self._batch_update():
+        with self._terminal._batch_update_ctx():
             for block in detector.all_blocks:
-                self._mark_block_in_context(block)
+                self._terminal._mark_block_in_context(block)
 
             if detector.first_agent_block:
                 if response.error:

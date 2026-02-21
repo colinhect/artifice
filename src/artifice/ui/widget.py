@@ -159,12 +159,7 @@ class ArtificeTerminal(Widget):
                 agent=self._agent,
                 stream_manager=self._stream,
                 output=self.output,
-                batch_update_fn=self._batch_update_ctx,
-                call_after_refresh_fn=self.call_after_refresh,
-                mark_block_in_context_fn=self._mark_block_in_context,
-                set_send_user_commands_to_agent_fn=self._set_send_user_commands_to_agent,
-                is_send_user_commands_to_agent_fn=self._is_send_user_commands_to_agent,
-                get_config_attr_fn=self._get_config_attr,
+                terminal=self,
                 status_manager=self._status_manager,
             )
 
@@ -175,9 +170,7 @@ class ArtificeTerminal(Widget):
             self._nav = NavigationController(
                 input_widget=self.input,
                 output_widget=self.output,
-                focus_input_fn=self._focus_input,
-                context_blocks=self._context_blocks,
-                mark_block_in_context_fn=self._mark_block_in_context,
+                terminal=self,
             )
 
     def _batch_update_ctx(self):

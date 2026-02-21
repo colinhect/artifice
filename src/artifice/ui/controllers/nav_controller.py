@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artifice.ui.components.blocks.blocks import BaseBlock
     from artifice.ui.components.input import TerminalInput
     from artifice.ui.components.output import TerminalOutput
+    from artifice.ui.widget import ArtificeTerminal
 
 
 class NavigationController:
@@ -24,24 +25,18 @@ class NavigationController:
         self,
         input_widget: TerminalInput,
         output_widget: TerminalOutput,
-        focus_input_fn: Callable[[], None],
-        context_blocks: list[BaseBlock],
-        mark_block_in_context_fn: Callable[[BaseBlock], None],
+        terminal: ArtificeTerminal,
     ) -> None:
         """Initialize the navigation controller.
 
         Args:
             input_widget: The terminal input widget
             output_widget: The terminal output widget
-            focus_input_fn: Function to focus the input area
-            context_blocks: List of blocks currently in context
-            mark_block_in_context_fn: Function to mark blocks as in-context
+            terminal: The main terminal widget (for focus_input)
         """
         self._input = input_widget
         self._output = output_widget
-        self._focus_input = focus_input_fn
-        self._context_blocks = context_blocks
-        self._mark_block_in_context = mark_block_in_context_fn
+        self._terminal = terminal
 
     def navigate_up(self) -> None:
         """Navigate up: from input to output, or up through output blocks."""
@@ -57,7 +52,7 @@ class NavigationController:
         """Navigate down: through output blocks, or from output to input."""
         if self._output.has_focus:
             if not self._output.highlight_next():
-                self._focus_input()
+                self._terminal._focus_input()
 
     def scroll_output_up(self) -> None:
         """Scroll the output window up by one page."""
@@ -69,7 +64,7 @@ class NavigationController:
 
     def focus_input(self) -> None:
         """Focus the input text area."""
-        self._focus_input()
+        self._terminal._focus_input()
 
     def highlight_block(self, block: BaseBlock) -> None:
         """Highlight a specific block in the output.
