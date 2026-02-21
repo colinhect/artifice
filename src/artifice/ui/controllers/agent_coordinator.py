@@ -225,7 +225,7 @@ class AgentCoordinator:
     def current_task(self, value: asyncio.Task | None) -> None:
         self._current_task = value
 
-    def on_prompt_selected(self, path: str, content: str) -> None:
+    def on_prompt_selected(self, _path: str, content: str) -> None:
         """Handle prompt template selection: append to agent's system prompt."""
         if self._agent is not None:
             self._agent.messages.append({"role": "user", "content": content})

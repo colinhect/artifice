@@ -70,7 +70,7 @@ class ArtificeTerminal(Widget):
         self,
         app: ArtificeApp,
         name: str | None = None,
-        id: str | None = None,
+        id: str | None = None,  # pylint: disable=redefined-builtin
         classes: str | None = None,
         history_file: str | Path | None = None,
         max_history_size: int = 1000,

@@ -16,8 +16,6 @@ from artifice.execution.base import ExecutionResult, ExecutionStatus
 class BaseBlock(Static):
     """Base class for all output block widgets."""
 
-    pass
-
 
 class CodeInputBlock(BaseBlock):
     """Block for displaying code input with syntax highlighting and status indicator."""

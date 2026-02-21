@@ -5,6 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
+from artifice.agent.tools.executors import (
+    execute_file_search,
+    execute_read_file,
+    execute_system_info,
+    execute_web_fetch,
+    execute_web_search,
+    execute_write_file,
+)
+
 
 # Type alias for tool executor functions: async (args) -> result string
 ToolExecutor = Callable[[dict[str, Any]], Awaitable[str]]
@@ -116,17 +125,6 @@ _register(
 )
 
 # --- Tools with direct executors ---
-
-# Imports are deferred to avoid circular imports and keep this module fast
-# to import.  The executor functions live in tool_executors.py.
-from artifice.agent.tools.executors import (  # noqa pyright:ignore
-    execute_file_search,
-    execute_read_file,
-    execute_system_info,
-    execute_web_fetch,
-    execute_web_search,
-    execute_write_file,
-)
 
 _register(
     ToolDef(

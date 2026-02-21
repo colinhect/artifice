@@ -230,7 +230,7 @@ class TerminalInput(Static):
         history: History | None = None,
         *,
         name: str | None = None,
-        id: str | None = None,
+        id: str | None = None,  # pylint: disable=redefined-builtin
         classes: str | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
