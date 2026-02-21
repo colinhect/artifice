@@ -6,14 +6,13 @@ that content splits on markdown headers.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 import pytest
 from artifice.agent.streaming import StreamingFenceDetector
 
 if TYPE_CHECKING:
     from typing import Protocol
-    from artifice.ui.components.output import TerminalOutput
 
     class FakeBlockProtocol(Protocol):
         """Protocol for fake blocks used in tests."""
@@ -121,7 +120,6 @@ def _patch_block_types():
 
 def make_detector() -> tuple[StreamingFenceDetector, FakeOutput]:
     """Create a detector with fake dependencies."""
-    from typing import cast
 
     output: FakeOutput = FakeOutput()
     detector = StreamingFenceDetector(output)  # type: ignore[arg-type]
