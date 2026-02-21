@@ -8,7 +8,7 @@ import pytest
 import pytest_asyncio
 
 from artifice.execution.shell import TmuxShellExecutor
-from artifice.execution.common import ExecutionStatus
+from artifice.execution.base import ExecutionStatus
 
 TMUX_AVAILABLE = shutil.which("tmux") is not None
 pytestmark = pytest.mark.skipif(not TMUX_AVAILABLE, reason="tmux not installed")

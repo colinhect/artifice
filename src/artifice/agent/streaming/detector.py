@@ -146,11 +146,3 @@ class StreamingFenceDetector:
         if self._current_block is not None:
             self._current_block.mark_success()
             self._current_block.finalize_streaming()
-
-    def resume(self) -> None:
-        """No-op: resume is not needed in the simplified version."""
-
-    @property
-    def last_code_block(self) -> None:
-        """Always returns None - no code blocks in simplified version."""
-        return None

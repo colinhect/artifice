@@ -404,28 +404,3 @@ class TestEdgeCases:
         assert len(d.all_blocks) == 2
         assert "Intro" in d.all_blocks[0]._text
         assert d.all_blocks[1]._text.startswith("#")
-
-    @pytest.mark.asyncio
-    async def test_last_code_block_none(self):
-        """last_code_block always returns None."""
-        d, out = make_detector()
-        d.start()
-        await d.feed("Some text with code fences")
-
-        assert d.last_code_block is None
-
-        await d.finish()
-        assert d.last_code_block is None
-
-    @pytest.mark.asyncio
-    async def test_resume_is_noop(self):
-        """resume() does nothing in simplified version."""
-        d, out = make_detector()
-        d.start()
-        await d.feed("Some text\n")  # Add newline so text is flushed immediately
-
-        # Should not raise or cause issues
-        d.resume()
-
-        # Text should still be there
-        assert "Some text" in d.all_blocks[0]._text

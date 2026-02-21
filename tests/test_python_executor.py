@@ -2,7 +2,7 @@
 
 import pytest
 from artifice.execution.python import CodeExecutor
-from artifice.execution.common import ExecutionStatus
+from artifice.execution.base import ExecutionStatus
 
 
 @pytest.fixture
