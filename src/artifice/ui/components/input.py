@@ -13,6 +13,7 @@ from textual import events
 from textual_autocomplete import DropdownItem, TargetState
 
 from artifice.core.events import InputMode
+from artifice.core.files import fuzzy_match_files, list_project_files, read_file_content
 from artifice.core.history import History
 from artifice.core.prompts import fuzzy_match, list_prompts, load_prompt
 from artifice.ui.controllers.search import SearchModeManager
@@ -75,6 +76,8 @@ class InputTextArea(TextArea):
         if await self._handle_empty_input_shortcuts(event):
             return
         if await self._handle_slash(event):
+            return
+        if await self._handle_at(event):
             return
 
         # Let parent handle other keys
@@ -165,6 +168,15 @@ class InputTextArea(TextArea):
             return True
         return False
 
+    async def _handle_at(self, event: events.Key) -> bool:
+        """Handle @ on empty input - trigger file search."""
+        if not self.text.strip() and event.character == "@":
+            event.prevent_default()
+            event.stop()
+            self.post_message(TerminalInput.FileSearchRequested())
+            return True
+        return False
+
 
 class TerminalInput(Static):
     """Input component for the Python REPL."""
@@ -205,6 +217,28 @@ class TerminalInput(Static):
             self.name = name
             self.path = path
             self.content = content
+            super().__init__()
+
+    class SlashCommand(Message):
+        """Message sent when a slash command is entered in AI mode."""
+
+        def __init__(self, command: str) -> None:
+            self.command = command
+            super().__init__()
+
+    class FileSearchRequested(Message):
+        """Message requesting file search interface."""
+
+    class FileSelected(Message):
+        """Message sent when a file is selected via @ search."""
+
+        def __init__(
+            self, path: Path, content: str, is_binary: bool, size: int
+        ) -> None:
+            self.path = path
+            self.content = content
+            self.is_binary = is_binary
+            self.size = size
             super().__init__()
 
     class Submitted(Message):
@@ -314,6 +348,11 @@ class TerminalInput(Static):
             if self._history is not None:
                 self._history.add(code, self.mode.value.name)
                 self._history.save()
+
+            # Check for slash command in AI mode
+            if self.mode.is_ai and code.startswith("/"):
+                self.post_message(self.SlashCommand(code))
+                return
 
             # Submit with current mode
             self.post_message(
@@ -455,6 +494,58 @@ class TerminalInput(Static):
             placeholder="Search prompts...",
             candidates_fn=get_prompt_candidates,
             apply_fn=apply_prompt,
+        )
+
+    def on_terminal_input_file_search_requested(self, _: FileSearchRequested) -> None:
+        """Handle @ key to enter file search mode."""
+        self._enter_file_search_mode()
+
+    def _enter_file_search_mode(self) -> None:
+        """Enter file search mode with autocomplete dropdown."""
+        if self._search_manager is None:
+            return
+
+        if self._search_manager.active:
+            return
+
+        from pathlib import Path as PathlibPath
+
+        root = PathlibPath.cwd()
+        files = list_project_files(root)
+
+        if not files:
+            return
+
+        def get_file_candidates(state: TargetState) -> list[DropdownItem]:
+            query = state.text.strip()
+            if not query:
+                sorted_files = sorted(files, key=lambda f: str(f.relative_to(root)))
+                return [
+                    DropdownItem(main=str(f.relative_to(root)))
+                    for f in sorted_files[:100]
+                ]
+            matched = fuzzy_match_files(query, files, root)
+            return [DropdownItem(main=str(f.relative_to(root))) for f in matched[:100]]
+
+        def apply_file(value: str) -> None:
+            """Load the selected file and exit search."""
+            file_path = root / value
+            content, is_binary, size = read_file_content(file_path)
+            self.post_message(
+                TerminalInput.FileSelected(
+                    path=file_path,
+                    content=content,
+                    is_binary=is_binary,
+                    size=size,
+                )
+            )
+            if self._search_manager:
+                self._search_manager.exit_search()
+
+        self._search_manager.enter_search(
+            placeholder="Search files...",
+            candidates_fn=get_file_candidates,
+            apply_fn=apply_file,
         )
 
     def on_key(self, event: events.Key) -> None:

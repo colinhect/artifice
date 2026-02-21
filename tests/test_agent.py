@@ -149,8 +149,6 @@ def test_registry_contains_expected_tools():
     assert "shell" in TOOLS
     assert "read" in TOOLS
     assert "write" in TOOLS
-    assert "web_search" in TOOLS
-    assert "web_fetch" in TOOLS
 
 
 def test_get_all_schemas_returns_valid_list():
@@ -180,9 +178,9 @@ def test_get_schemas_for_exact_names():
 
 def test_get_schemas_for_glob_pattern():
     """Test that get_schemas_for supports fnmatch wildcards."""
-    schemas = get_schemas_for(["web_*"])
+    schemas = get_schemas_for(["py*"])
     names = {s["function"]["name"] for s in schemas}
-    assert names == {"web_search", "web_fetch"}
+    assert names == {"python"}
 
 
 def test_get_schemas_for_no_match():
@@ -195,7 +193,7 @@ def test_get_schemas_for_mixed_patterns():
     """Test get_schemas_for with a mix of exact names and wildcards."""
     schemas = get_schemas_for(["python", "web_*"])
     names = {s["function"]["name"] for s in schemas}
-    assert names == {"python", "web_search", "web_fetch"}
+    assert names == {"python"}
 
 
 def test_toolcall_display_text_python():
@@ -246,8 +244,6 @@ def test_tools_with_executors():
     assert TOOLS["read"].executor is not None
     assert TOOLS["write"].executor is not None
     assert TOOLS["glob"].executor is not None
-    assert TOOLS["web_search"].executor is not None
-    assert TOOLS["web_fetch"].executor is not None
 
 
 # --- Tool executor tests ---

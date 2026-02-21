@@ -194,78 +194,78 @@ tool(
     executor=execute_glob,
 )
 
-tool(
-    name="grep",
-    description="Search for regex patterns in files.",
-    params={
-        "pattern": {
-            "type": "string",
-            "description": "Regular expression pattern to search for.",
-        },
-        "path": {
-            "type": "string",
-            "description": "Directory to search in (default: current directory).",
-        },
-        "file_filter": {
-            "type": "string",
-            "description": "Glob pattern to filter files (default: *).",
-        },
-        "case_sensitive": {
-            "type": "boolean",
-            "description": "Whether the search is case sensitive (default: true).",
-        },
-        "context_before": {
-            "type": "integer",
-            "description": "Number of lines of context before each match (default: 0).",
-        },
-        "context_after": {
-            "type": "integer",
-            "description": "Number of lines of context after each match (default: 0).",
-        },
-    },
-    required=["pattern"],
-    executor=execute_grep,
-)
+#tool(
+#    name="grep",
+#    description="Search for regex patterns in files.",
+#    params={
+#        "pattern": {
+#            "type": "string",
+#            "description": "Regular expression pattern to search for.",
+#        },
+#        "path": {
+#            "type": "string",
+#            "description": "Directory to search in (default: current directory).",
+#        },
+#        "file_filter": {
+#            "type": "string",
+#            "description": "Glob pattern to filter files (default: *).",
+#        },
+#        "case_sensitive": {
+#            "type": "boolean",
+#            "description": "Whether the search is case sensitive (default: true).",
+#        },
+#        "context_before": {
+#            "type": "integer",
+#            "description": "Number of lines of context before each match (default: 0).",
+#        },
+#        "context_after": {
+#            "type": "integer",
+#            "description": "Number of lines of context after each match (default: 0).",
+#        },
+#    },
+#    required=["pattern"],
+#    executor=execute_grep,
+#)
 
-tool(
-    name="replace",
-    description="Replace string occurrences in files with regex support.",
-    params={
-        "path": {"type": "string", "description": "Absolute or relative file path."},
-        "pattern": {
-            "type": "string",
-            "description": "Regular expression pattern to match.",
-        },
-        "replacement": {
-            "type": "string",
-            "description": "Replacement string (supports backreferences).",
-        },
-        "case_sensitive": {
-            "type": "boolean",
-            "description": "Whether the search is case sensitive (default: true).",
-        },
-        "dry_run": {
-            "type": "boolean",
-            "description": "If true, only show what would be changed without writing (default: true).",
-        },
-    },
-    required=["path", "pattern", "replacement"],
-    executor=execute_replace,
-)
+#tool(
+#    name="replace",
+#    description="Replace string occurrences in files with regex support.",
+#    params={
+#        "path": {"type": "string", "description": "Absolute or relative file path."},
+#        "pattern": {
+#            "type": "string",
+#            "description": "Regular expression pattern to match.",
+#        },
+#        "replacement": {
+#            "type": "string",
+#            "description": "Replacement string (supports backreferences).",
+#        },
+#        "case_sensitive": {
+#            "type": "boolean",
+#            "description": "Whether the search is case sensitive (default: true).",
+#        },
+#        "dry_run": {
+#            "type": "boolean",
+#            "description": "If true, only show what would be changed without writing (default: true).",
+#        },
+#    },
+#    required=["path", "pattern", "replacement"],
+#    executor=execute_replace,
+#)
 
-tool(
-    name="web_search",
-    description="Search the web for information.",
-    params={"query": {"type": "string", "description": "Search query."}},
-    executor=execute_web_search,
-)
+#tool(
+#    name="web_search",
+#    description="Search the web for information.",
+#    params={"query": {"type": "string", "description": "Search query."}},
+#    executor=execute_web_search,
+#)
 
-tool(
-    name="web_fetch",
-    description="Fetch the contents of a URL.",
-    params={"url": {"type": "string", "description": "URL to fetch."}},
-    executor=execute_web_fetch,
-)
+#tool(
+#    name="web_fetch",
+#    description="Fetch the contents of a URL.",
+#    params={"url": {"type": "string", "description": "URL to fetch."}},
+#    executor=execute_web_fetch,
+#)
 
 
 def get_all_schemas() -> list[dict]:

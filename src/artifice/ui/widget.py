@@ -15,6 +15,7 @@ from textual.widget import Widget
 from textual.widgets import LoadingIndicator, Static
 
 from artifice.core.events import InputMode
+from artifice.core.files import LARGE_FILE_THRESHOLD
 from artifice.core.history import History
 from artifice.core.prompts import load_prompt
 from artifice.agent import (
@@ -280,31 +281,42 @@ class ArtificeTerminal(Widget):
         code = event.code
         self.input.clear()
 
-        # Immediately display the submitted input for responsiveness
         if event.is_agent_prompt:
             agent_input_block = AgentInputBlock(code)
             self.output.append_block(agent_input_block)
             self.mark_block_in_context(agent_input_block)
-
-        async def do_execute():
-            if event.is_agent_prompt:
-                await self._handle_agent_prompt(code)
-            elif event.is_shell_command:
-                result = await self._exec.execute(
-                    code, language="bash", in_context=self._send_user_commands_to_agent
+            self.call_after_refresh(
+                lambda: setattr(
+                    self,
+                    "_current_task",
+                    asyncio.create_task(self._run_cancellable(self.do_execute(event))),
                 )
-                if self._send_user_commands_to_agent:
-                    await self._send_execution_result_to_agent(code, "bash", result)
-            else:
-                result = await self._exec.execute(
-                    code,
-                    language="python",
-                    in_context=self._send_user_commands_to_agent,
-                )
-                if self._send_user_commands_to_agent:
-                    await self._send_execution_result_to_agent(code, "python", result)
+            )
+            return
 
-        self._current_task = asyncio.create_task(self._run_cancellable(do_execute()))
+        self._current_task = asyncio.create_task(
+            self._run_cancellable(self.do_execute(event))
+        )
+
+    async def do_execute(self, event: TerminalInput.Submitted) -> None:
+        """Execute the submitted input."""
+        code = event.code
+        if event.is_agent_prompt:
+            await self._handle_agent_prompt(code)
+        elif event.is_shell_command:
+            result = await self._exec.execute(
+                code, language="bash", in_context=self._send_user_commands_to_agent
+            )
+            if self._send_user_commands_to_agent:
+                await self._send_execution_result_to_agent(code, "bash", result)
+        else:
+            result = await self._exec.execute(
+                code,
+                language="python",
+                in_context=self._send_user_commands_to_agent,
+            )
+            if self._send_user_commands_to_agent:
+                await self._send_execution_result_to_agent(code, "python", result)
 
     def mark_block_in_context(self, block: BaseBlock) -> None:
         """Mark a block as being in the agent's context."""
@@ -508,6 +520,98 @@ class ArtificeTerminal(Widget):
         if self._agent is not None:
             self._agent.messages.append({"role": "user", "content": event.content})
             self._append_system_block(event.path, event.content)
+
+    def on_terminal_input_slash_command(
+        self, event: TerminalInput.SlashCommand
+    ) -> None:
+        """Handle slash commands in AI mode."""
+        command = event.command
+
+        if command == "/clear":
+            self.action_clear_agent_context()
+            return
+
+        if command == "/exit":
+            self.app.exit()
+            return
+
+        if command == "/help":
+            self._show_slash_help()
+            return
+
+        prompt_name = command[1:]
+        prompt = load_prompt(prompt_name)
+        if prompt is not None:
+            (path, content) = prompt
+            if self._agent is not None:
+                self._agent.messages.append(
+                    {"role": "user", "content": content.strip()}
+                )
+            self._append_system_block(path, content.strip())
+        else:
+            block = SystemBlock(
+                output=f"Unknown command or prompt: `{command}`",
+                render_markdown=True,
+            )
+            block.flush()
+            self.output.append_block(block)
+
+    def _show_slash_help(self) -> None:
+        """Display available slash commands."""
+        help_text = """**Slash Commands**
+
+| Command | Description |
+|---------|-------------|
+| `/clear` | Clear agent conversation context |
+| `/exit` | Exit the application |
+| `/help` | Show this help message |
+| `/<name>` | Load prompt from `~/.artifice/prompts/<name>.md` or `./.artifice/prompts/<name>.md` |
+
+Press `/` on empty input to search prompts."""
+        block = SystemBlock(output=help_text, render_markdown=True)
+        block.flush()
+        self.output.append_block(block)
+
+    def on_terminal_input_file_selected(
+        self, event: TerminalInput.FileSelected
+    ) -> None:
+        """Handle file selection via @ search."""
+        warnings = []
+
+        if event.is_binary:
+            warnings.append("_Binary file - content not displayed_")
+
+        if event.size > LARGE_FILE_THRESHOLD:
+            size_kb = event.size / 1024
+            warnings.append(f"_Large file ({size_kb:.1f} KB)_")
+
+        if event.is_binary:
+            display_content = ""
+        else:
+            display_content = event.content
+
+        warning_text = "\n".join(warnings) if warnings else ""
+
+        if self._agent is not None and not event.is_binary:
+            self._agent.messages.append(
+                {"role": "user", "content": f"File: {event.path}\n\n{event.content}"}
+            )
+
+        path_obj = event.path
+        try:
+            display_path = str(path_obj.relative_to(Path.cwd()))
+        except ValueError:
+            display_path = str(path_obj)
+
+        header = f"{display_path} (_{len(display_content)} characters_)"
+        if warning_text:
+            header = f"{header}\n{warning_text}"
+
+        block = SystemBlock(output=header, render_markdown=True)
+        block.flush()
+        if self._send_user_commands_to_agent and not event.is_binary:
+            self.mark_block_in_context(block)
+        self.output.append_block(block)
 
     def action_scroll_output_up(self) -> None:
         """Scroll the output window up by one page."""
