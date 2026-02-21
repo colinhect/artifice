@@ -127,6 +127,28 @@ class History:
             return []
         return self._histories[mode].copy()
 
+    def get_index(self, mode: str) -> int:
+        """Get current navigation index for the specified mode.
+
+        Args:
+            mode: The mode ("python", "ai", or "shell").
+
+        Returns:
+            Current navigation index, or -1 if not browsing history.
+        """
+        return self._indices.get(mode, -1)
+
+    def get_current_input(self, mode: str) -> str:
+        """Get saved current input for the specified mode.
+
+        Args:
+            mode: The mode ("python", "ai", or "shell").
+
+        Returns:
+            Saved current input, or empty string if not set.
+        """
+        return self._current_input.get(mode, "")
+
     def clear(self) -> None:
         """Clear all history."""
         for mode in self.MODES:

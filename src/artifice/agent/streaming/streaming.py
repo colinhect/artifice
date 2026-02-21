@@ -7,7 +7,7 @@ import inspect
 import logging
 import re
 import time
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from artifice.ui.components.blocks.blocks import (
     AgentOutputBlock,
@@ -112,7 +112,9 @@ class StreamingFenceDetector:
     and the previous block is finalized.
     """
 
-    def __init__(self, output: TerminalOutput) -> None:
+    def __init__(
+        self, output: TerminalOutput, block_factory: Any | None = None
+    ) -> None:
         self._output = output
         self.all_blocks: list[BaseBlock] = []
         self.first_agent_block: AgentOutputBlock | None = None
@@ -120,7 +122,9 @@ class StreamingFenceDetector:
         self._current_block: AgentOutputBlock | None = None
         self._incomplete_line: str = ""
         self._block_has_content: bool = False
-        self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
+        self._make_prose_block = block_factory or (
+            lambda activity: AgentOutputBlock(activity=activity)
+        )
 
     def start(self) -> None:
         """Create the initial AgentOutputBlock for streaming.

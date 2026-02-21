@@ -304,11 +304,10 @@ class TmuxShellExecutor(BaseExecutor):
                 continue
 
     def _handle_timeout_error(
-        self, message: str, on_error: Callable[[str], None] | None
+        self, message: str, on_error: Callable[[str], None] | None, code: str
     ) -> ExecutionResult:
         """Create a timeout error result."""
-        result = ExecutionResult()
-        result.status = ExecutionStatus.ERROR
+        result = ExecutionResult(code=code, status=ExecutionStatus.ERROR)
         result.error = message
         if on_error:
             on_error(message)
@@ -371,7 +370,7 @@ class TmuxShellExecutor(BaseExecutor):
             )
             if timed_out:
                 return self._handle_timeout_error(
-                    f"Command timed out after {timeout}s", on_error
+                    f"Command timed out after {timeout}s", on_error, command
                 )
             result.output = output
 
@@ -381,7 +380,7 @@ class TmuxShellExecutor(BaseExecutor):
             )
             if timed_out:
                 return self._handle_timeout_error(
-                    f"Command timed out after {timeout}s", on_error
+                    f"Command timed out after {timeout}s", on_error, command
                 )
 
             # Determine status
