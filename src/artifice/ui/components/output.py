@@ -11,7 +11,6 @@ from textual.message import Message
 from artifice.ui.components.input import InputTextArea
 from artifice.ui.components.blocks.blocks import (
     AgentInputBlock,
-    AgentOutputBlock,
     BaseBlock,
     CodeInputBlock,
     CodeOutputBlock,
@@ -173,7 +172,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     async def action_toggle_block_markdown(self) -> None:
         """Toggle markdown rendering for the currently highlighted block."""
         block = self.get_highlighted_block()
-        if block and isinstance(block, (CodeOutputBlock, AgentOutputBlock)):
+        if block and isinstance(block, CodeOutputBlock):
             block.toggle_markdown()
 
     def action_highlight_previous(self) -> None:

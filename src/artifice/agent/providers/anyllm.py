@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable
+from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, cast
 
 from artifice.agent.providers.base import (
     Provider,
@@ -76,7 +76,7 @@ class AnyLLMProvider(Provider):
             logger.error("%s", error)
             raise ConnectionError(error)
 
-        async for chunk in stream:
+        async for chunk in cast(AsyncIterator[Any], stream):
             stream_chunk = StreamChunk()
 
             # Extract usage if available

@@ -7,6 +7,8 @@ The header line is the first content in the new block, and the previous one is f
 from __future__ import annotations
 
 import re
+from typing import Any
+
 from artifice.ui.components.blocks.blocks import AgentOutputBlock
 from artifice.ui.components.blocks.factory import BlockFactory
 from artifice.ui.components.output import TerminalOutput
@@ -36,7 +38,7 @@ class StreamingFenceDetector:
         self._make_prose_block = lambda activity: AgentOutputBlock(activity=activity)
 
     @property
-    def all_blocks(self) -> list[AgentOutputBlock]:
+    def all_blocks(self) -> list[Any]:
         """All blocks created by this detector."""
         return self._factory.all_blocks  # type: ignore[return-value]
 
@@ -136,8 +138,9 @@ class StreamingFenceDetector:
                 self._block_has_content = False
 
             # Append the incomplete line
-            await self._current_block.append(self._incomplete_line)
-            self._block_has_content = True
+            if self._current_block is not None:
+                await self._current_block.append(self._incomplete_line)
+                self._block_has_content = True
 
         # Mark the current block as complete and finalize streaming
         if self._current_block is not None:
