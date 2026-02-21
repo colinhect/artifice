@@ -8,9 +8,12 @@ import threading
 import traceback
 from io import StringIO
 from queue import Queue
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from artifice.execution.base import ExecutionResult, ExecutionStatus
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class StreamCapture(StringIO):

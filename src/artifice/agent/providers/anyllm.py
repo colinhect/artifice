@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, AsyncIterator, Callable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from artifice.agent.providers.base import (
     Provider,
     StreamChunk,
     TokenUsage,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import AsyncIterator
 
 logger = logging.getLogger(__name__)
 

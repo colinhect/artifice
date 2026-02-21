@@ -6,11 +6,14 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import TYPE_CHECKING
 
 from artifice.agent.conversation import ConversationManager
 from artifice.agent.providers.base import Provider, TokenUsage
 from artifice.agent.tools.base import ToolCall, get_schemas_for
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 

@@ -7,10 +7,12 @@ import os
 import re
 import tempfile
 import traceback
-
-from typing import Callable
+from typing import TYPE_CHECKING
 
 from artifice.execution.base import ExecutionResult, ExecutionStatus
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 _OSC_RE = re.compile(r"\x1b\].*?(?:\x1b\\|\x07)")
