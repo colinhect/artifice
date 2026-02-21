@@ -328,7 +328,7 @@ class ArtificeTerminal(Widget):
         self.input.code = event.code
         try:
             self.input.mode = InputMode.from_name(event.mode)
-            self.input._update_prompt()
+            self.input.update_prompt()
         except ValueError:
             pass
         self.input.query_one("#code-input", InputTextArea).focus()

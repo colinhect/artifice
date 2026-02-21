@@ -104,7 +104,7 @@ class ExecutionCoordinator:
 
         # Track output block in context if needed
         if in_context and self._context_tracker:
-            original_ensure = handler._ensure_block
+            original_ensure = handler.ensure_block
             tracker = self._context_tracker
 
             def ensure_and_track():
@@ -113,7 +113,7 @@ class ExecutionCoordinator:
                     tracker(block)
                 return block
 
-            handler._ensure_block = ensure_and_track
+            handler.ensure_block = ensure_and_track
 
         return handler.on_output, handler.on_error, handler.flush
 

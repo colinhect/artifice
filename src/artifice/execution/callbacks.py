@@ -27,7 +27,7 @@ class OutputCallbackHandler:
         self._block: CodeOutputBlock | None = None
         self._flush_scheduled = False
 
-    def _ensure_block(self) -> CodeOutputBlock | None:
+    def ensure_block(self) -> CodeOutputBlock | None:
         """Lazily create output block on first output."""
         if not self._use_code_block:
             return None
@@ -53,14 +53,14 @@ class OutputCallbackHandler:
 
     def on_output(self, text: str) -> None:
         """Handle stdout text from execution."""
-        block = self._ensure_block()
+        block = self.ensure_block()
         if block:
             block.append_output(text)
             self._schedule_flush()
 
     def on_error(self, text: str) -> None:
         """Handle stderr text from execution."""
-        block = self._ensure_block()
+        block = self.ensure_block()
         if block:
             block.append_error(text)
             self._schedule_flush()

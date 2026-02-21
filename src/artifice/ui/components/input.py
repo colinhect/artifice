@@ -248,7 +248,7 @@ class TerminalInput(Static):
         text_area.focus()
         # Hide the loading indicator initially
         self.query_one("#activity-indicator", LoadingIndicator).styles.display = "none"
-        self._update_prompt()
+        self.update_prompt()
         # Initialize search manager
         self._search_manager = SearchModeManager(
             text_area=text_area,
@@ -268,12 +268,12 @@ class TerminalInput(Static):
         """Switch to the given mode if not already active."""
         if self.mode != mode:
             self.mode = mode
-            self._update_prompt()
+            self.update_prompt()
 
     def on_terminal_input_cycle_mode(self, _: CycleMode) -> None:
         """Handle Insert key press - cycle through modes while keeping input."""
         self.mode = self.mode.cycle_next()
-        self._update_prompt()
+        self.update_prompt()
 
     def on_terminal_input_history_previous(self, _: HistoryPrevious) -> None:
         """Handle up arrow key press at top of input - navigate to previous history."""
@@ -283,7 +283,7 @@ class TerminalInput(Static):
         """Handle down arrow key press at bottom of input - navigate to next history."""
         self.action_history_forward()
 
-    def _update_prompt(self) -> None:
+    def update_prompt(self) -> None:
         """Update the prompt display based on current mode."""
         prompt_widget = self.query_one("#prompt-display", Static)
         text_area = self.query_one("#code-input", InputTextArea)
