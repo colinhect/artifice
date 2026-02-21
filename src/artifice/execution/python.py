@@ -40,7 +40,7 @@ class CodeExecutor:
     Only execute trusted code from trusted sources.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, sleep_interval: float = 0.005) -> None:
         """Initialize executor with fresh globals/locals context."""
         self._globals: dict[str, Any] = {
             "__name__": "__main__",
@@ -48,6 +48,7 @@ class CodeExecutor:
         }
         self._locals: dict[str, Any] = {}
         self._exec_lock = threading.Lock()
+        self.sleep_interval = sleep_interval
 
     def reset(self) -> None:
         """Reset the execution context."""
@@ -94,7 +95,7 @@ class CodeExecutor:
                             on_error(text)
 
                     # Small sleep to avoid busy-waiting
-                    await asyncio.sleep(0.01)
+                    await asyncio.sleep(self.sleep_interval)
             except asyncio.CancelledError:
                 # Cancel the execution task
                 exec_task.cancel()

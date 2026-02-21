@@ -41,16 +41,19 @@ class ExecutionCoordinator:
         self._context_tracker = context_tracker
 
         # Create executors
-        self._executor = CodeExecutor()
+        self._executor = CodeExecutor(sleep_interval=config.python_executor_sleep)
         if config.tmux_target:
-            prompt_pattern = config.tmux_prompt_pattern or r"^\$ "
+            prompt_pattern = config.tmux_prompt_pattern or r"^\\$ "
             self._shell_executor: ShellExecutor | TmuxShellExecutor = TmuxShellExecutor(
                 config.tmux_target,
                 prompt_pattern=prompt_pattern,
                 check_exit_code=config.tmux_echo_exit_code,
+                poll_interval=config.shell_poll_interval,
             )
         else:
-            self._shell_executor = ShellExecutor()
+            self._shell_executor = ShellExecutor(
+                poll_interval=config.shell_poll_interval
+            )
 
         # Set shell init script from config (only applicable to ShellExecutor)
         if config.shell_init_script and isinstance(self._shell_executor, ShellExecutor):

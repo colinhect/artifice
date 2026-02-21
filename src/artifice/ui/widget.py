@@ -132,6 +132,7 @@ class ArtificeTerminal(Widget):
                 call_later=self.call_later,
                 call_after_refresh=self.call_after_refresh,
                 batch_update=self._batch_update_ctx,
+                streaming_fps=self._config.streaming_fps,
             )
 
         def on_connect(_):

@@ -147,19 +147,16 @@ class TmuxShellExecutor:
     """
 
     def __init__(
-        self, target: str, prompt_pattern: str, check_exit_code: bool = False
+        self,
+        target: str,
+        prompt_pattern: str = r"^\\$ ",
+        check_exit_code: bool = False,
+        poll_interval: float = 0.02,
     ) -> None:
-        """Initialize with a tmux target string and prompt pattern.
-
-        Args:
-            target: A tmux target like 'session:window' or 'session:window.pane'.
-            prompt_pattern: Regex matching the shell prompt (used with re.MULTILINE).
-                Example: r"^colin@lucidity:\\S+\\$ " for a prompt like "colin@lucidity:~$ ".
-            check_exit_code: Whether to check exit code with `echo $?` (default False).
-        """
         self.target = target
         self.prompt_re = re.compile(prompt_pattern, re.MULTILINE)
         self.check_exit_code = check_exit_code
+        self.poll_interval = poll_interval
 
     async def _run_tmux(self, *args: str) -> tuple[int, str, str]:
         """Run a tmux command and return (returncode, stdout, stderr)."""
@@ -228,7 +225,6 @@ class TmuxShellExecutor:
             # Phase 1: Capture command output until prompt reappears
             streamed_len = 0
             cmd_echo_end = -1
-            poll_interval = 0.05
             elapsed = 0.0
 
             while True:
@@ -238,8 +234,8 @@ class TmuxShellExecutor:
                     if on_error:
                         on_error(result.error)
                     return result
-                await asyncio.sleep(poll_interval)
-                elapsed += poll_interval
+                await asyncio.sleep(self.poll_interval)
+                elapsed += self.poll_interval
 
                 content = self._read_content(tmpfile)
 
@@ -282,8 +278,8 @@ class TmuxShellExecutor:
                         if on_error:
                             on_error(result.error)
                         return result
-                    await asyncio.sleep(poll_interval)
-                    elapsed += poll_interval
+                    await asyncio.sleep(self.poll_interval)
+                    elapsed += self.poll_interval
 
                     content = self._read_content(tmpfile)
                     new_content = content[content_before_len:]

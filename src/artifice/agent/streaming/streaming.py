@@ -38,7 +38,7 @@ class ChunkBuffer:
     """
 
     def __init__(
-        self, schedule: Callable, drain: Callable, min_interval: float = 1.0 / 30.0
+        self, schedule: Callable, drain: Callable, min_interval: float = 1.0 / 60.0
     ) -> None:
         self._schedule = schedule
         self._drain = drain
@@ -219,6 +219,7 @@ class StreamManager:
         call_later: Callable,
         call_after_refresh: Callable,
         batch_update: Callable,
+        streaming_fps: int = 60,
     ) -> None:
         self._output = output
         self._call_after_refresh = call_after_refresh
@@ -226,8 +227,9 @@ class StreamManager:
 
         self._current_detector: StreamingFenceDetector | None = None
         self._thinking_block: ThinkingOutputBlock | None = None
-        self._chunk_buf = ChunkBuffer(call_later, self._drain_chunks)
-        self._thinking_buf = ChunkBuffer(call_later, self._drain_thinking)
+        min_interval = 1.0 / streaming_fps
+        self._chunk_buf = ChunkBuffer(call_later, self._drain_chunks, min_interval)
+        self._thinking_buf = ChunkBuffer(call_later, self._drain_thinking, min_interval)
         self._scroll_scheduled = False
 
     @property

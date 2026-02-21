@@ -44,6 +44,10 @@ _FIELDS: dict[str, Any] = {
     "tmux_target": None,
     "tmux_prompt_pattern": None,
     "tmux_echo_exit_code": False,
+    # Performance settings
+    "streaming_fps": 60,
+    "shell_poll_interval": 0.02,
+    "python_executor_sleep": 0.005,
 }
 
 
@@ -85,6 +89,11 @@ class ArtificeConfig:
     tmux_target: str | None
     tmux_prompt_pattern: str | None
     tmux_echo_exit_code: bool
+
+    # Performance settings
+    streaming_fps: int
+    shell_poll_interval: float
+    python_executor_sleep: float
 
     def __init__(self):
         for key, default in _FIELDS.items():
