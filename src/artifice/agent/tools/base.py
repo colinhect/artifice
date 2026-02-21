@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from artifice.agent.tools.executors import (
+    execute_edit,
     execute_glob,
     execute_grep,
     execute_read,
@@ -194,7 +195,31 @@ tool(
     executor=execute_glob,
 )
 
-#tool(
+tool(
+    name="edit",
+    description=(
+        "Replace a unique string in a file with a new string. "
+        "The old_string must appear exactly once. "
+        "Include enough context to make it unique."
+    ),
+    params={
+        "path": {
+            "type": "string",
+            "description": "Absolute or relative file path.",
+        },
+        "old_string": {
+            "type": "string",
+            "description": "The exact text to find and replace. Must be unique in the file.",
+        },
+        "new_string": {
+            "type": "string",
+            "description": "The replacement text.",
+        },
+    },
+    executor=execute_edit,
+)
+
+# tool(
 #    name="grep",
 #    description="Search for regex patterns in files.",
 #    params={
@@ -225,9 +250,9 @@ tool(
 #    },
 #    required=["pattern"],
 #    executor=execute_grep,
-#)
+# )
 
-#tool(
+# tool(
 #    name="replace",
 #    description="Replace string occurrences in files with regex support.",
 #    params={
@@ -251,21 +276,21 @@ tool(
 #    },
 #    required=["path", "pattern", "replacement"],
 #    executor=execute_replace,
-#)
+# )
 
-#tool(
+# tool(
 #    name="web_search",
 #    description="Search the web for information.",
 #    params={"query": {"type": "string", "description": "Search query."}},
 #    executor=execute_web_search,
-#)
+# )
 
-#tool(
+# tool(
 #    name="web_fetch",
 #    description="Fetch the contents of a URL.",
 #    params={"url": {"type": "string", "description": "URL to fetch."}},
 #    executor=execute_web_fetch,
-#)
+# )
 
 
 def get_all_schemas() -> list[dict]:

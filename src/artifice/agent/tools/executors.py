@@ -64,21 +64,72 @@ async def execute_read(args: dict[str, Any]) -> str:
 
 
 async def execute_write(args: dict[str, Any]) -> str:
-    """Write content to a file, creating directories as needed."""
+    """Write content to a file, creating directories as needed.
+
+    Returns JSON string with diff data for UI rendering.
+
+    Args:
+        args: {
+            "path": str,
+            "content": str
+        }
+
+    Returns:
+        JSON string with structure:
+        {
+            "success": bool,
+            "path": str,
+            "old_lines": [str],    # existing content or empty if new file
+            "new_lines": [str],    # new content
+            "start_line": int,     # always 1 for write
+            "context_before": [],  # empty for write
+            "context_after": [],   # empty for write
+            "is_new_file": bool,
+            "error": str | None
+        }
+    """
+    import json
+
     path = Path(args["path"]).expanduser().resolve()
     display_path = _relative_path(path)
     content = args["content"]
 
     logger.debug("Writing %d bytes to: %s", len(content), path)
 
+    is_new_file = not path.exists()
+
+    if is_new_file:
+        old_lines = []
+    else:
+        try:
+            old_content = path.read_text(encoding="utf-8")
+            old_lines = old_content.splitlines()
+        except Exception:
+            old_lines = []
+
+    new_lines = content.splitlines() if content else [""]
+
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         logger.debug("Successfully wrote to: %s", path)
-        return f"Wrote {len(content)} bytes to {display_path}"
     except Exception as e:
         logger.error("Error writing file %s: %s", path, e)
-        return f"Error writing file: {e}"
+        return json.dumps({"success": False, "error": f"Error writing file: {e}"})
+
+    return json.dumps(
+        {
+            "success": True,
+            "path": str(display_path),
+            "old_lines": old_lines,
+            "new_lines": new_lines,
+            "start_line": 1,
+            "context_before": [],
+            "context_after": [],
+            "is_new_file": is_new_file,
+            "error": None,
+        }
+    )
 
 
 async def execute_glob(args: dict[str, Any]) -> str:
@@ -318,6 +369,120 @@ async def execute_web_fetch(args: dict[str, Any]) -> str:
     except Exception as e:
         logger.error("Error fetching URL %s: %s", url, e)
         return f"Error fetching URL: {e}"
+
+
+async def execute_edit(args: dict[str, Any]) -> str:
+    """Replace a unique string in a file.
+
+    The old_string must appear exactly once in the file.
+    Returns JSON string with diff data for UI rendering.
+
+    Args:
+        args: {
+            "path": str,
+            "old_string": str,
+            "new_string": str
+        }
+
+    Returns:
+        JSON string with structure:
+        {
+            "success": bool,
+            "path": str,           # relative path for display
+            "old_lines": [str],    # original lines that were replaced
+            "new_lines": [str],    # new lines
+            "start_line": int,     # 1-based line number where change starts
+            "context_before": [str],  # 3 lines before change
+            "context_after": [str],   # 3 lines after change
+            "error": str | None
+        }
+    """
+    import json
+
+    path = Path(args["path"]).expanduser().resolve()
+    display_path = _relative_path(path)
+    old_string = args["old_string"]
+    new_string = args["new_string"]
+
+    if not path.is_file():
+        return json.dumps(
+            {"success": False, "error": f"File not found: {display_path}"}
+        )
+
+    try:
+        content = path.read_text(encoding="utf-8")
+    except PermissionError:
+        return json.dumps(
+            {"success": False, "error": f"Permission denied: {display_path}"}
+        )
+    except Exception as e:
+        return json.dumps({"success": False, "error": f"Error reading file: {e}"})
+
+    count = content.count(old_string)
+    if count == 0:
+        return json.dumps(
+            {"success": False, "error": f"String not found in {display_path}"}
+        )
+    if count > 1:
+        return json.dumps(
+            {
+                "success": False,
+                "error": f"String found {count} times in {display_path}. "
+                f"Provide a more specific string with surrounding context.",
+            }
+        )
+
+    lines = content.splitlines(keepends=True)
+    char_pos = content.index(old_string)
+
+    start_line = 1
+    current_pos = 0
+    for i, line in enumerate(lines):
+        if current_pos + len(line) > char_pos:
+            start_line = i + 1
+            break
+        current_pos += len(line)
+
+    old_lines = old_string.splitlines()
+    end_line = start_line + len(old_lines) - 1
+
+    context_size = 3
+    context_before_start = max(0, start_line - 1 - context_size)
+    context_after_end = min(len(lines), end_line + context_size)
+
+    context_before = [
+        line.rstrip("\n\r") for line in lines[context_before_start : start_line - 1]
+    ]
+    context_after = [line.rstrip("\n\r") for line in lines[end_line:context_after_end]]
+
+    new_content = content.replace(old_string, new_string)
+
+    try:
+        path.write_text(new_content, encoding="utf-8")
+    except Exception as e:
+        return json.dumps({"success": False, "error": f"Error writing file: {e}"})
+
+    new_lines = new_string.splitlines() if new_string else [""]
+
+    logger.debug(
+        "Edited %s: replaced %d lines at line %d",
+        display_path,
+        len(old_lines),
+        start_line,
+    )
+
+    return json.dumps(
+        {
+            "success": True,
+            "path": str(display_path),
+            "old_lines": old_lines,
+            "new_lines": new_lines,
+            "start_line": start_line,
+            "context_before": context_before,
+            "context_after": context_after,
+            "error": None,
+        }
+    )
 
 
 async def execute_web_search(args: dict[str, Any]) -> str:

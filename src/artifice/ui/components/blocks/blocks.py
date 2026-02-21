@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from artifice.ui.components.blocks.base import BaseBlock
+from artifice.ui.components.blocks.diff import DiffOutputBlock
 from artifice.ui.components.blocks.input import AgentInputBlock, CodeInputBlock
 from artifice.ui.components.blocks.mixins import StatusMixin
 from artifice.ui.components.blocks.output import (
@@ -25,6 +26,7 @@ __all__ = [
     "ThinkingOutputBlock",
     "BufferedOutputBlock",
     "CodeOutputBlock",
+    "DiffOutputBlock",
     "WidgetOutputBlock",
     "SystemBlock",
     "ToolCallBlock",

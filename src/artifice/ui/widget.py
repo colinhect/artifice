@@ -35,6 +35,7 @@ from artifice.ui.components.blocks.blocks import (
     AgentInputBlock,
     BaseBlock,
     CodeOutputBlock,
+    DiffOutputBlock,
     SystemBlock,
     ToolCallBlock,
 )
@@ -414,6 +415,8 @@ class ArtificeTerminal(Widget):
 
     def _execute_tool_with_executor(self, block: ToolCallBlock) -> None:
         """Execute a tool call that has a direct executor (not code execution)."""
+        import json
+
         block.show_loading()
         self.input.query_one("#code-input", InputTextArea).focus()
 
@@ -427,25 +430,51 @@ class ArtificeTerminal(Widget):
             if result_text is None:
                 result_text = "(no executor for this tool)"
 
-            # Show result as a success
-            result = ExecutionResult(
-                code=block.get_code(),
-                status=ExecutionStatus.SUCCESS,
-                output=result_text,
-            )
-            block.update_status(result)
+            if block.tool_name in ("edit", "write"):
+                diff_block = DiffOutputBlock.from_json(result_text)
+                if diff_block:
+                    self.output.append_block(diff_block)
+                    self.mark_block_in_context(diff_block)
+                    result = ExecutionResult(
+                        code=block.get_code(),
+                        status=ExecutionStatus.SUCCESS,
+                        output="",
+                    )
+                    block.update_status(result)
+                else:
+                    try:
+                        data = json.loads(result_text)
+                        error_msg = data.get("error", result_text)
+                    except json.JSONDecodeError:
+                        error_msg = result_text
+                    result = ExecutionResult(
+                        code=block.get_code(),
+                        status=ExecutionStatus.ERROR,
+                        error=error_msg,
+                    )
+                    block.update_status(result)
+                    output_block = CodeOutputBlock(
+                        error_msg,
+                        in_context=self._send_user_commands_to_agent,
+                    )
+                    self.output.append_block(output_block)
+                    self.mark_block_in_context(output_block)
+            else:
+                result = ExecutionResult(
+                    code=block.get_code(),
+                    status=ExecutionStatus.SUCCESS,
+                    output=result_text,
+                )
+                block.update_status(result)
+                output_block = CodeOutputBlock(
+                    result_text,
+                    in_context=self._send_user_commands_to_agent,
+                )
+                if not self._config.show_tool_output:
+                    output_block.add_class("hide-tool-output")
+                self.output.append_block(output_block)
+                self.mark_block_in_context(output_block)
 
-            # Display result in an output block
-            output_block = CodeOutputBlock(
-                result_text,
-                in_context=self._send_user_commands_to_agent,
-            )
-            if not self._config.show_tool_output:
-                output_block.add_class("hide-tool-output")
-            self.output.append_block(output_block)
-            self.mark_block_in_context(output_block)
-
-            # Send result back to agent
             if self._send_user_commands_to_agent and self._agent is not None:
                 state["sent_to_agent"] = True
                 self._agent_coord.add_tool_result(block.tool_call_id, result_text)

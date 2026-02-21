@@ -338,6 +338,61 @@ CodeOutputBlock .markdown-output {
 }
 
 /* --------------------------------------------------------------------------
+   Diff Output Block
+   -------------------------------------------------------------------------- */
+DiffOutputBlock {
+    margin: 0 0 1 0;
+    padding: 0;
+    padding-left: 1;
+}
+
+DiffOutputBlock .diff-container {
+    layout: horizontal;
+    height: auto;
+    width: 1fr;
+}
+
+DiffOutputBlock .diff-side {
+    width: 1fr;
+    height: auto;
+    padding: 0 1 0 0;
+}
+
+DiffOutputBlock .diff-header {
+    color: $primary;
+    text-style: bold;
+    margin-bottom: 0;
+    padding: 0;
+}
+
+DiffOutputBlock .diff-line {
+    height: 1;
+    padding: 0;
+    margin: 0;
+    content-align: left middle;
+}
+
+DiffOutputBlock .diff-line-context {
+    color: $foreground 75%;
+    background: $surface-darken-1;
+}
+
+DiffOutputBlock .diff-line-removed {
+    color: $error-lighten-1;
+    background: $error-darken-3;
+}
+
+DiffOutputBlock .diff-line-added {
+    color: $success-lighten-1;
+    background: $success-darken-3;
+}
+
+DiffOutputBlock .diff-gutter {
+    color: $foreground 40%;
+    width: 5;
+}
+
+/* --------------------------------------------------------------------------
    System Block
    -------------------------------------------------------------------------- */
 SystemBlock {

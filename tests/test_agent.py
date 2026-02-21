@@ -293,13 +293,18 @@ async def test_execute_read_not_found():
 @pytest.mark.asyncio
 async def test_execute_write(tmp_path):
     """Test write executor creates files."""
+    import json
+
     f = tmp_path / "output.txt"
 
     tc = ToolCall(id="1", name="write", args={"path": str(f), "content": "hello world"})
     result = await execute_tool_call(tc)
 
     assert result is not None
-    assert "Wrote" in result
+    data = json.loads(result)
+    assert data["success"] is True
+    assert data["is_new_file"] is True
+    assert data["new_lines"] == ["hello world"]
     assert f.read_text() == "hello world"
 
 
