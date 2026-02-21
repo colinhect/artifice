@@ -78,6 +78,52 @@ def _register(tool: ToolDef) -> ToolDef:
     return tool
 
 
+def tool(
+    name: str,
+    description: str,
+    params: dict,
+    display_arg: str | None = None,
+    language: str = "text",
+    executor: ToolExecutor | None = None,
+    required: list[str] | None = None,
+) -> ToolDef:
+    """Simplified tool registration helper.
+
+    Args:
+        name: Tool name (e.g., "read_file").
+        description: Human-readable description.
+        params: Parameter properties dict ({"param_name": {"type": "string", ...}}).
+        display_arg: Parameter to display in the UI (defaults to first param).
+        language: Syntax highlighting language for display.
+        executor: Optional async executor function.
+        required: List of required parameter names (defaults to all params).
+
+    Returns:
+        The registered ToolDef.
+    """
+    if display_arg is None:
+        display_arg = list(params.keys())[0] if params else ""
+    if required is None:
+        required = list(params.keys())
+
+    parameters = {
+        "type": "object",
+        "required": required,
+        "properties": params,
+    }
+
+    return _register(
+        ToolDef(
+            name=name,
+            description=description,
+            parameters=parameters,
+            display_language=language,
+            display_arg=display_arg,
+            executor=executor,
+        )
+    )
+
+
 async def execute_tool_call(tool_call: ToolCall) -> str | None:
     """Execute a tool call if it has a registered executor.
 

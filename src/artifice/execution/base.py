@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any
+from typing import Any, Callable
 
 
 class ExecutionStatus(Enum):
@@ -26,3 +26,11 @@ class ExecutionResult:
     error: str = ""
     result_value: Any = None
     exception: Exception | None = None
+
+
+@dataclass
+class ExecutionCallbacks:
+    """Callbacks for execution output streaming."""
+
+    on_output: Callable[[str], None] | None = None
+    on_error: Callable[[str], None] | None = None

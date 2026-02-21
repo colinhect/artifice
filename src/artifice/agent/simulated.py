@@ -1,4 +1,4 @@
-"""Agent - manages LLM conversation and tool calls via any-llm."""
+"""Simulated agents for testing without API calls."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import logging
 from typing import Any, Callable
 
 from artifice.agent.client import AgentResponse
+from artifice.agent.conversation import ConversationManager
 from artifice.agent.tools.base import TOOLS, ToolCall
 
 logger = logging.getLogger(__name__)
@@ -484,7 +485,7 @@ def _parse_tool_calls(text: str, start_id: int = 0) -> tuple[str, list[ToolCall]
     return prose, tool_calls
 
 
-class SimulatedAgent:
+class SimulatedAgent(ConversationManager):
     """Test double for Agent — no API calls, configurable scripted responses.
 
     Scenarios are matched against the last user message. Each scenario is a
@@ -502,11 +503,10 @@ class SimulatedAgent:
         on_connect: Callable | None = None,
         response_delay: float = 0.001,
     ):
+        super().__init__()
         self.system_prompt = system_prompt
         self._on_connect = on_connect
         self.response_delay = response_delay
-        self.messages: list[dict] = []
-        self._pending_tool_calls: list[ToolCall] = []
         self._tc_counter = 0
 
         self.scenarios: list[dict[str, Any]] = list(_DEFAULT_SCENARIOS)
@@ -568,10 +568,10 @@ class SimulatedAgent:
             self._on_connect = None
 
         if prompt.strip():
-            self.messages.append({"role": "user", "content": prompt})
+            self.add_user_message(prompt)
 
         last_user = prompt
-        for msg in reversed(self.messages):
+        for msg in reversed(self._messages):
             if msg.get("role") == "user":
                 last_user = msg.get("content", "")
                 break
@@ -584,47 +584,24 @@ class SimulatedAgent:
             response_text = self.default_response
             thinking_text = self.default_thinking
 
-        # Stream thinking
         if thinking_text:
             await _stream_text(thinking_text, on_thinking_chunk, self.response_delay)
 
-        # Parse tool calls from response text
         prose, tool_calls = _parse_tool_calls(response_text, start_id=self._tc_counter)
         self._tc_counter += len(tool_calls)
 
-        # Stream prose text (without the tool call XML)
         await _stream_text(prose, on_chunk, self.response_delay)
 
-        # Update history
         if prose:
-            self.messages.append({"role": "assistant", "content": prose})
+            self.add_assistant_message(prose)
         if tool_calls:
-            self._pending_tool_calls = list(tool_calls)
+            self.set_pending_tool_calls(tool_calls)
 
         return AgentResponse(
             text=prose,
             tool_calls=tool_calls,
             thinking=thinking_text,
         )
-
-    @property
-    def has_pending_tool_calls(self) -> bool:
-        """Check if there are pending tool calls to execute."""
-        return len(self._pending_tool_calls) > 0
-
-    def add_tool_result(self, tool_call_id: str, content: str) -> None:
-        """Add a tool execution result to conversation history."""
-        self.messages.append(
-            {"role": "tool", "tool_call_id": tool_call_id, "content": content}
-        )
-        self._pending_tool_calls = [
-            tc for tc in self._pending_tool_calls if tc.id != tool_call_id
-        ]
-
-    def clear(self) -> None:
-        """Clear conversation history."""
-        self.messages = []
-        self._pending_tool_calls = []
 
     def reset(self) -> None:
         """Clear conversation history and reset scenario index."""
@@ -634,7 +611,7 @@ class SimulatedAgent:
 
     def get_conversation_history(self) -> list[dict[str, Any]]:
         """Return a copy of the conversation history."""
-        return list(self.messages)
+        return self.get_messages()
 
 
 class ScriptedAgent(SimulatedAgent):
@@ -656,7 +633,7 @@ class ScriptedAgent(SimulatedAgent):
         on_thinking_chunk: Callable | None = None,
     ) -> AgentResponse:
         if prompt.strip():
-            self.messages.append({"role": "user", "content": prompt})
+            self.add_user_message(prompt)
 
         if self.current_scenario_index < len(self.scenarios):
             scenario = self.scenarios[self.current_scenario_index]
@@ -676,9 +653,9 @@ class ScriptedAgent(SimulatedAgent):
         await _stream_text(prose, on_chunk, self.response_delay)
 
         if prose:
-            self.messages.append({"role": "assistant", "content": prose})
+            self.add_assistant_message(prose)
         if tool_calls:
-            self._pending_tool_calls = list(tool_calls)
+            self.set_pending_tool_calls(tool_calls)
 
         return AgentResponse(
             text=prose,
@@ -716,7 +693,7 @@ class EchoAgent(SimulatedAgent):
         await _stream_text(response_text, on_chunk, self.response_delay)
 
         if prompt.strip():
-            self.messages.append({"role": "user", "content": prompt})
-        self.messages.append({"role": "assistant", "content": response_text})
+            self.add_user_message(prompt)
+        self.add_assistant_message(response_text)
 
         return AgentResponse(text=response_text)

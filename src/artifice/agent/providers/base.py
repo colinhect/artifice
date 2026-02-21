@@ -26,6 +26,14 @@ class StreamChunk:
     tool_calls: list[dict] = field(default_factory=list)
 
 
+@dataclass
+class StreamCallbacks:
+    """Callbacks for streaming LLM responses."""
+
+    on_chunk: Callable[[str], None] | None = None
+    on_thinking_chunk: Callable[[str], None] | None = None
+
+
 class Provider(ABC):
     """Abstract base class for LLM providers.
 

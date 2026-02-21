@@ -1,27 +1,35 @@
-"""Output blocks components."""
+"""Block widgets for the terminal display.
+
+This module re-exports all block classes from their respective modules
+for backward compatibility.
+"""
 
 from __future__ import annotations
 
-from artifice.ui.components.blocks.blocks import (
-    AgentInputBlock,
+from artifice.ui.components.blocks.base import BaseBlock
+from artifice.ui.components.blocks.input import AgentInputBlock, CodeInputBlock
+from artifice.ui.components.blocks.mixins import StatusMixin
+from artifice.ui.components.blocks.output import (
     AgentOutputBlock,
-    BaseBlock,
-    CodeInputBlock,
+    BufferedOutputBlock,
     CodeOutputBlock,
-    SystemBlock,
+    StreamingMarkdownBlock,
     ThinkingOutputBlock,
-    ToolCallBlock,
-    WidgetOutputBlock,
 )
+from artifice.ui.components.blocks.system import SystemBlock, WidgetOutputBlock
+from artifice.ui.components.blocks.tool import ToolCallBlock
 
 __all__ = [
-    "AgentInputBlock",
-    "AgentOutputBlock",
     "BaseBlock",
+    "StatusMixin",
     "CodeInputBlock",
-    "CodeOutputBlock",
-    "SystemBlock",
+    "AgentInputBlock",
+    "StreamingMarkdownBlock",
+    "AgentOutputBlock",
     "ThinkingOutputBlock",
-    "ToolCallBlock",
+    "BufferedOutputBlock",
+    "CodeOutputBlock",
     "WidgetOutputBlock",
+    "SystemBlock",
+    "ToolCallBlock",
 ]

@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Callable
 
+from artifice.agent.conversation import ConversationManager
 from artifice.agent.providers.base import Provider, TokenUsage
 from artifice.agent.tools.base import ToolCall, get_schemas_for
 
@@ -25,7 +26,7 @@ class AgentResponse:
     usage: TokenUsage | None = None
 
 
-class Agent:
+class Agent(ConversationManager):
     """Manages LLM conversation history and streaming via provider abstraction.
 
     Supports native OpenAI-style tool calls (python/shell) and maintains
@@ -47,18 +48,15 @@ class Agent:
         base_url: str | None = None,
         on_connect: Callable | None = None,
     ) -> None:
+        super().__init__()
         self.system_prompt = system_prompt
         self.tools = tools
         self._on_connect = on_connect
         self._connected = False
-        self.messages: list[dict] = []
-        self._pending_tool_calls: list[ToolCall] = []
 
-        # Initialize provider
         if provider is not None:
             self._provider = provider
         elif model is not None:
-            # Backward compatibility: create AnyLLMProvider
             from artifice.agent.providers.anyllm import AnyLLMProvider
 
             self._provider = AnyLLMProvider(
@@ -79,17 +77,15 @@ class Agent:
     ) -> AgentResponse:
         """Send a prompt, stream the response, and return the full result."""
         if prompt.strip():
-            self.messages.append({"role": "user", "content": prompt})
-            # If user sends a new message while there are pending tool calls,
-            # clear them - the user is choosing to respond instead of executing
+            self.add_user_message(prompt)
             if self._pending_tool_calls:
                 logger.debug(
                     "Clearing %d pending tool calls due to new user message",
                     len(self._pending_tool_calls),
                 )
-                self._pending_tool_calls.clear()
+                self.clear_pending_tool_calls()
 
-        messages = self.messages.copy()
+        messages = self._messages.copy()
         sys_content = self.system_prompt or ""
         if sys_content and (not messages or messages[0].get("role") != "system"):
             messages = [{"role": "system", "content": sys_content}, *messages]
@@ -97,7 +93,6 @@ class Agent:
         tool_schemas = get_schemas_for(self.tools) if self.tools else None
 
         try:
-            # Stream via provider
             text = ""
             thinking = ""
             usage: TokenUsage | None = None
@@ -135,16 +130,16 @@ class Agent:
                             rtc["function"]["arguments"] += tc["function"]["arguments"]
 
         except asyncio.CancelledError:
-            if prompt.strip() and self.messages and self.messages[-1]["role"] == "user":
-                self.messages.pop()
+            if prompt.strip():
+                self.pop_last_user_message()
             raise
         except Exception:
             import traceback
 
             error = f"Connection error: {traceback.format_exc()}"
             logger.error("%s", error)
-            if prompt.strip() and self.messages and self.messages[-1]["role"] == "user":
-                self.messages.pop()
+            if prompt.strip():
+                self.pop_last_user_message()
             return AgentResponse(text="", error=error)
 
         if not self._connected:
@@ -152,7 +147,6 @@ class Agent:
             if self._on_connect:
                 self._on_connect("connected")
 
-        # Parse raw tool calls into ToolCall objects
         tool_calls: list[ToolCall] = []
         logger.debug("Parsing %d raw tool calls", len(raw_tool_calls))
         for i, rtc in enumerate(raw_tool_calls):
@@ -171,18 +165,11 @@ class Agent:
             tool_calls.append(ToolCall(id=rtc["id"], name=name, args=args))
         logger.debug("Parsed %d tool calls", len(tool_calls))
 
-        # Update conversation history
         if tool_calls:
-            self.messages.append(
-                {
-                    "role": "assistant",
-                    "content": text if text else None,
-                    "tool_calls": raw_tool_calls,
-                }
-            )
-            self._pending_tool_calls = list(tool_calls)
+            self.add_assistant_message(text if text else None, raw_tool_calls)
+            self.set_pending_tool_calls(tool_calls)
         elif text:
-            self.messages.append({"role": "assistant", "content": text})
+            self.add_assistant_message(text)
 
         return AgentResponse(
             text=text,
@@ -190,26 +177,3 @@ class Agent:
             thinking=thinking or None,
             usage=usage,
         )
-
-    @property
-    def has_pending_tool_calls(self) -> bool:
-        """Check if there are pending tool calls to execute."""
-        return len(self._pending_tool_calls) > 0
-
-    def add_tool_result(self, tool_call_id: str, content: str) -> None:
-        """Add a tool execution result to conversation history."""
-        self.messages.append(
-            {
-                "role": "tool",
-                "tool_call_id": tool_call_id,
-                "content": content,
-            }
-        )
-        self._pending_tool_calls = [
-            tc for tc in self._pending_tool_calls if tc.id != tool_call_id
-        ]
-
-    def clear(self) -> None:
-        """Clear conversation history."""
-        self.messages = []
-        self._pending_tool_calls = []
