@@ -147,8 +147,8 @@ def test_registry_contains_expected_tools():
     """Test that TOOLS contains python and shell (and stubs)."""
     assert "python" in TOOLS
     assert "shell" in TOOLS
-    assert "read_file" in TOOLS
-    assert "write_file" in TOOLS
+    assert "read" in TOOLS
+    assert "write" in TOOLS
     assert "web_search" in TOOLS
     assert "web_fetch" in TOOLS
     assert "system_info" in TOOLS
@@ -220,9 +220,9 @@ def test_toolcall_display_language():
     assert tc_sh.display_language == "bash"
 
 
-def test_toolcall_display_text_read_file():
+def test_toolcall_display_text_read():
     """Test ToolCall.display_text for stub tools."""
-    tc = ToolCall(id="3", name="read_file", args={"path": "/tmp/foo.txt"})
+    tc = ToolCall(id="3", name="read", args={"path": "/tmp/foo.txt"})
     assert tc.display_text == "/tmp/foo.txt"
     assert tc.display_language == "text"
 
@@ -234,19 +234,19 @@ def test_toolcall_unknown_tool():
     assert tc.display_language == "text"
 
 
-def test_registry_contains_file_search():
-    """Test that file_search tool is registered."""
-    assert "file_search" in TOOLS
-    assert TOOLS["file_search"].display_arg == "pattern"
+def test_registry_contains_glob():
+    """Test that glob tool is registered."""
+    assert "glob" in TOOLS
+    assert TOOLS["glob"].display_arg == "pattern"
 
 
 def test_tools_with_executors():
     """Test that non-code tools have executors, code tools do not."""
     assert TOOLS["python"].executor is None
     assert TOOLS["shell"].executor is None
-    assert TOOLS["read_file"].executor is not None
-    assert TOOLS["write_file"].executor is not None
-    assert TOOLS["file_search"].executor is not None
+    assert TOOLS["read"].executor is not None
+    assert TOOLS["write"].executor is not None
+    assert TOOLS["glob"].executor is not None
     assert TOOLS["web_search"].executor is not None
     assert TOOLS["web_fetch"].executor is not None
     assert TOOLS["system_info"].executor is not None
@@ -256,12 +256,12 @@ def test_tools_with_executors():
 
 
 @pytest.mark.asyncio
-async def test_execute_read_file(tmp_path):
-    """Test read_file executor reads file contents with line numbers."""
+async def test_execute_read(tmp_path):
+    """Test read executor reads file contents with line numbers."""
     f = tmp_path / "test.txt"
     f.write_text("line1\nline2\nline3\n")
 
-    tc = ToolCall(id="1", name="read_file", args={"path": str(f)})
+    tc = ToolCall(id="1", name="read", args={"path": str(f)})
     result = await execute_tool_call(tc)
 
     assert result is not None
@@ -271,14 +271,12 @@ async def test_execute_read_file(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_execute_read_file_with_offset_and_limit(tmp_path):
-    """Test read_file executor respects offset and limit."""
+async def test_execute_read_with_offset_and_limit(tmp_path):
+    """Test read executor respects offset and limit."""
     f = tmp_path / "test.txt"
     f.write_text("a\nb\nc\nd\ne\n")
 
-    tc = ToolCall(
-        id="1", name="read_file", args={"path": str(f), "offset": 1, "limit": 2}
-    )
+    tc = ToolCall(id="1", name="read", args={"path": str(f), "offset": 1, "limit": 2})
     result = await execute_tool_call(tc)
 
     assert result is not None
@@ -289,9 +287,9 @@ async def test_execute_read_file_with_offset_and_limit(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_execute_read_file_not_found():
-    """Test read_file executor handles missing files."""
-    tc = ToolCall(id="1", name="read_file", args={"path": "/nonexistent/file.txt"})
+async def test_execute_read_not_found():
+    """Test read executor handles missing files."""
+    tc = ToolCall(id="1", name="read", args={"path": "/nonexistent/file.txt"})
     result = await execute_tool_call(tc)
 
     assert result is not None
@@ -299,13 +297,11 @@ async def test_execute_read_file_not_found():
 
 
 @pytest.mark.asyncio
-async def test_execute_write_file(tmp_path):
-    """Test write_file executor creates files."""
+async def test_execute_write(tmp_path):
+    """Test write executor creates files."""
     f = tmp_path / "output.txt"
 
-    tc = ToolCall(
-        id="1", name="write_file", args={"path": str(f), "content": "hello world"}
-    )
+    tc = ToolCall(id="1", name="write", args={"path": str(f), "content": "hello world"})
     result = await execute_tool_call(tc)
 
     assert result is not None
@@ -314,11 +310,11 @@ async def test_execute_write_file(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_execute_write_file_creates_dirs(tmp_path):
-    """Test write_file executor creates parent directories."""
+async def test_execute_write_creates_dirs(tmp_path):
+    """Test write executor creates parent directories."""
     f = tmp_path / "sub" / "dir" / "file.txt"
 
-    tc = ToolCall(id="1", name="write_file", args={"path": str(f), "content": "nested"})
+    tc = ToolCall(id="1", name="write", args={"path": str(f), "content": "nested"})
     result = await execute_tool_call(tc)
 
     assert result is not None
@@ -326,15 +322,13 @@ async def test_execute_write_file_creates_dirs(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_execute_file_search(tmp_path):
-    """Test file_search executor finds files by glob pattern."""
+async def test_execute_glob(tmp_path):
+    """Test glob executor finds files by glob pattern."""
     (tmp_path / "a.py").write_text("")
     (tmp_path / "b.py").write_text("")
     (tmp_path / "c.txt").write_text("")
 
-    tc = ToolCall(
-        id="1", name="file_search", args={"pattern": "*.py", "path": str(tmp_path)}
-    )
+    tc = ToolCall(id="1", name="glob", args={"pattern": "*.py", "path": str(tmp_path)})
     result = await execute_tool_call(tc)
 
     assert result is not None
@@ -344,11 +338,9 @@ async def test_execute_file_search(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_execute_file_search_no_matches(tmp_path):
-    """Test file_search executor when no files match."""
-    tc = ToolCall(
-        id="1", name="file_search", args={"pattern": "*.xyz", "path": str(tmp_path)}
-    )
+async def test_execute_glob_no_matches(tmp_path):
+    """Test glob executor when no files match."""
+    tc = ToolCall(id="1", name="glob", args={"pattern": "*.xyz", "path": str(tmp_path)})
     result = await execute_tool_call(tc)
 
     assert result is not None

@@ -11,12 +11,12 @@ from artifice.agent.tools.base import (
     get_schemas_for,
 )
 from artifice.agent.tools.executors import (
-    execute_file_search,
-    execute_read_file,
+    execute_glob,
+    execute_read,
     execute_system_info,
     execute_web_fetch,
     execute_web_search,
-    execute_write_file,
+    execute_write,
 )
 
 __all__ = [
@@ -26,10 +26,10 @@ __all__ = [
     "TOOLS",
     "get_all_schemas",
     "get_schemas_for",
-    "execute_file_search",
-    "execute_read_file",
+    "execute_glob",
+    "execute_read",
     "execute_system_info",
     "execute_web_fetch",
     "execute_web_search",
-    "execute_write_file",
+    "execute_write",
 ]

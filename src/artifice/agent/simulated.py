@@ -210,41 +210,41 @@ print(fibonacci(10))
 That covers the basics. Markdown is expressive enough for most documentation needs without being overwhelming.\
 """
 
-_RESP_READ_FILE = """\
+_RESP_READ = """\
 Let me read the file and see what we're working with.
 
-<read_file>path=src/main.py</read_file>
+<read>path=src/main.py</read>
 
 I'll take a look at the contents and walk you through the key parts once it loads.\
 """
 
-_RESP_WRITE_FILE = """\
+_RESP_WRITE = """\
 I'll create that file for you now.
 
-<write_file>path=output/results.txt
+<write>path=output/results.txt
 content=# Analysis Results
 
 Summary of findings:
 - Total records processed: 1,247
 - Valid entries: 1,198 (96.1%)
 - Anomalies detected: 49 (3.9%)
-</write_file>
+</write>
 
 The file has been written. Let me verify it looks correct:
 
-<read_file>path=output/results.txt</read_file>
+<read>path=output/results.txt</read>
 
 Everything looks good. Let me know if you need any changes.\
 """
 
-_RESP_FILE_SEARCH = """\
+_RESP_GLOB = """\
 Let me find those files for you.
 
-<file_search>pattern=**/*.py</file_search>
+<glob>pattern=**/*.py</glob>
 
 That will locate all Python files in the project. If you need to narrow it down, I can also search for specific patterns:
 
-<file_search>pattern=**/test_*.py</file_search>
+<glob>pattern=**/test_*.py</glob>
 
 Once we see the results, I can help you navigate to the right file.\
 """
@@ -335,24 +335,24 @@ _DEFAULT_SCENARIOS: list[dict] = [
     },
     {
         "pattern": r"read|open|view|show|cat|contents",
-        "response": _RESP_READ_FILE,
+        "response": _RESP_READ,
         "thinking": (
-            "The user wants to read a file. I'll use the read_file tool to fetch its contents."
+            "The user wants to read a file. I'll use the read tool to fetch its contents."
         ),
     },
     {
         "pattern": r"write|create|save|output|generate file",
-        "response": _RESP_WRITE_FILE,
+        "response": _RESP_WRITE,
         "thinking": (
-            "The user wants to create or write a file. I'll use write_file to create it, "
-            "then verify with read_file."
+            "The user wants to create or write a file. I'll use write to create it, "
+            "then verify with read."
         ),
     },
     {
         "pattern": r"find|search file|locate|glob|where",
-        "response": _RESP_FILE_SEARCH,
+        "response": _RESP_GLOB,
         "thinking": (
-            "The user wants to find files in the project. I'll use file_search "
+            "The user wants to find files in the project. I'll use glob "
             "with glob patterns to locate them."
         ),
     },

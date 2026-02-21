@@ -18,7 +18,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-async def execute_read_file(args: dict[str, Any]) -> str:
+async def execute_read(args: dict[str, Any]) -> str:
     """Read file contents, optionally with offset and limit."""
     path = os.path.expanduser(args["path"])
     offset = args.get("offset", 0)
@@ -53,7 +53,7 @@ async def execute_read_file(args: dict[str, Any]) -> str:
     return "".join(numbered) if numbered else "(empty file)"
 
 
-async def execute_write_file(args: dict[str, Any]) -> str:
+async def execute_write(args: dict[str, Any]) -> str:
     """Write content to a file, creating directories as needed."""
     path = os.path.expanduser(args["path"])
     content = args["content"]
@@ -73,7 +73,7 @@ async def execute_write_file(args: dict[str, Any]) -> str:
         return f"Error writing file: {e}"
 
 
-async def execute_file_search(args: dict[str, Any]) -> str:
+async def execute_glob(args: dict[str, Any]) -> str:
     """Search for files matching a glob pattern."""
     pattern = args["pattern"]
     path = os.path.expanduser(args.get("path", "."))

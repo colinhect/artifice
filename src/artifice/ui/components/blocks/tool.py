@@ -16,7 +16,7 @@ class ToolCallBlock(CodeInputBlock):
     detector XML hack used previously. Displays a tool-name label above
     the syntax-highlighted code so the user can inspect and execute it.
 
-    For tools with a direct executor (read_file, web_fetch, etc.) the
+    For tools with a direct executor (read, write, glob, web_fetch, etc.) the
     ``tool_args`` dict carries the full arguments so the executor can be
     invoked without reparsing the display text.
     """

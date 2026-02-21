@@ -348,7 +348,7 @@ class ArtificeTerminal(Widget):
         """Handle block execution: execute code from a block."""
         block = event.block
 
-        # Check if this is a tool call with a direct executor (read_file, etc.)
+        # Check if this is a tool call with a direct executor (read, write, glob, etc.)
         if isinstance(block, ToolCallBlock) and block.tool_args:
             tool_def = TOOLS.get(block.tool_name)
             if tool_def and tool_def.executor:

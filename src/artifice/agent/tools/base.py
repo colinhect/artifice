@@ -6,12 +6,12 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from artifice.agent.tools.executors import (
-    execute_file_search,
-    execute_read_file,
+    execute_glob,
+    execute_read,
     execute_system_info,
     execute_web_fetch,
     execute_web_search,
-    execute_write_file,
+    execute_write,
 )
 
 
@@ -91,7 +91,7 @@ def tool(
     """Simplified tool registration helper.
 
     Args:
-        name: Tool name (e.g., "read_file").
+        name: Tool name (e.g., "read").
         description: Human-readable description.
         params: Parameter properties dict ({"param_name": {"type": "string", ...}}).
         display_arg: Parameter to display in the UI (defaults to first param).
@@ -152,7 +152,7 @@ tool(
 )
 
 tool(
-    name="read_file",
+    name="read",
     description="Read the contents of a file.",
     params={
         "path": {"type": "string", "description": "Absolute or relative file path."},
@@ -163,21 +163,21 @@ tool(
         "limit": {"type": "integer", "description": "Maximum number of lines to read."},
     },
     required=["path"],
-    executor=execute_read_file,
+    executor=execute_read,
 )
 
 tool(
-    name="write_file",
+    name="write",
     description="Write or create a file with the given content.",
     params={
         "path": {"type": "string", "description": "Absolute or relative file path."},
         "content": {"type": "string", "description": "Content to write to the file."},
     },
-    executor=execute_write_file,
+    executor=execute_write,
 )
 
 tool(
-    name="file_search",
+    name="glob",
     description="Search for files matching a glob pattern.",
     params={
         "pattern": {
@@ -190,7 +190,7 @@ tool(
         },
     },
     required=["pattern"],
-    executor=execute_file_search,
+    executor=execute_glob,
 )
 
 tool(
