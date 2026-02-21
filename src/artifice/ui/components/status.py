@@ -50,9 +50,16 @@ class StatusIndicatorManager:
                     context_window = agent.get("context_window")
                     if context_window and usage.input_tokens:
                         pct = usage.input_tokens / context_window * 100
-                        status += f"  [{pct:.0f}% of {format_tokens(context_window)} · {format_tokens(usage.input_tokens)}in / {format_tokens(usage.output_tokens)}out]"
+                        status += (
+                            f"  [{pct:.0f}% of {format_tokens(context_window)} · "
+                            f"{format_tokens(usage.input_tokens)}in / "
+                            f"{format_tokens(usage.output_tokens)}out]"
+                        )
                     else:
-                        status += f"  [{format_tokens(usage.input_tokens)}in / {format_tokens(usage.output_tokens)}out]"
+                        status += (
+                            f"  [{format_tokens(usage.input_tokens)}in / "
+                            f"{format_tokens(usage.output_tokens)}out]"
+                        )
                 self._agent.update(status)
                 return
         self._agent.update("")

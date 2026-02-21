@@ -46,11 +46,11 @@ class AnyLLMProvider(Provider):
         """Stream completion from any-llm."""
         from any_llm import acompletion
 
-        kwargs: dict[str, Any] = dict(
-            model=self.model,
-            messages=messages,
-            stream=True,
-        )
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": True,
+        }
 
         if self._api_key is not None:
             kwargs["api_key"] = self._api_key
@@ -64,12 +64,12 @@ class AnyLLMProvider(Provider):
 
         try:
             stream = await acompletion(**kwargs)
-        except Exception:
+        except Exception as exc:
             import traceback
 
             error = f"Connection error: {traceback.format_exc()}"
             logger.error("%s", error)
-            raise ConnectionError(error)
+            raise ConnectionError(error) from exc
 
         async for chunk in cast(AsyncIterator[Any], stream):
             stream_chunk = StreamChunk()

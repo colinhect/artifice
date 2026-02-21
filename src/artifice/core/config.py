@@ -143,7 +143,7 @@ def load_config() -> tuple[ArtificeConfig, str | None]:
 
     try:
         # Read and parse the YAML file
-        with open(init_path, "r") as f:
+        with open(init_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         # If the file is empty or invalid YAML, return default config

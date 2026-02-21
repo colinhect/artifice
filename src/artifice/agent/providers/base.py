@@ -9,6 +9,8 @@ from typing import Any, AsyncIterator, Callable
 
 @dataclass
 class TokenUsage:
+    """Token usage statistics from LLM responses."""
+
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0

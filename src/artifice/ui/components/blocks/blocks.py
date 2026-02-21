@@ -14,10 +14,14 @@ from artifice.execution.base import ExecutionResult, ExecutionStatus
 
 
 class BaseBlock(Static):
+    """Base class for all output block widgets."""
+
     pass
 
 
 class CodeInputBlock(BaseBlock):
+    """Block for displaying code input with syntax highlighting and status indicator."""
+
     def __init__(
         self,
         code: str,
@@ -57,6 +61,7 @@ class CodeInputBlock(BaseBlock):
             yield self._code
 
     def update_status(self, result: ExecutionResult) -> None:
+        """Update the status indicator based on execution result."""
         self._loading_indicator.styles.display = "none"
         if result.status == ExecutionStatus.SUCCESS:
             self._status_icon.update("\u2714")
@@ -167,9 +172,11 @@ class StreamingMarkdownBlock(BaseBlock):
         self._streaming = False
 
     def mark_success(self) -> None:
+        """Mark the block as successful."""
         self._status_indicator.styles.display = "block"
 
     def mark_failed(self) -> None:
+        """Mark the block as failed."""
         self._status_indicator.styles.display = "block"
 
 
@@ -219,6 +226,7 @@ class BufferedOutputBlock(BaseBlock):
             self._output.update(self._output_str)
 
     def toggle_markdown(self) -> None:
+        """Toggle between static and markdown rendering."""
         self._render_markdown = not self._render_markdown
         if self._render_markdown:
             if not self._markdown_loaded:
@@ -240,6 +248,8 @@ class BufferedOutputBlock(BaseBlock):
 
 
 class CodeOutputBlock(BufferedOutputBlock):
+    """Block for displaying code output with optional markdown rendering."""
+
     _STATIC_CSS_CLASS = "code-output"
     _MARKDOWN_CSS_CLASS = "markdown-output"
 
@@ -259,17 +269,21 @@ class CodeOutputBlock(BufferedOutputBlock):
             yield self._markdown
 
     def on_mount(self) -> None:
+        """Hide markdown widget on mount."""
         self._markdown.styles.display = "none"
 
     def append_output(self, output: str) -> None:
+        """Append output text to the buffer."""
         self._output_str += output
         self._dirty = True
 
     def append_error(self, output: str) -> None:
+        """Append error output and mark as failed."""
         self.append_output(output)
         self.mark_failed()
 
     def mark_failed(self) -> None:
+        """Mark the output as having an error."""
         if not self._has_error:
             self._has_error = True
             if self._output:
@@ -296,6 +310,8 @@ class WidgetOutputBlock(BaseBlock):
 
 
 class AgentInputBlock(BaseBlock):
+    """Block for displaying user input prompts."""
+
     def __init__(self, prompt: str, in_context: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._status_indicator = Static(">", classes="status-indicator status-success")
@@ -320,6 +336,8 @@ class AgentInputBlock(BaseBlock):
 
 
 class SystemBlock(BufferedOutputBlock):
+    """Block for displaying system messages."""
+
     _STATIC_CSS_CLASS = "system-output"
     _MARKDOWN_CSS_CLASS = "system-markdown-output"
 

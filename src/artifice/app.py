@@ -1,3 +1,5 @@
+"""Main application entry point for Artifice."""
+
 from __future__ import annotations
 
 import argparse
@@ -34,6 +36,8 @@ class ArtificeHeader(Static):
 
 
 class ArtificeApp(App):
+    """Main Textual application for Artifice terminal interface."""
+
     TITLE = "Artifice Terminal"
     CSS_PATH = "styles.tcss"
 
@@ -57,6 +61,7 @@ class ArtificeApp(App):
         yield footer
 
     def on_mount(self) -> None:
+        """Register and apply the Artifice theme on mount."""
         self.register_theme(create_artifice_theme())
         self.theme = "artifice"
 

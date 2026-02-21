@@ -1,3 +1,5 @@
+"""Python code executor with async streaming support."""
+
 from __future__ import annotations
 
 import asyncio

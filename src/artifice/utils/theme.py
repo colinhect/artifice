@@ -1,9 +1,12 @@
+"""Theme configuration for Artifice."""
+
 from __future__ import annotations
 
 from textual.theme import Theme
 
 
 def create_artifice_theme() -> Theme:
+    """Create the Artifice color theme based on Nord color palette."""
     # black = "#07080A"
     dark_gray = "#3B4252"
     gray = "#434C5E"

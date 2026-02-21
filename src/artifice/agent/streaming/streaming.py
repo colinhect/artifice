@@ -234,6 +234,7 @@ class StreamManager:
 
     @property
     def current_detector(self) -> StreamingFenceDetector | None:
+        """Get the current fence detector."""
         return self._current_detector
 
     @current_detector.setter

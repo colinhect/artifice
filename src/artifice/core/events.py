@@ -59,7 +59,6 @@ class InputMode(enum.Enum):
         """Get the next mode in the cycle (python -> ai -> shell -> python)."""
         if self == InputMode.PYTHON:
             return InputMode.AI
-        elif self == InputMode.AI:
+        if self == InputMode.AI:
             return InputMode.SHELL
-        else:  # SHELL
-            return InputMode.PYTHON
+        return InputMode.PYTHON

@@ -280,62 +280,96 @@ _DEFAULT_SCENARIOS: list[dict] = [
     {
         "pattern": r"structure|layout|project|files",
         "response": _RESP_PROJECT_STRUCTURE,
-        "thinking": "The user wants to understand the project structure. I should explore the filesystem and explain what I find.",
+        "thinking": (
+            "The user wants to understand the project structure. "
+            "I should explore the filesystem and explain what I find."
+        ),
     },
     {
         "pattern": r"data|csv|analy|pandas",
         "response": _RESP_DATA_ANALYSIS,
-        "thinking": "They want to analyze some data. I'll use pandas to load and summarize the CSV, then suggest next steps for cleaning.",
+        "thinking": (
+            "They want to analyze some data. I'll use pandas to load and summarize "
+            "the CSV, then suggest next steps for cleaning."
+        ),
     },
     {
         "pattern": r"refactor|clean|improve|review",
         "response": _RESP_REFACTOR,
-        "thinking": "Let me look at the code quality issues. I see duplicated validation logic, old-style path handling, and missing type hints. I'll prioritize by impact.",
+        "thinking": (
+            "Let me look at the code quality issues. I see duplicated validation logic, "
+            "old-style path handling, and missing type hints. I'll prioritize by impact."
+        ),
     },
     {
         "pattern": r"bug|error|fix|debug|crash|fail",
         "response": _RESP_DEBUG,
-        "thinking": "There's a bug to track down. Let me first reproduce it, then inspect the failing input to understand the root cause before proposing a fix.",
+        "thinking": (
+            "There's a bug to track down. Let me first reproduce it, then inspect "
+            "the failing input to understand the root cause before proposing a fix."
+        ),
     },
     {
         "pattern": r"disk|memory|system|server|process",
         "response": _RESP_SYSADMIN,
-        "thinking": "They need system diagnostics. I'll check disk, memory, and top processes to identify any resource pressure.",
+        "thinking": (
+            "They need system diagnostics. I'll check disk, memory, "
+            "and top processes to identify any resource pressure."
+        ),
     },
     {
         "pattern": r"markdown|format|demo|test",
         "response": _RESP_MARKDOWN_DEMO,
-        "thinking": "Let me put together a comprehensive markdown demo that exercises all the major formatting features — headers, lists, tables, code, and blockquotes.",
+        "thinking": (
+            "Let me put together a comprehensive markdown demo that exercises "
+            "all the major formatting features — headers, lists, tables, code, and blockquotes."
+        ),
     },
     {
         "pattern": r"calculat|math|add|subtract|multiply|divide",
         "response": _RESP_CALCULATE,
-        "thinking": "The user wants me to perform a calculation. I'll use Python to compute the result.",
+        "thinking": (
+            "The user wants me to perform a calculation. I'll use Python to compute the result."
+        ),
     },
     {
         "pattern": r"read|open|view|show|cat|contents",
         "response": _RESP_READ_FILE,
-        "thinking": "The user wants to read a file. I'll use the read_file tool to fetch its contents.",
+        "thinking": (
+            "The user wants to read a file. I'll use the read_file tool to fetch its contents."
+        ),
     },
     {
         "pattern": r"write|create|save|output|generate file",
         "response": _RESP_WRITE_FILE,
-        "thinking": "The user wants to create or write a file. I'll use write_file to create it, then verify with read_file.",
+        "thinking": (
+            "The user wants to create or write a file. I'll use write_file to create it, "
+            "then verify with read_file."
+        ),
     },
     {
         "pattern": r"find|search file|locate|glob|where",
         "response": _RESP_FILE_SEARCH,
-        "thinking": "The user wants to find files in the project. I'll use file_search with glob patterns to locate them.",
+        "thinking": (
+            "The user wants to find files in the project. I'll use file_search "
+            "with glob patterns to locate them."
+        ),
     },
     {
         "pattern": r"search|google|look up|research|web search",
         "response": _RESP_WEB_SEARCH,
-        "thinking": "The user wants to search the web for information. I'll use web_search to find relevant results.",
+        "thinking": (
+            "The user wants to search the web for information. "
+            "I'll use web_search to find relevant results."
+        ),
     },
     {
         "pattern": r"fetch|url|http|webpage|download|web page",
         "response": _RESP_WEB_FETCH,
-        "thinking": "The user wants to fetch content from a URL. I'll use web_fetch to retrieve and summarize the page.",
+        "thinking": (
+            "The user wants to fetch content from a URL. "
+            "I'll use web_fetch to retrieve and summarize the page."
+        ),
     },
 ]
 
@@ -481,23 +515,28 @@ class SimulatedAgent:
         self.default_thinking: str | None = _DEFAULT_THINKING
 
     def configure_defaults(self):
+        """Reset to default scenarios and responses."""
         self.scenarios = list(_DEFAULT_SCENARIOS)
         self.default_response = _DEFAULT_RESPONSE
         self.default_thinking = _DEFAULT_THINKING
 
     def configure_scenarios(self, scenarios: list[dict[str, Any]]) -> None:
+        """Replace scenarios with a custom list."""
         self.scenarios = list(scenarios)
         self.current_scenario_index = 0
 
     def set_default_response(self, response: str) -> None:
+        """Set the default response for unmatched prompts."""
         self.default_response = response
 
     def set_default_thinking(self, thinking: str | None) -> None:
+        """Set the default thinking text for unmatched prompts."""
         self.default_thinking = thinking
 
     def add_scenario(
         self, response: str, pattern: str | None = None, thinking: str | None = None
     ) -> None:
+        """Add a scenario with optional pattern matching and thinking text."""
         scenario: dict[str, Any] = {"response": response}
         if pattern is not None:
             scenario["pattern"] = pattern
@@ -523,6 +562,7 @@ class SimulatedAgent:
         on_chunk: Callable | None = None,
         on_thinking_chunk: Callable | None = None,
     ) -> AgentResponse:
+        """Send a prompt and return a simulated response."""
         if self._on_connect:
             self._on_connect("connected")
             self._on_connect = None
@@ -569,9 +609,11 @@ class SimulatedAgent:
 
     @property
     def has_pending_tool_calls(self) -> bool:
+        """Check if there are pending tool calls to execute."""
         return len(self._pending_tool_calls) > 0
 
     def add_tool_result(self, tool_call_id: str, content: str) -> None:
+        """Add a tool execution result to conversation history."""
         self.messages.append(
             {"role": "tool", "tool_call_id": tool_call_id, "content": content}
         )
@@ -591,6 +633,7 @@ class SimulatedAgent:
         self._tc_counter = 0
 
     def get_conversation_history(self) -> list[dict[str, Any]]:
+        """Return a copy of the conversation history."""
         return list(self.messages)
 
 

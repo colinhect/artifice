@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AgentResponse:
+    """Response from an Agent completion request."""
+
     text: str
     tool_calls: list[ToolCall] = field(default_factory=list)
     thinking: str | None = None
@@ -194,6 +196,7 @@ class Agent:
 
     @property
     def has_pending_tool_calls(self) -> bool:
+        """Check if there are pending tool calls to execute."""
         return len(self._pending_tool_calls) > 0
 
     def add_tool_result(self, tool_call_id: str, content: str) -> None:

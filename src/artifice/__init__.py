@@ -1,3 +1,5 @@
+"""Artifice - AI-powered terminal interface."""
+
 from __future__ import annotations
 
 from artifice.ui.widget import ArtificeTerminal

@@ -241,6 +241,7 @@ class ArtificeTerminal(Widget):
         self.output.append_block(block)
 
     def on_mount(self) -> None:
+        """Initialize the terminal on mount."""
         self._status_manager.update_agent_info()
         if (
             self._system_prompt_path is not None

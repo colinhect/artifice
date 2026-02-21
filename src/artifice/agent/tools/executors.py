@@ -25,7 +25,7 @@ async def execute_read_file(args: dict[str, Any]) -> str:
         return f"Error: File not found: {path}"
 
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             lines = f.readlines()
     except PermissionError:
         return f"Error: Permission denied: {path}"
@@ -54,7 +54,7 @@ async def execute_write_file(args: dict[str, Any]) -> str:
         parent = os.path.dirname(path)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(content)
         return f"Wrote {len(content)} bytes to {path}"
     except Exception as e:

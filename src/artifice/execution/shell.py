@@ -1,3 +1,5 @@
+"""Shell and tmux command execution with streaming output."""
+
 from __future__ import annotations
 
 import asyncio
@@ -175,7 +177,7 @@ class TmuxShellExecutor:
 
     def _read_content(self, tmpfile: str) -> str:
         """Read and clean the pipe-pane output file."""
-        with open(tmpfile, "r", errors="replace") as f:
+        with open(tmpfile, "r", encoding="utf-8", errors="replace") as f:
             return strip_ansi_escapes(f.read())
 
     async def execute(
@@ -259,12 +261,11 @@ class TmuxShellExecutor:
                         on_output(command_output[streamed_len:])
                     result.output = command_output
                     break
-                else:
-                    if len(body) > streamed_len:
-                        chunk = body[streamed_len:]
-                        streamed_len = len(body)
-                        if chunk and on_output:
-                            on_output(chunk)
+                if len(body) > streamed_len:
+                    chunk = body[streamed_len:]
+                    streamed_len = len(body)
+                    if chunk and on_output:
+                        on_output(chunk)
 
             # Phase 2: Query exit code (if enabled)
             if self.check_exit_code:

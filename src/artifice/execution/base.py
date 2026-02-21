@@ -1,3 +1,5 @@
+"""Base types for code execution."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

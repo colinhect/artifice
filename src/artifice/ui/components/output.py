@@ -118,6 +118,7 @@ class TerminalOutput(HighlightableContainerMixin, VerticalScroll):
     ]
 
     def append_block(self, block: BaseBlock, scroll: bool = True):
+        """Append a block to the output and optionally scroll to end."""
         self._blocks.append(block)
         self.mount(block)
         if scroll:
