@@ -61,8 +61,6 @@ _art() {
         '--list-prompts[List available prompt names]' \\
         '--print-completion[Print shell completion script]:shell:(bash zsh fish)'
 }
-
-_art
 """
 
 FISH_COMPLETION = """complete -c art -f

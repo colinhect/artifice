@@ -106,6 +106,51 @@ Options:
   -s, --system-prompt SYSTEM_PROMPT
                       Override system prompt
   --logging           Enable debug logging to stderr
+  --list-agents       List available agent names
+  --list-prompts      List available prompt names
+  --print-completion {bash,zsh,fish}
+                      Print shell completion script
+```
+
+### Shell Completion
+
+Art supports shell completion for Bash, Zsh, and Fish shells with dynamic agent and prompt name completion.
+
+#### Zsh
+
+```bash
+# Install completion to zsh site-functions
+art --print-completion zsh | sudo tee /usr/local/share/zsh/site-functions/_art
+
+# Or manually add to your zsh configuration
+art --print-completion zsh > ~/.zsh/completions/_art
+# Then add to ~/.zshrc:
+# fpath=(~/.zsh/completions $fpath)
+# autoload -U compinit && compinit
+```
+
+#### Bash
+
+```bash
+# Install system-wide
+sudo art --print-completion bash > /etc/bash_completion.d/art
+
+# Or add to your ~/.bashrc or ~/.bash_profile:
+art --print-completion bash >> ~/.bash_completion
+source ~/.bash_completion
+```
+
+#### Fish
+
+```bash
+# Install to fish completions directory
+art --print-completion fish > ~/.config/fish/completions/art.fish
+```
+
+After installation, restart your shell or reload your configuration:
+
+```bash
+exec zsh  # or exec bash
 ```
 
 ---

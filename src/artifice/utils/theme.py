@@ -42,7 +42,7 @@ def create_artifice_theme() -> Theme:
         secondary=aurora_3,
         accent=frost_0,
         foreground=snow_storm_2,
-        #background=polar_night_0,
+        # background=polar_night_0,
         success=aurora_3,
         warning=frost_2,
         error=aurora_0,

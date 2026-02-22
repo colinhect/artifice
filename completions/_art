@@ -27,4 +27,3 @@ _art() {
         '--print-completion[Print shell completion script]:shell:(bash zsh fish)'
 }
 
-_art
