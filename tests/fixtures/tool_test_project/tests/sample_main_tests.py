@@ -1,6 +1,5 @@
 """Tests for the main module."""
 
-import pytest
 
 from src.main import greet, calculate_sum, process_data, DataProcessor
 
