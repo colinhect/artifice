@@ -131,7 +131,7 @@ src/artifice/
 ```
 
 ## Configuration
-- User config at `~/.config/artifice/init.yaml`
+- User config at `~/.artifice/config.yaml`
 - Load via `load_config()` from `artifice.core.config`
 - All settings have sensible defaults
 - Command-line args override config

@@ -1,6 +1,7 @@
 """Tests for configuration loading."""
 
 import yaml
+from pathlib import Path
 
 from artifice.core.config import ArtificeConfig, load_config
 
@@ -18,12 +19,12 @@ def test_default_config():
 
 def test_load_empty_yaml(tmp_path, monkeypatch):
     """Test loading an empty YAML file returns default config."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
-    init_file.write_text("")
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("")
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is None
@@ -33,9 +34,9 @@ def test_load_empty_yaml(tmp_path, monkeypatch):
 
 def test_load_basic_yaml(tmp_path, monkeypatch):
     """Test loading a basic YAML configuration."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
+    config_file = config_dir / "config.yaml"
 
     yaml_content = {
         "agent": "llama",
@@ -43,9 +44,9 @@ def test_load_basic_yaml(tmp_path, monkeypatch):
         "system_prompt": "Test prompt",
         "send_user_commands_to_agent": False,
     }
-    init_file.write_text(yaml.dump(yaml_content))
+    config_file.write_text(yaml.dump(yaml_content))
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is None
@@ -57,9 +58,9 @@ def test_load_basic_yaml(tmp_path, monkeypatch):
 
 def test_load_models_dict(tmp_path, monkeypatch):
     """Test loading agents dictionary configuration."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
+    config_file = config_dir / "config.yaml"
 
     yaml_content = {
         "agent": "llama",
@@ -68,9 +69,9 @@ def test_load_models_dict(tmp_path, monkeypatch):
             "what": {"provider": "ollama", "model": "what-model"},
         },
     }
-    init_file.write_text(yaml.dump(yaml_content))
+    config_file.write_text(yaml.dump(yaml_content))
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is None
@@ -82,9 +83,9 @@ def test_load_models_dict(tmp_path, monkeypatch):
 
 def test_load_all_display_settings(tmp_path, monkeypatch):
     """Test loading all display settings."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
+    config_file = config_dir / "config.yaml"
 
     yaml_content = {
         "banner": True,
@@ -92,9 +93,9 @@ def test_load_all_display_settings(tmp_path, monkeypatch):
         "agent_markdown": False,
         "shell_markdown": True,
     }
-    init_file.write_text(yaml.dump(yaml_content))
+    config_file.write_text(yaml.dump(yaml_content))
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is None
@@ -106,16 +107,16 @@ def test_load_all_display_settings(tmp_path, monkeypatch):
 
 def test_load_shell_init_script(tmp_path, monkeypatch):
     """Test loading shell init script."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
+    config_file = config_dir / "config.yaml"
 
     yaml_content = {
         "shell_init_script": "alias ll='ls -la'\nexport MY_VAR=value",
     }
-    init_file.write_text(yaml.dump(yaml_content))
+    config_file.write_text(yaml.dump(yaml_content))
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is None
@@ -124,18 +125,18 @@ def test_load_shell_init_script(tmp_path, monkeypatch):
 
 def test_load_custom_settings(tmp_path, monkeypatch):
     """Test that custom settings are stored in _custom dict."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
+    config_file = config_dir / "config.yaml"
 
     yaml_content = {
         "agent": "llama",
         "custom_key": "custom_value",
         "another_custom": 42,
     }
-    init_file.write_text(yaml.dump(yaml_content))
+    config_file.write_text(yaml.dump(yaml_content))
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is None
@@ -145,12 +146,12 @@ def test_load_custom_settings(tmp_path, monkeypatch):
 
 def test_load_invalid_yaml(tmp_path, monkeypatch):
     """Test that invalid YAML returns an error."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
-    init_file.write_text("invalid: yaml: content: [")
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("invalid: yaml: content: [")
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is not None
@@ -161,11 +162,11 @@ def test_load_invalid_yaml(tmp_path, monkeypatch):
 
 def test_load_nonexistent_file(tmp_path, monkeypatch):
     """Test that missing config file returns default config."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    # Don't create init.yaml
+    # Don't create config.yaml
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is None
@@ -175,14 +176,14 @@ def test_load_nonexistent_file(tmp_path, monkeypatch):
 
 def test_show_tool_output_config(tmp_path, monkeypatch):
     """Test loading show_tool_output setting."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
+    config_file = config_dir / "config.yaml"
 
     yaml_content = {"show_tool_output": False}
-    init_file.write_text(yaml.dump(yaml_content))
+    config_file.write_text(yaml.dump(yaml_content))
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is None
@@ -199,18 +200,18 @@ def test_performance_settings_defaults():
 
 def test_performance_settings_custom(tmp_path, monkeypatch):
     """Test loading custom performance settings."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
+    config_file = config_dir / "config.yaml"
 
     yaml_content = {
         "streaming_fps": 30,
         "shell_poll_interval": 0.05,
         "python_executor_sleep": 0.01,
     }
-    init_file.write_text(yaml.dump(yaml_content))
+    config_file.write_text(yaml.dump(yaml_content))
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is None
@@ -221,9 +222,9 @@ def test_performance_settings_custom(tmp_path, monkeypatch):
 
 def test_multiline_yaml_strings(tmp_path, monkeypatch):
     """Test that multiline YAML strings work correctly."""
-    config_dir = tmp_path / "artifice"
+    config_dir = tmp_path / ".artifice"
     config_dir.mkdir()
-    init_file = config_dir / "init.yaml"
+    config_file = config_dir / "config.yaml"
 
     yaml_content = """
 system_prompt: |
@@ -231,9 +232,9 @@ system_prompt: |
   Line 2
   Line 3
 """
-    init_file.write_text(yaml_content)
+    config_file.write_text(yaml_content)
 
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config, error = load_config()
 
     assert error is None

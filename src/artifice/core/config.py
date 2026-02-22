@@ -1,13 +1,12 @@
 """Configuration management for Artifice.
 
-This module handles loading user configuration from ~/.config/artifice/init.yaml
+This module handles loading user configuration from ~/.artifice/config.yaml
 and provides YAML-based configuration.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import traceback
 from pathlib import Path
 from typing import Any
@@ -59,7 +58,7 @@ _FIELDS: dict[str, Any] = {
 class ArtificeConfig:
     """Configuration container for Artifice settings.
 
-    This class stores configuration values that can be set by the user's init.yaml file.
+    This class stores configuration values that can be set by the user's config.yaml file.
     All settings have sensible defaults.
     """
 
@@ -123,21 +122,18 @@ class ArtificeConfig:
 
 def get_config_path() -> Path:
     """Get the path to the user's config directory."""
-    config_home = os.environ.get("XDG_CONFIG_HOME")
-    if config_home:
-        return Path(config_home) / "artifice"
-    return Path.home() / ".config" / "artifice"
+    return Path.home() / ".artifice"
 
 
-def get_init_script_path() -> Path:
-    """Get the path to the user's init.yaml script."""
-    return get_config_path() / "init.yaml"
+def get_config_file_path() -> Path:
+    """Get the path to the user's config.yaml file."""
+    return get_config_path() / "config.yaml"
 
 
 def load_config() -> tuple[ArtificeConfig, str | None]:
-    """Load configuration from ~/.config/artifice/init.yaml.
+    """Load configuration from ~/.artifice/config.yaml.
 
-    The init.yaml file is parsed as YAML and configuration values are loaded
+    The config.yaml file is parsed as YAML and configuration values are loaded
     from the resulting dictionary.
 
     Returns:
@@ -145,16 +141,16 @@ def load_config() -> tuple[ArtificeConfig, str | None]:
         will contain details about the failure.
     """
     config = ArtificeConfig()
-    init_path = get_init_script_path()
+    config_path = get_config_file_path()
 
-    # If no init.yaml exists, return default config
-    if not init_path.exists():
-        logger.debug("No config file at %s, using defaults", init_path)
+    # If no config.yaml exists, return default config
+    if not config_path.exists():
+        logger.debug("No config file at %s, using defaults", config_path)
         return config, None
 
     try:
         # Read and parse the YAML file
-        with open(init_path, "r", encoding="utf-8") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         # If the file is empty or invalid YAML, return default config
@@ -171,12 +167,14 @@ def load_config() -> tuple[ArtificeConfig, str | None]:
             if key not in _FIELDS:
                 config.set(key, value)
 
-        logger.info("Loaded config from %s", init_path)
+        logger.info("Loaded config from %s", config_path)
         return config, None
 
     except yaml.YAMLError as e:
-        error_msg = f"Error parsing YAML from {init_path}:\n{e}"
+        error_msg = f"Error parsing YAML from {config_path}:\n{e}"
         return config, error_msg
     except Exception:
-        error_msg = f"Error loading config from {init_path}:\n{traceback.format_exc()}"
+        error_msg = (
+            f"Error loading config from {config_path}:\n{traceback.format_exc()}"
+        )
         return config, error_msg

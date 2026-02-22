@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib.resources
 import json
 import logging
 import os
+import shutil
 import sys
 
 from artifice.agent import Agent, AnyLLMProvider
 from artifice.agent.tools.base import ToolCall, execute_tool_call
-from artifice.core.config import load_config
+from artifice.core.config import load_config, get_config_path, get_config_file_path
 from artifice.core.prompts import list_prompts, load_prompt
 
 logger = logging.getLogger(__name__)
@@ -91,6 +93,33 @@ def _print_completion(shell: str) -> None:
         "fish": FISH_COMPLETION,
     }
     print(scripts.get(shell, ""))
+
+
+def install_config() -> None:
+    """Install default configuration to ~/.artifice/."""
+    config_dir = get_config_path()
+    config_file = get_config_file_path()
+    prompts_dir = config_dir / "prompts"
+
+    if config_file.exists():
+        print(f"Config already exists at {config_file}", file=sys.stderr)
+        sys.exit(1)
+
+    config_dir.mkdir(parents=True, exist_ok=True)
+    prompts_dir.mkdir(exist_ok=True)
+
+    try:
+        example_config = importlib.resources.files("artifice.data").joinpath(
+            "example.yaml"
+        )
+        with importlib.resources.as_file(example_config) as example_path:
+            shutil.copy(example_path, config_file)
+        print(f"Created {config_file}")
+        print(f"Created {prompts_dir}/")
+        print("\nEdit the config file to customize your settings.")
+    except Exception as e:
+        print(f"Error creating config: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 class ToolApprover:
@@ -331,7 +360,16 @@ def main() -> None:
         default=None,
         help="Tool approval mode: ask (interactive), auto (allow all), or deny (disable all)",
     )
+    parser.add_argument(
+        "--install",
+        action="store_true",
+        help="Install default configuration to ~/.artifice/",
+    )
     args = parser.parse_args()
+
+    if args.install:
+        install_config()
+        sys.exit(0)
 
     if args.logging:
         logging.basicConfig(

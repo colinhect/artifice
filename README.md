@@ -12,6 +12,7 @@ Tool support allows agents to execute operations like reading files, running she
 
 ```bash
 pip install artifice
+art --install  # Creates ~/.artifice/config.yaml with example config
 ```
 
 ### Quick Start
@@ -29,7 +30,7 @@ cat error.log | art -a debug "What's causing this error?"
 
 ### Configuration
 
-Create `~/.config/artifice/init.yaml`:
+Run `art --install` to create `~/.artifice/config.yaml`, or create it manually:
 
 ```yaml
 agent: glm4
@@ -288,7 +289,7 @@ Type a special character when input is empty to switch modes:
 
 ## Configuration Reference
 
-Configuration file: `~/.config/artifice/init.yaml`
+Configuration file: `~/.artifice/config.yaml`
 
 ```yaml
 # Default agent

@@ -106,7 +106,7 @@ def main():
     )
     args = parser.parse_args()
 
-    # Load configuration from ~/.config/artifice/init.yaml
+    # Load configuration from ~/.artifice/config.yaml
     config, config_error = load_config()
 
     # Exit immediately if config failed to load

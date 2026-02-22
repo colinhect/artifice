@@ -1,6 +1,6 @@
 # Example Artifice Configuration File (YAML)
 # 
-# Copy this file to ~/.config/artifice/init.yaml and customize as needed
+# Copy this file to ~/.artifice/config.yaml and customize as needed
 
 # System Prompt
 system_prompt: ""

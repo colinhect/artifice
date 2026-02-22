@@ -72,7 +72,7 @@ Artifice is a minimal AI agent harness with a terminal interface. It provides a 
 
 ### 4. Core (`artifice/core/`)
 
-- **Config**: YAML-based configuration from `~/.config/artifice/init.yaml`
+- **Config**: YAML-based configuration from `~/.artifice/config.yaml`
 - **History**: Persistent command history with search
 - **Events**: Input modes (AI, Python, Shell)
 
@@ -124,7 +124,7 @@ LLM Stream → ChunkBuffer → StreamingFenceDetector ─┬─> UI (live text w
 
 ## Configuration
 
-Configuration is loaded from `~/.config/artifice/init.yaml`:
+Configuration is loaded from `~/.artifice/config.yaml`:
 
 - **Agent settings**: Model, provider, API key, tools
 - **Display**: Markdown rendering toggles per mode

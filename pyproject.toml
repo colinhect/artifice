@@ -30,3 +30,6 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/artifice"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/artifice"]
