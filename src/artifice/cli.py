@@ -12,6 +12,7 @@ import sys
 from artifice.agent import Agent, AnyLLMProvider
 from artifice.agent.tools.base import ToolCall, execute_tool_call
 from artifice.core.config import load_config
+from artifice.core.prompts import list_prompts, load_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -351,8 +352,9 @@ def main() -> None:
         sys.exit(0)
 
     if args.list_prompts:
-        if config.prompts:
-            for name in config.prompts:
+        prompts = list_prompts()
+        if prompts:
+            for name in prompts:
                 print(name)
         sys.exit(0)
 
@@ -408,13 +410,14 @@ def main() -> None:
     system_prompt = args.system_prompt
     if system_prompt is None:
         if args.prompt_name:
-            if not config.prompts or args.prompt_name not in config.prompts:
+            prompt_result = load_prompt(args.prompt_name)
+            if not prompt_result:
                 print(
                     f"Error: Unknown prompt '{args.prompt_name}'",
                     file=sys.stderr,
                 )
                 sys.exit(1)
-            system_prompt = config.prompts[args.prompt_name]
+            _, system_prompt = prompt_result
         else:
             system_prompt = agent_def.get("system_prompt", config.system_prompt)
 
