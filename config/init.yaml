@@ -20,6 +20,56 @@ agents:
     tools:
       - "*"  # Enable all tools (supports fnmatch wildcards: "web_*", "python", etc.)
 
+  # DeepSeek Coder v2 - Great for coding tasks
+  deepseek-coder:
+    api_key_env: "HF_TOKEN"
+    provider: "openai"
+    model: "deepseek-ai/DeepSeek-Coder-V2-Instruct"
+    base_url: "https://router.huggingface.co/v1"
+    context_window: 128000
+    tools:
+      - "*"
+
+  # Mistral 7B Instruct - Lightweight and efficient
+  mistral-7b:
+    api_key_env: "HF_TOKEN"
+    provider: "openai"
+    model: "mistralai/Mistral-7B-Instruct-v0.3"
+    base_url: "https://router.huggingface.co/v1"
+    context_window: 32000
+    tools:
+      - "*"
+
+  # Mixtral 8x7B - Mixture of Experts model
+  mixtral-8x7b:
+    api_key_env: "HF_TOKEN"
+    provider: "openai"
+    model: "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    base_url: "https://router.huggingface.co/v1"
+    context_window: 32000
+    tools:
+      - "*"
+
+  # Qwen 2.5 72B - Very capable model from Alibaba Cloud
+  qwen-72b:
+    api_key_env: "HF_TOKEN"
+    provider: "openai"
+    model: "Qwen/Qwen2.5-72B-Instruct"
+    base_url: "https://router.huggingface.co/v1"
+    context_window: 32000
+    tools:
+      - "*"
+
+  # Llama 3.1 70B - Meta's flagship model
+  llama-3-70b:
+    api_key_env: "HF_TOKEN"
+    provider: "openai"
+    model: "meta-llama/Llama-3.1-70B-Instruct"
+    base_url: "https://router.huggingface.co/v1"
+    context_window: 128000
+    tools:
+      - "*"
+
   # Ollama models (run locally via https://ollama.com)
   llama3:
     provider: "openai"
