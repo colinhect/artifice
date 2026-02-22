@@ -6,6 +6,8 @@ A GNU-style command-line tool for LLM interactions, plus an experimental agentic
 
 `art` is a simple input/output tool for prompting LLMs from the command line. It reads from stdin or an argument and outputs to stdout—designed to compose with other Unix tools.
 
+Tool support allows agents to execute operations like reading files, running shell commands, and searching code—all with interactive approval.
+
 ### Installation
 
 ```bash
@@ -52,6 +54,25 @@ prompts:
   review: |
     Review the code for bugs, security issues, and improvements.
     Be concise and actionable.
+
+# Tool configuration (optional)
+tools: ["*"]                       # Enable all tools
+tool_approval: ask                 # "ask", "auto", or "deny"
+tool_allowlist: ["read", "glob"]  # Always allow these tools
+```
+
+**Tool Configuration Options:**
+
+- `tools`: List of tool patterns to enable. Use `"*"` for all tools, or specific names like `["read", "write", "glob"]`
+- `tool_approval`: Approval mode for tool calls
+  - `ask`: Prompt for approval on each tool call (default)
+  - `auto`: Automatically approve all tool calls
+  - `deny`: Automatically deny all tool calls
+- `tool_allowlist`: List of tool patterns that are always allowed without prompting
+
+You can also override these settings via command-line flags:
+```bash
+art --tools "*" --tool-approval auto "Your prompt here"
 ```
 
 ### Usage Patterns
@@ -91,6 +112,68 @@ grep -r "TODO" src/ | art "Prioritize and categorize these TODOs"
 cat README.md CHANGELOG.md | art -p summarize
 ```
 
+### Tool Support
+
+`art` supports tool calls that allow the LLM to interact with your system. Tools include file operations, shell commands, and code execution. Each tool call requires approval (unless configured otherwise).
+
+**Available Tools:**
+- `read` - Read file contents
+- `write` - Write or create files
+- `edit` - Edit files by string replacement
+- `glob` - Search for files matching patterns
+- `shell` - Execute shell commands
+- `python` - Execute Python code
+
+**Basic Usage:**
+
+```bash
+# Enable all tools and approve interactively
+art --tools "*" "Read the README.md file and summarize it"
+
+# Enable specific tools only
+art --tools "read,glob" "Find all Python files and check for TODOs"
+
+# Auto-approve all tool calls (use with caution)
+art --tools "*" --tool-approval auto "Search for all .txt files and count lines"
+
+# Never allow tools, even if agent requests them
+art --tools "*" --tool-approval deny "What files are in this directory?"
+```
+
+**Interactive Approval:**
+
+When `--tool-approval ask` (default), you'll be prompted for each tool call:
+
+```
+🛠️  Tool Call: read
+   Arguments: {
+     "path": "README.md"
+   }
+
+Approve this tool call? [Y]es [N]o [A]lways [O]nce:
+```
+
+- **Yes** - Approve this call
+- **No** - Deny this call
+- **Always** - Always allow this tool type
+- **Once** - Allow this tool once this session
+
+**Examples:**
+
+```bash
+# Read and analyze code
+cat src/main.py | art --tools "read,write" "Review this code and write feedback to review.md"
+
+# Search codebase
+art --tools "glob,read" "Find all test files and list the first 10 lines of each"
+
+# Edit files
+art --tools "edit" "In config.py, change timeout from 30 to 60 seconds"
+
+# Process with shell commands
+art --tools "shell" "Count lines of code in src/ directory and show top 5 largest files"
+```
+
 ### Command Reference
 
 ```
@@ -110,6 +193,11 @@ Options:
   --list-prompts      List available prompt names
   --print-completion {bash,zsh,fish}
                       Print shell completion script
+  --tools TOOLS       Enable tools (comma-separated patterns, e.g., "read,write",
+                      or "*" for all)
+  --tool-approval {ask,auto,deny}
+                      Tool approval mode: ask (interactive), auto (allow all),
+                      or deny (disable all) [default: ask]
 ```
 
 ### Shell Completion
@@ -228,6 +316,11 @@ prompts:
   review: |
     Review the code for bugs, security issues, and improvements.
     Be concise and actionable.
+
+# Tool settings
+tools: ["read", "write", "glob", "edit"]  # List of tools to enable
+tool_approval: ask                          # ask, auto, or deny
+tool_allowlist: ["read", "glob"]           # Always allow these tools
 
 # Global settings
 system_prompt: null

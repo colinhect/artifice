@@ -8,7 +8,11 @@ from typing import Any, Awaitable, Callable
 from artifice.agent.tools.executors import (
     execute_edit,
     execute_glob,
+    execute_grep,
     execute_read,
+    execute_replace,
+    execute_web_fetch,
+    execute_web_search,
     execute_write,
 )
 

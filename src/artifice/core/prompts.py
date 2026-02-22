@@ -1,4 +1,4 @@
-"""Prompt template loading from prompts/ directories."""
+"""Prompt template loading from .artifice/prompts/ directories."""
 
 from __future__ import annotations
 
@@ -8,22 +8,14 @@ from pathlib import Path
 def get_prompt_dirs() -> list[Path]:
     """Return prompt directories in priority order (local first, then home)."""
     dirs = []
-
-    # Project root directory (prompts/ in current working directory)
-    project_prompts = Path.cwd() / "prompts"
-    if project_prompts.is_dir():
-        dirs.append(project_prompts)
-
-    # Local project directory (.artifice/prompts)
+    # Local project directory
     local = Path.cwd() / ".artifice" / "prompts"
     if local.is_dir():
         dirs.append(local)
-
     # Home directory
     home = Path.home() / ".artifice" / "prompts"
     if home.is_dir():
         dirs.append(home)
-
     return dirs
 
 
