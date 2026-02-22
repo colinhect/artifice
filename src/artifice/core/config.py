@@ -130,51 +130,83 @@ def get_config_file_path() -> Path:
     return get_config_path() / "config.yaml"
 
 
-def load_config() -> tuple[ArtificeConfig, str | None]:
-    """Load configuration from ~/.artifice/config.yaml.
+def get_local_config_path() -> Path:
+    """Get the path to the local project's config directory."""
+    return Path.cwd() / ".artifice"
 
-    The config.yaml file is parsed as YAML and configuration values are loaded
-    from the resulting dictionary.
+
+def get_local_config_file_path() -> Path:
+    """Get the path to the local project's config.yaml file."""
+    return get_local_config_path() / "config.yaml"
+
+
+def _load_config_file(config_path: Path) -> dict[str, Any] | None:
+    """Load a single config file and return its data dict.
+
+    Returns None if file doesn't exist or is empty.
+    Raises exceptions on parse errors.
+    """
+    if not config_path.exists():
+        return None
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    return data if data else None
+
+
+def load_config() -> tuple[ArtificeConfig, str | None]:
+    """Load configuration from ~/.artifice/config.yaml and .artifice/config.yaml.
+
+    Configuration is loaded from home directory first, then local directory
+    (current working directory) overrides any settings from home.
 
     Returns:
         A tuple of (config, error_message). If loading fails, error_message
         will contain details about the failure.
     """
     config = ArtificeConfig()
-    config_path = get_config_file_path()
+    home_config_path = get_config_file_path()
+    local_config_path = get_local_config_file_path()
 
-    # If no config.yaml exists, return default config
-    if not config_path.exists():
-        logger.debug("No config file at %s, using defaults", config_path)
+    configs_to_load = []
+
+    # Load home config first
+    if home_config_path.exists():
+        configs_to_load.append(("home", home_config_path))
+
+    # Load local config second (will override home)
+    if local_config_path.exists():
+        configs_to_load.append(("local", local_config_path))
+
+    # If no config files exist, return default config
+    if not configs_to_load:
+        logger.debug("No config files found, using defaults")
         return config, None
 
     try:
-        # Read and parse the YAML file
-        with open(config_path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+        for location, config_path in configs_to_load:
+            data = _load_config_file(config_path)
+            if data is None:
+                continue
 
-        # If the file is empty or invalid YAML, return default config
-        if data is None:
-            return config, None
+            # Load known fields from YAML data
+            for key in _FIELDS:
+                if key in data:
+                    setattr(config, key, data[key])
 
-        # Load known fields from YAML data
-        for key in _FIELDS:
-            if key in data:
-                setattr(config, key, data[key])
+            # Store any additional custom settings
+            for key, value in data.items():
+                if key not in _FIELDS:
+                    config.set(key, value)
 
-        # Store any additional custom settings
-        for key, value in data.items():
-            if key not in _FIELDS:
-                config.set(key, value)
+            logger.info("Loaded config from %s (%s)", config_path, location)
 
-        logger.info("Loaded config from %s", config_path)
         return config, None
 
     except yaml.YAMLError as e:
-        error_msg = f"Error parsing YAML from {config_path}:\n{e}"
+        error_msg = f"Error parsing YAML:\n{e}"
         return config, error_msg
     except Exception:
-        error_msg = (
-            f"Error loading config from {config_path}:\n{traceback.format_exc()}"
-        )
+        error_msg = f"Error loading config:\n{traceback.format_exc()}"
         return config, error_msg
