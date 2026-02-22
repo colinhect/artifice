@@ -26,7 +26,7 @@ agents:
     provider: "openai"
     model: "zai-org/GLM-4.7-Flash"
     base_url: "https://router.huggingface.co/v1"
-    context_window: 200000
+    context_window: 131072
     tools:
       - "*"
   glm-5:
@@ -34,7 +34,7 @@ agents:
     provider: "openai"
     model: "zai-org/GLM-5"
     base_url: "https://router.huggingface.co/v1"
-    context_window: 200000
+    context_window: 202752
     tools:
       - "*"
   minimax-m2.5:
@@ -42,7 +42,7 @@ agents:
     provider: "openai"
     model: "MiniMaxAI/MiniMax-M2.5"
     base_url: "https://router.huggingface.co/v1"
-    context_window: 200000
+    context_window: 1000000
     tools:
       - "*"  # Enable all tools (supports fnmatch wildcards: "web_*", "python", etc.)
   kimi-k2.5:
