@@ -10,9 +10,23 @@ prompt_prefix: ""
 agent: "minimax"
 agents:
 
+  summarize:
+    api_key_env: "HF_TOKEN"
+    provider: "openai"
+    model: "zai-org/GLM-4.7-Flash:novita"
+    base_url: "https://router.huggingface.co/v1"
+    system_prompt: "Summarize the following."
+
+  filename:
+    api_key_env: "HF_TOKEN"
+    provider: "openai"
+    model: "zai-org/GLM-4.7-Flash:novita"
+    base_url: "https://router.huggingface.co/v1"
+    system_prompt: "Come up with an `all-lower-case-filename.md` for a file with the following contents. Respond only with the filename."
+
   # Huggingface models
   minimax:
-    api_key: "..."
+    api_key_env: "HF_TOKEN"
     provider: "openai"
     model: "MiniMaxAI/MiniMax-M2.5"
     base_url: "https://router.huggingface.co/v1"
