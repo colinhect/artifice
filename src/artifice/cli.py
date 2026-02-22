@@ -9,7 +9,7 @@ import os
 import sys
 
 from artifice.agent import Agent, AnyLLMProvider
-from artifice.core.config import load_config
+from artifice.core.config import load_config, write_config_file
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ BASH_COMPLETION = """_art_completion() {
     esac
 
     if [[ ${cur} == -* ]]; then
-        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt --logging --list-agents --list-prompts --print-completion" -- "${cur}"))
+        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt --logging --list-agents --list-prompts --set-agent --print-completion" -- "${cur}"))
     fi
 }
 
@@ -57,6 +57,7 @@ _art() {
         '-s[System prompt for the model]:system prompt:' \\
         '--system-prompt[System prompt for the model]:system prompt:' \\
         '--logging[Enable logging to stderr]' \\
+        '--set-agent[Set default agent in config]:agent:(--set-agent)' \\
         '--list-agents[List available agent names]' \\
         '--list-prompts[List available prompt names]' \\
         '--print-completion[Print shell completion script]:shell:(bash zsh fish)'
@@ -69,6 +70,7 @@ complete -c art -s a -l agent -d 'Agent name from config' -a '(art --list-agents
 complete -c art -s p -l prompt-name -d 'Named prompt from config' -a '(art --list-prompts 2>/dev/null)'
 complete -c art -s s -l system-prompt -d 'System prompt for the model'
 complete -c art -l logging -d 'Enable logging to stderr'
+complete -c art -l set-agent -d 'Set default agent in config'
 complete -c art -l list-agents -d 'List available agent names'
 complete -c art -l list-prompts -d 'List available prompt names'
 complete -c art -l print-completion -d 'Print shell completion script' -a 'bash zsh fish'
@@ -154,6 +156,11 @@ def main() -> None:
         help="List available prompt names (for shell completion)",
     )
     parser.add_argument(
+        "--set-agent",
+        metavar="AGENT",
+        help="Set the default agent in ~/.config/artifice/init.yaml and exit",
+    )
+    parser.add_argument(
         "--print-completion",
         choices=["bash", "zsh", "fish"],
         help="Print shell completion script",
@@ -171,6 +178,11 @@ def main() -> None:
     if config_error:
         print(f"Configuration error: {config_error}", file=sys.stderr)
         sys.exit(1)
+
+    if args.set_agent is not None:
+        write_config_file("agent", args.set_agent)
+        print(f"Agent set to '{args.set_agent}' in ~/.config/artifice/init.yaml")
+        sys.exit(0)
 
     if args.list_agents:
         if config.agents:

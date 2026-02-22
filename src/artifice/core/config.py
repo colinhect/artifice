@@ -171,3 +171,47 @@ def load_config() -> tuple[ArtificeConfig, str | None]:
     except Exception:
         error_msg = f"Error loading config from {init_path}:\n{traceback.format_exc()}"
         return config, error_msg
+
+
+def write_config_file(key: str, value: Any) -> None:
+    """Write a configuration value to ~/.config/artifice/init.yaml.
+
+    This function reads the existing config file (if it exists), updates the
+    specified key with the new value, and writes it back to the file.
+    If the file doesn't exist, it creates it with the appropriate directory structure.
+
+    Args:
+        key: The configuration key to set/update
+        value: The value to set for the key
+    """
+    init_path = get_init_script_path()
+
+    # Ensure config directory exists
+    init_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Load existing config data if file exists
+    config_data: dict[str, Any] = {}
+    if init_path.exists():
+        try:
+            with open(init_path, "r", encoding="utf-8") as f:
+                existing_data = yaml.safe_load(f)
+                if isinstance(existing_data, dict):
+                    config_data = existing_data
+        except yaml.YAMLError:
+            # If existing file has invalid YAML, start fresh
+            logger.warning("Existing config file has invalid YAML, creating new one")
+        except Exception as e:
+            logger.error("Error reading existing config: %s", e)
+            raise RuntimeError(f"Cannot read existing config file: {e}")
+
+    # Update the specific key
+    config_data[key] = value
+
+    # Write config back to file
+    try:
+        with open(init_path, "w", encoding="utf-8") as f:
+            yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
+        logger.info("Updated config file at %s with %s=%s", init_path, key, value)
+    except Exception as e:
+        logger.error("Error writing config to %s: %s", init_path, e)
+        raise RuntimeError(f"Failed to write config file: {e}")

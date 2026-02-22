@@ -11,7 +11,7 @@ from textual.binding import Binding
 from textual.widgets import Footer, Static
 
 from artifice.ui.widget import ArtificeTerminal
-from artifice.core.config import load_config, ArtificeConfig
+from artifice.core.config import load_config, write_config_file, ArtificeConfig
 from artifice.utils.theme import create_artifice_theme
 
 
@@ -104,6 +104,11 @@ def main():
         metavar="PATTERN",
         help="Regex matching the shell prompt in the tmux pane",
     )
+    parser.add_argument(
+        "--set-agent",
+        metavar="AGENT",
+        help="Set the default agent in ~/.config/artifice/init.yaml and exit",
+    )
     args = parser.parse_args()
 
     # Load configuration from ~/.config/artifice/init.yaml
@@ -113,6 +118,12 @@ def main():
     if config_error:
         print(f"\n❌ Configuration Error:\n{config_error}\n", file=sys.stderr)
         sys.exit(1)
+
+    # Handle --set-agent to update config file and exit
+    if args.set_agent is not None:
+        write_config_file("agent", args.set_agent)
+        print(f"Agent set to '{args.set_agent}' in ~/.config/artifice/init.yaml")
+        sys.exit(0)
 
     # Command-line arguments override config
     if args.agent is not None:
