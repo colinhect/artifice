@@ -34,7 +34,7 @@ BASH_COMPLETION = """_art_completion() {
     esac
 
     if [[ ${cur} == -* ]]; then
-        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt --logging --list-agents --list-prompts --print-completion --tools --tool-approval" -- "${cur}"))
+        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt --logging --list-agents --list-prompts --get-current-agent --print-completion --tools --tool-approval" -- "${cur}"))
     fi
 }
 
@@ -60,6 +60,7 @@ _art() {
         '--logging[Enable logging to stderr]' \
         '--list-agents[List available agent names]' \
         '--list-prompts[List available prompt names]' \
+        '--get-current-agent[Print the current agent name and exit]' \
         '--print-completion[Print shell completion script]:shell:(bash zsh fish)' \
         '--tools[Tool patterns (e.g., "*", "read,write")]' \
         '--tool-approval[Tool approval mode]:mode:(ask auto deny)'
@@ -74,6 +75,7 @@ complete -c art -s s -l system-prompt -d 'System prompt for the model'
 complete -c art -l logging -d 'Enable logging to stderr'
 complete -c art -l list-agents -d 'List available agent names'
 complete -c art -l list-prompts -d 'List available prompt names'
+complete -c art -l get-current-agent -d 'Print the current agent name and exit'
 complete -c art -l print-completion -d 'Print shell completion script' -a 'bash zsh fish'
 complete -c art -l tools -d 'Tool patterns (e.g., "*", "read,write")'
 complete -c art -l tool-approval -d 'Tool approval mode' -a 'ask auto deny'
@@ -308,6 +310,11 @@ def main() -> None:
         help="List available prompt names (for shell completion)",
     )
     parser.add_argument(
+        "--get-current-agent",
+        action="store_true",
+        help="Print the current agent name and exit",
+    )
+    parser.add_argument(
         "--print-completion",
         choices=["bash", "zsh", "fish"],
         help="Print shell completion script",
@@ -347,6 +354,14 @@ def main() -> None:
         if config.prompts:
             for name in config.prompts:
                 print(name)
+        sys.exit(0)
+
+    if args.get_current_agent:
+        agent_name = args.agent or config.agent
+        if not agent_name:
+            print("Error: No agent configured", file=sys.stderr)
+            sys.exit(1)
+        print(agent_name)
         sys.exit(0)
 
     if args.print_completion:
