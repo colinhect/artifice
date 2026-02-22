@@ -20,6 +20,7 @@ dependencies = [
 
 [project.scripts]
 artifice = "artifice.app:main"
+art = "artifice.cli:main"
 
 [project.optional-dependencies]
 dev = [
