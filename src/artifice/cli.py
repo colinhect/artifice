@@ -48,42 +48,6 @@ _art() {
     agents=(${(f)"$(art --list-agents 2>/dev/null)"})
     prompts=(${(f)"$(art --list-prompts 2>/dev/null)"})
 
-    _arguments \\\\
-        '1:prompt:' \\\\
-        '-a[Agent name from config]:agent:($agents)' \\\\
-        '--agent[Agent name from config]:agent:($agents)' \\\\
-        '-p[Named prompt from config]:prompt:($prompts)' \\\\
-        '--prompt-name[Named prompt from config]:prompt:($prompts)' \\\\
-        '-s[System prompt for the model]:system prompt:' \\\\
-        '--system-prompt[System prompt for the model]:system prompt:' \\\\
-        '--logging[Enable logging to stderr]' \\\\
-        '--list-agents[List available agent names]' \\\\
-        '--list-prompts[List available prompt names]' \\\\
-        '--print-completion[Print shell completion script]:shell:(bash zsh fish)'
-}
-
-_art
-"""
-
-FISH_COMPLETION = """complete -c art -f
-
-complete -c art -s a -l agent -d 'Agent name from config' -a '(art --list-agents 2>/dev/null)'
-complete -c art -s p -l prompt-name -d 'Named prompt from config' -a '(art --list-prompts 2>/dev/null)'
-complete -c art -s s -l system-prompt -d 'System prompt for the model'
-complete -c art -l logging -d 'Enable logging to stderr'
-complete -c art -l list-agents -d 'List available agent names'
-complete -c art -l list-prompts -d 'List available prompt names'
-complete -c art -l print-completion -d 'Print shell completion script' -a 'bash zsh fish'
-"""
-
-ZSH_COMPLETION = """#compdef art
-
-_art() {
-    local -a agents prompts
-
-    agents=(${(f)"$({art} --list-agents 2>/dev/null)"})
-    prompts=(${(f)"$({art} --list-prompts 2>/dev/null)"})
-
     _arguments \\
         '1:prompt:' \\
         '-a[Agent name from config]:agent:($agents)' \\
@@ -103,8 +67,8 @@ _art
 
 FISH_COMPLETION = """complete -c art -f
 
-complete -c art -s a -l agent -d 'Agent name from config' -a '({art} --list-agents 2>/dev/null)'
-complete -c art -s p -l prompt-name -d 'Named prompt from config' -a '({art} --list-prompts 2>/dev/null)'
+complete -c art -s a -l agent -d 'Agent name from config' -a '(art --list-agents 2>/dev/null)'
+complete -c art -s p -l prompt-name -d 'Named prompt from config' -a '(art --list-prompts 2>/dev/null)'
 complete -c art -s s -l system-prompt -d 'System prompt for the model'
 complete -c art -l logging -d 'Enable logging to stderr'
 complete -c art -l list-agents -d 'List available agent names'
@@ -131,7 +95,7 @@ async def run_prompt(
     provider: str | None,
     base_url: str | None,
 ) -> str:
-    """Run a prompt through the LLM and return the response."""
+    """Run a prompt through the LLM and stream the response to stdout."""
     provider_instance = AnyLLMProvider(
         model=model,
         api_key=api_key,
@@ -139,7 +103,11 @@ async def run_prompt(
         base_url=base_url,
     )
     agent = Agent(provider=provider_instance, system_prompt=system_prompt, tools=None)
-    response = await agent.send(prompt)
+
+    def on_chunk(chunk: str) -> None:
+        print(chunk, end="", flush=True)
+
+    response = await agent.send(prompt, on_chunk=on_chunk)
     return response.text
 
 
@@ -283,7 +251,8 @@ def main() -> None:
         response = asyncio.run(
             run_prompt(prompt, model, system_prompt, api_key, provider, base_url)
         )
-        print(response, end="" if response.endswith("\n") else "\n")
+        if response and not response.endswith("\n"):
+            print()
     except KeyboardInterrupt:
         sys.exit(130)
     except Exception as e:
