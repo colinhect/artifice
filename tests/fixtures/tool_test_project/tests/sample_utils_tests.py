@@ -1,6 +1,5 @@
 """Tests for utility functions."""
 
-
 from src.utils import format_output, validate_input, merge_configs
 
 
