@@ -191,6 +191,7 @@ Options:
   --logging           Enable debug logging to stderr
   --list-agents       List available agent names
   --list-prompts      List available prompt names
+  --get-current-agent Print the current agent name and exit
   --print-completion {bash,zsh,fish}
                       Print shell completion script
   --tools TOOLS       Enable tools (comma-separated patterns, e.g., "read,write",
