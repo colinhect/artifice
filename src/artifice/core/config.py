@@ -22,6 +22,7 @@ _FIELDS: dict[str, Any] = {
     # Agent settings
     "agent": None,
     "agents": None,
+    "prompts": None,
     "system_prompt": None,
     "prompt_prefix": None,
     "thinking_budget": None,
@@ -61,6 +62,7 @@ class ArtificeConfig:
     # Agent settings
     agent: str | None
     agents: dict | None
+    prompts: dict | None
     system_prompt: str | None
     prompt_prefix: str | None
     thinking_budget: int | None

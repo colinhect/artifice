@@ -44,6 +44,14 @@ agents:
     tools:
       - "*"
 
+# Named prompts (use with -p option)
+prompts:
+  summarize: |
+    Summarize the input concisely. Use bullet points for key items.
+  review: |
+    Review the code for bugs, security issues, and improvements.
+    Be concise and actionable.
+
 # Show/hide tool call output (the result blocks after tool execution)
 # When false, output is still sent to the agent but hidden from the UI
 show_tool_output: true

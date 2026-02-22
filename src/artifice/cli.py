@@ -52,6 +52,12 @@ def main() -> None:
         help="Agent name from config (uses config default if not specified)",
     )
     parser.add_argument(
+        "-p",
+        "--prompt-name",
+        default=None,
+        help="Named prompt from config to use as system prompt",
+    )
+    parser.add_argument(
         "-s",
         "--system-prompt",
         default=None,
@@ -115,7 +121,16 @@ def main() -> None:
 
     system_prompt = args.system_prompt
     if system_prompt is None:
-        system_prompt = agent_def.get("system_prompt", config.system_prompt)
+        if args.prompt_name:
+            if not config.prompts or args.prompt_name not in config.prompts:
+                print(
+                    f"Error: Unknown prompt '{args.prompt_name}'",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            system_prompt = config.prompts[args.prompt_name]
+        else:
+            system_prompt = agent_def.get("system_prompt", config.system_prompt)
 
     provider = agent_def.get("provider")
     if provider and provider.lower() == "simulated":
