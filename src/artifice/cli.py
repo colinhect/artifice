@@ -14,6 +14,115 @@ from artifice.core.config import load_config
 logger = logging.getLogger(__name__)
 
 
+BASH_COMPLETION = """_art_completion() {
+    local cur prev words cword
+    _init_completion || return
+
+    case ${prev} in
+        -a|--agent)
+            COMPREPLY=($(compgen -W "$(art --list-agents 2>/dev/null)" -- "${cur}"))
+            return
+            ;;
+        -p|--prompt-name)
+            COMPREPLY=($(compgen -W "$(art --list-prompts 2>/dev/null)" -- "${cur}"))
+            return
+            ;;
+        -s|--system-prompt)
+            return
+            ;;
+    esac
+
+    if [[ ${cur} == -* ]]; then
+        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt --logging --list-agents --list-prompts --print-completion" -- "${cur}"))
+    fi
+}
+
+complete -F _art_completion art
+"""
+
+ZSH_COMPLETION = """#compdef art
+
+_art() {
+    local -a agents prompts
+
+    agents=(${(f)"$(art --list-agents 2>/dev/null)"})
+    prompts=(${(f)"$(art --list-prompts 2>/dev/null)"})
+
+    _arguments \\\\
+        '1:prompt:' \\\\
+        '-a[Agent name from config]:agent:($agents)' \\\\
+        '--agent[Agent name from config]:agent:($agents)' \\\\
+        '-p[Named prompt from config]:prompt:($prompts)' \\\\
+        '--prompt-name[Named prompt from config]:prompt:($prompts)' \\\\
+        '-s[System prompt for the model]:system prompt:' \\\\
+        '--system-prompt[System prompt for the model]:system prompt:' \\\\
+        '--logging[Enable logging to stderr]' \\\\
+        '--list-agents[List available agent names]' \\\\
+        '--list-prompts[List available prompt names]' \\\\
+        '--print-completion[Print shell completion script]:shell:(bash zsh fish)'
+}
+
+_art
+"""
+
+FISH_COMPLETION = """complete -c art -f
+
+complete -c art -s a -l agent -d 'Agent name from config' -a '(art --list-agents 2>/dev/null)'
+complete -c art -s p -l prompt-name -d 'Named prompt from config' -a '(art --list-prompts 2>/dev/null)'
+complete -c art -s s -l system-prompt -d 'System prompt for the model'
+complete -c art -l logging -d 'Enable logging to stderr'
+complete -c art -l list-agents -d 'List available agent names'
+complete -c art -l list-prompts -d 'List available prompt names'
+complete -c art -l print-completion -d 'Print shell completion script' -a 'bash zsh fish'
+"""
+
+ZSH_COMPLETION = """#compdef art
+
+_art() {
+    local -a agents prompts
+
+    agents=(${(f)"$({art} --list-agents 2>/dev/null)"})
+    prompts=(${(f)"$({art} --list-prompts 2>/dev/null)"})
+
+    _arguments \\
+        '1:prompt:' \\
+        '-a[Agent name from config]:agent:($agents)' \\
+        '--agent[Agent name from config]:agent:($agents)' \\
+        '-p[Named prompt from config]:prompt:($prompts)' \\
+        '--prompt-name[Named prompt from config]:prompt:($prompts)' \\
+        '-s[System prompt for the model]:system prompt:' \\
+        '--system-prompt[System prompt for the model]:system prompt:' \\
+        '--logging[Enable logging to stderr]' \\
+        '--list-agents[List available agent names]' \\
+        '--list-prompts[List available prompt names]' \\
+        '--print-completion[Print shell completion script]:shell:(bash zsh fish)'
+}
+
+_art
+"""
+
+FISH_COMPLETION = """complete -c art -f
+
+complete -c art -s a -l agent -d 'Agent name from config' -a '({art} --list-agents 2>/dev/null)'
+complete -c art -s p -l prompt-name -d 'Named prompt from config' -a '({art} --list-prompts 2>/dev/null)'
+complete -c art -s s -l system-prompt -d 'System prompt for the model'
+complete -c art -l logging -d 'Enable logging to stderr'
+complete -c art -l list-agents -d 'List available agent names'
+complete -c art -l list-prompts -d 'List available prompt names'
+complete -c art -l print-completion -d 'Print shell completion script' -a 'bash zsh fish'
+"""
+
+
+def _print_completion(shell: str) -> None:
+    """Print shell completion script."""
+    scripts = {
+        "bash": BASH_COMPLETION,
+        "zsh": ZSH_COMPLETION,
+        "fish": FISH_COMPLETION,
+    }
+    print(scripts.get(shell, ""))
+
+
 async def run_prompt(
     prompt: str,
     model: str,
@@ -68,6 +177,21 @@ def main() -> None:
         action="store_true",
         help="Enable logging to stderr",
     )
+    parser.add_argument(
+        "--list-agents",
+        action="store_true",
+        help="List available agent names (for shell completion)",
+    )
+    parser.add_argument(
+        "--list-prompts",
+        action="store_true",
+        help="List available prompt names (for shell completion)",
+    )
+    parser.add_argument(
+        "--print-completion",
+        choices=["bash", "zsh", "fish"],
+        help="Print shell completion script",
+    )
     args = parser.parse_args()
 
     if args.logging:
@@ -81,6 +205,22 @@ def main() -> None:
     if config_error:
         print(f"Configuration error: {config_error}", file=sys.stderr)
         sys.exit(1)
+
+    if args.list_agents:
+        if config.agents:
+            for name in config.agents:
+                print(name)
+        sys.exit(0)
+
+    if args.list_prompts:
+        if config.prompts:
+            for name in config.prompts:
+                print(name)
+        sys.exit(0)
+
+    if args.print_completion:
+        _print_completion(args.print_completion)
+        sys.exit(0)
 
     prompt = args.prompt
     if prompt is None:

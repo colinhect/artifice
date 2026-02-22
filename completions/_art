@@ -1,0 +1,30 @@
+#compdef art
+
+# Zsh completion for art command
+# Install to a directory in your fpath, e.g.:
+#   cp _art /usr/local/share/zsh/site-functions/
+# Or add this directory to fpath in ~/.zshrc:
+#   fpath=(/path/to/completions $fpath)
+# Then run: autoload -U compinit && compinit
+
+_art() {
+    local -a agents prompts
+
+    agents=(${(f)"$(art --list-agents 2>/dev/null)"})
+    prompts=(${(f)"$(art --list-prompts 2>/dev/null)"})
+
+    _arguments \
+        '1:prompt:' \
+        '-a[Agent name from config]:agent:($agents)' \
+        '--agent[Agent name from config]:agent:($agents)' \
+        '-p[Named prompt from config]:prompt:($prompts)' \
+        '--prompt-name[Named prompt from config]:prompt:($prompts)' \
+        '-s[System prompt for the model]:system prompt:' \
+        '--system-prompt[System prompt for the model]:system prompt:' \
+        '--logging[Enable logging to stderr]' \
+        '--list-agents[List available agent names]' \
+        '--list-prompts[List available prompt names]' \
+        '--print-completion[Print shell completion script]:shell:(bash zsh fish)'
+}
+
+_art
