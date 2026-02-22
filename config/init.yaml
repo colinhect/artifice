@@ -50,7 +50,7 @@ agents:
     provider: "openai"
     model: "moonshotai/Kimi-K2.5"
     base_url: "https://router.huggingface.co/v1"
-    context_window: 200000
+    context_window: 256000
     tools:
       - "*"
 
