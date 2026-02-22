@@ -8,9 +8,11 @@ from artifice.agent.providers.base import (
     StreamChunk,
     TokenUsage,
 )
+from artifice.agent.providers.copilot import CopilotProvider
 
 __all__ = [
     "AnyLLMProvider",
+    "CopilotProvider",
     "Provider",
     "StreamChunk",
     "TokenUsage",
