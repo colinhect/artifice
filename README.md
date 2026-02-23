@@ -50,7 +50,7 @@ Create `~/.artifice/config.yaml`:
 agent: glm-flash
 
 agents:
-  glm4:
+  glm-flash:
     api_key_env: HF_TOKEN
     provider: openai
     model: zai-org/GLM-4.7-Flash:novita
