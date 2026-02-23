@@ -32,6 +32,12 @@ grep -r "TODO" src/ | art "Prioritize these TODOs"
 
 # Generate tests
 cat mymodule.py | art "Write pytest tests"
+
+# Attach files as context with prompt
+cat error.log | art -a glm-5 -s "Why doesn't this work?" -f relevant_code.cpp
+
+# Multiple files as context
+art -f main.py -f utils.py "Refactor these to reduce duplication"
 ```
 
 ---
@@ -90,6 +96,7 @@ Options:
   -a, --agent AGENT       Agent name from config
   -p, --prompt-name NAME  Named prompt from config
   -s, --system-prompt     Override system prompt
+  -f, --file FILE         Attach file(s) as context (multiple allowed)
   --tools PATTERNS        Enable tools ("*" or "read,write,...")
   --tool-approval MODE    ask | auto | deny
   --list-agents           List available agents
