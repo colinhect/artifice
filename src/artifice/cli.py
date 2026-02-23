@@ -554,15 +554,14 @@ def main() -> None:
         _print_completion(args.print_completion)
         sys.exit(0)
 
-    prompt = args.prompt
-    if prompt is None:
-        if sys.stdin.isatty():
-            print(
-                "Error: No prompt provided. Use argument or pipe input.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        prompt = sys.stdin.read()
+    prompt = args.prompt or ""
+
+    if not sys.stdin.isatty():
+        stdin_content = sys.stdin.read()
+        if args.prompt and stdin_content.strip():
+            prompt = f"{args.prompt}\n\n{stdin_content}"
+        elif stdin_content.strip():
+            prompt = stdin_content
 
     if not prompt.strip():
         sys.exit(0)
