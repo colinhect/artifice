@@ -628,7 +628,7 @@ def main() -> None:
             print()
 
         if config.save_session and not args.no_session:
-            session_path = save_session(
+            save_session(
                 prompt=prompt,
                 system_prompt=system_prompt,
                 model=model,
