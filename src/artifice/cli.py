@@ -76,10 +76,14 @@ BASH_COMPLETION = """_art_completion() {
         --add-prompt|--new-prompt)
             return
             ;;
+        -f|--file)
+            COMPREPLY=($(compgen -f -- "${cur}"))
+            return
+            ;;
     esac
 
     if [[ ${cur} == -* ]]; then
-        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt -r --rich --logging --list-agents --list-prompts --get-current-agent --print-completion --tools --tool-approval --install --add-prompt --new-prompt --no-session" -- "${cur}"))
+        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt -r --rich -f --file --logging --list-agents --list-prompts --get-current-agent --print-completion --tools --tool-approval --install --add-prompt --new-prompt --no-session" -- "${cur}"))
     fi
 }
 
@@ -104,6 +108,8 @@ _art() {
         '--system-prompt[System prompt for the model]:system prompt:' \
         '-r[Enable rich markdown rendering for output]' \
         '--rich[Enable rich markdown rendering for output]' \
+        '-f[Attach file as context]:file:_files' \
+        '--file[Attach file as context]:file:_files' \
         '--logging[Enable logging to stderr]' \
         '--list-agents[List available agent names]' \
         '--list-prompts[List available prompt names]' \
@@ -123,6 +129,7 @@ complete -c art -s a -l agent -d 'Agent name from config' -a '(art --list-agents
 complete -c art -s p -l prompt-name -d 'Named prompt from config' -a '(art --list-prompts 2>/dev/null)'
 complete -c art -s s -l system-prompt -d 'System prompt for the model'
 complete -c art -s r -l rich -d 'Enable rich markdown rendering for output'
+complete -c art -s f -l file -d 'Attach file as context' -a '(_files)'
 complete -c art -l logging -d 'Enable logging to stderr'
 complete -c art -l list-agents -d 'List available agent names'
 complete -c art -l list-prompts -d 'List available prompt names'
@@ -452,6 +459,14 @@ def main() -> None:
         action="store_true",
         help="Enable rich markdown rendering for output",
     )
+    parser.add_argument(
+        "-f",
+        "--file",
+        action="append",
+        dest="files",
+        metavar="FILE",
+        help="Attach file(s) as context (can be specified multiple times)",
+    )
     args = parser.parse_args()
 
     if args.install:
@@ -551,6 +566,23 @@ def main() -> None:
 
     if not prompt.strip():
         sys.exit(0)
+
+    if args.files:
+        file_contents: list[str] = []
+        for file_path in args.files:
+            path = Path(file_path)
+            if not path.is_file():
+                print(f"Error: File not found: {file_path}", file=sys.stderr)
+                sys.exit(1)
+            try:
+                content = path.read_text(encoding="utf-8")
+                file_contents.append(f"--- {file_path} ---\n{content}")
+            except Exception as e:
+                print(f"Error reading {file_path}: {e}", file=sys.stderr)
+                sys.exit(1)
+        if file_contents:
+            context = "\n\n".join(file_contents)
+            prompt = f"{context}\n\n---\n\n{prompt}"
 
     agent_name = args.agent or config.agent
     if not agent_name or not config.agents:
