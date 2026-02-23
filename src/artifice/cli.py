@@ -624,8 +624,6 @@ def main() -> None:
                 provider=provider,
                 response=response,
             )
-            if session_path:
-                print(f"\n[Session saved to {session_path}]", file=sys.stderr)
     except KeyboardInterrupt:
         sys.exit(130)
     except Exception as e:
