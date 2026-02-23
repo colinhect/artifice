@@ -5,12 +5,15 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from typing import Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator
 
 from artifice.agent.providers.base import (
     Provider,
     StreamChunk,
 )
+
+if TYPE_CHECKING:
+    from copilot.types import CopilotClientOptions
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +50,7 @@ class CopilotProvider(Provider):
 
         from copilot import CopilotClient
 
-        config: dict[str, Any] = {
+        config: CopilotClientOptions = {
             "port": self._port,
             "use_stdio": self._use_stdio,
             "auto_start": True,
@@ -83,17 +86,28 @@ class CopilotProvider(Provider):
 
         if tools:
             from copilot import define_tool
+            from copilot.types import ToolInvocation
 
             copilot_tools = []
             for tool in tools:
+                tool_name = tool.get("name", "")
+
+                def make_handler(
+                    t: dict[str, Any],
+                ) -> Callable[[Any, ToolInvocation], Any]:
+                    def handler(args: Any, inv: ToolInvocation) -> dict[str, Any]:
+                        return {
+                            "text_result_for_llm": f"Tool {t.get('name', '')} execution is handled externally",
+                            "result_type": "success",
+                        }
+
+                    return handler
+
                 copilot_tools.append(
-                    define_tool(
-                        name=tool.get("name", ""),
+                    define_tool(  # type: ignore[call-overload]
+                        name=tool_name,
                         description=tool.get("description", ""),
-                        parameters=tool.get("parameters", {}),
-                        handler=lambda args, inv, t=tool: self._handle_tool_call(
-                            t.get("name", ""), args, inv
-                        ),
+                        handler=make_handler(tool),
                     )
                 )
             config["tools"] = copilot_tools

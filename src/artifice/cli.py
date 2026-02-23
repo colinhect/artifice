@@ -10,10 +10,10 @@ import logging
 import os
 import shutil
 import sys
+from typing import TYPE_CHECKING
 
-from artifice.core.config import load_config, get_config_path, get_config_file_path
-from artifice.core.prompts import list_prompts, load_prompt
-from artifice.agent.tools.base import ToolCall
+if TYPE_CHECKING:
+    from artifice.agent.tools.base import ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +96,8 @@ def _print_completion(shell: str) -> None:
 
 def install_config() -> None:
     """Install default configuration to ~/.artifice/."""
+    from artifice.core.config import get_config_path, get_config_file_path
+
     config_dir = get_config_path()
     config_file = get_config_file_path()
     prompts_dir = config_dir / "prompts"
@@ -389,6 +391,8 @@ def main() -> None:
             stream=sys.stderr,
         )
 
+    from artifice.core.config import load_config
+
     config, config_error = load_config()
     if config_error:
         print(f"Configuration error: {config_error}", file=sys.stderr)
@@ -401,6 +405,8 @@ def main() -> None:
         sys.exit(0)
 
     if args.list_prompts:
+        from artifice.core.prompts import list_prompts
+
         prompts = list_prompts()
         if prompts:
             for name in prompts:
@@ -459,6 +465,8 @@ def main() -> None:
     system_prompt = args.system_prompt
     if system_prompt is None:
         if args.prompt_name:
+            from artifice.core.prompts import load_prompt
+
             prompt_result = load_prompt(args.prompt_name)
             if not prompt_result:
                 print(
