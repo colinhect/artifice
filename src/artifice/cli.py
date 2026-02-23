@@ -108,7 +108,6 @@ def install_config() -> None:
         sys.exit(1)
 
     config_dir.mkdir(parents=True, exist_ok=True)
-    prompts_dir.mkdir(exist_ok=True)
 
     try:
         example_config = importlib.resources.files("artifice.data").joinpath(
@@ -117,7 +116,17 @@ def install_config() -> None:
         with importlib.resources.as_file(example_config) as example_path:
             shutil.copy(example_path, config_file)
         print(f"Created {config_file}")
-        print(f"Created {prompts_dir}/")
+
+        prompts_source = importlib.resources.files("artifice.data.prompts")
+        prompts_dir.mkdir(exist_ok=True)
+        count = 0
+        for prompt_file in prompts_source.iterdir():
+            if prompt_file.is_file() and prompt_file.name.endswith(".md"):
+                with importlib.resources.as_file(prompt_file) as prompt_path:
+                    shutil.copy(prompt_path, prompts_dir / prompt_file.name)
+                    count += 1
+        print(f"Created {prompts_dir}/ ({count} prompts)")
+
         print("\nEdit the config file to customize your settings.")
     except Exception as e:
         print(f"Error creating config: {e}", file=sys.stderr)
