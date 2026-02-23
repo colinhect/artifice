@@ -10,13 +10,10 @@ import logging
 import os
 import shutil
 import sys
-from typing import TYPE_CHECKING
 
 from artifice.core.config import load_config, get_config_path, get_config_file_path
 from artifice.core.prompts import list_prompts, load_prompt
-
-if TYPE_CHECKING:
-    from artifice.agent.tools.base import ToolCall
+from artifice.agent.tools.base import ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -487,59 +484,46 @@ def main() -> None:
     elif config.tools:
         tools = config.tools
 
-    tool_approval = args.tool_approval or config.tool_approval or "ask"
+    tool_approval = args.tool_approval or config.tool_approval
     tool_allowlist = config.tool_allowlist
 
-    # If no tools enabled, use simple mode
-    if not tools:
-        try:
-            response = asyncio.run(
-                run_prompt_simple(
-                    prompt, model, system_prompt, api_key, provider, base_url
-                )
+    try:
+        response = asyncio.run(
+            run_prompt(
+                prompt,
+                model,
+                system_prompt,
+                api_key,
+                provider,
+                base_url,
+                tools,
+                tool_approval,
+                tool_allowlist,
             )
-            if response and not response.endswith("\n"):
-                print()
-        except KeyboardInterrupt:
-            sys.exit(130)
-        except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
-    else:
-        # Use tool-enabled mode
-        try:
-            response = asyncio.run(
-                run_prompt_with_tools(
-                    prompt,
-                    model,
-                    system_prompt,
-                    api_key,
-                    provider,
-                    base_url,
-                    tools,
-                    tool_approval,
-                    tool_allowlist,
-                )
-            )
-            if response and not response.endswith("\n"):
-                print()
-        except KeyboardInterrupt:
-            sys.exit(130)
-        except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
+        )
+        if response and not response.endswith("\n"):
+            print()
+    except KeyboardInterrupt:
+        sys.exit(130)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
-async def run_prompt_simple(
+async def run_prompt(
     prompt: str,
     model: str,
     system_prompt: str | None,
     api_key: str | None,
     provider: str | None,
     base_url: str | None,
+    tools: list[str] | None = None,
+    tool_approval: str | None = None,
+    tool_allowlist: list[str] | None = None,
 ) -> str:
-    """Run a simple prompt without tool support."""
+    """Run a prompt, optionally with tool support and interactive approval."""
     from artifice.agent import Agent, AnyLLMProvider
+    from artifice.agent.tools.base import execute_tool_call
 
     provider_instance = AnyLLMProvider(
         model=model,
@@ -547,13 +531,61 @@ async def run_prompt_simple(
         provider=provider,
         base_url=base_url,
     )
-    agent = Agent(provider=provider_instance, system_prompt=system_prompt, tools=None)
+
+    agent = Agent(provider=provider_instance, system_prompt=system_prompt, tools=tools)
+    final_text = ""
 
     def on_chunk(chunk: str) -> None:
+        nonlocal final_text
         print(chunk, end="", flush=True)
+        final_text += chunk
 
     response = await agent.send(prompt, on_chunk=on_chunk)
-    return response.text
+
+    if not tools:
+        return final_text
+
+    approver = ToolApprover(tool_approval or "ask", tool_allowlist)
+
+    while response.tool_calls:
+        print(
+            f"\n🔧 Processing {len(response.tool_calls)} tool call(s)...",
+            file=sys.stderr,
+        )
+
+        for tool_call in response.tool_calls:
+            is_allowed, continue_session = approver.approve_tool(tool_call)
+
+            if not continue_session:
+                print("\n❌ Operation cancelled by user.", file=sys.stderr)
+                return final_text
+
+            if is_allowed:
+                print(f"\n✅ Executing tool: {tool_call.name}", file=sys.stderr)
+
+                try:
+                    result = await execute_tool_call(tool_call)
+                    if result is None:
+                        result = f"Tool {tool_call.name} not executed (no executor)"
+
+                    agent.add_tool_result(tool_call.id, result)
+                    logger.debug("Tool %s executed successfully", tool_call.name)
+                except Exception:
+                    logger.error(
+                        "Error executing tool %s", tool_call.name, exc_info=True
+                    )
+                    error = f"Error executing tool {tool_call.name}"
+                    agent.add_tool_result(tool_call.id, error)
+            else:
+                logger.debug("Tool %s denied by user", tool_call.name)
+                agent.add_tool_result(
+                    tool_call.id, f"Tool call {tool_call.name} was denied by user"
+                )
+
+        print("\n💭 Continuing conversation...", file=sys.stderr)
+        response = await agent.send("", on_chunk=on_chunk)
+
+    return final_text
 
 
 if __name__ == "__main__":
