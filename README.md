@@ -47,7 +47,7 @@ art -f main.py -f utils.py "Refactor these to reduce duplication"
 Create `~/.artifice/config.yaml`:
 
 ```yaml
-agent: glm4
+agent: glm-flash
 
 agents:
   glm4:
@@ -55,10 +55,6 @@ agents:
     provider: openai
     model: zai-org/GLM-4.7-Flash:novita
     base_url: https://router.huggingface.co/v1
-
-prompts:
-  summarize: "Summarize concisely. Use bullet points."
-  review: "Review for bugs, security issues, and improvements."
 ```
 
 ---
@@ -127,6 +123,8 @@ Run `artifice` for an interactive terminal interface with:
 - Tool calls and code execution
 - Markdown rendering
 - Block navigation
+
+See [docs/TUI.md](docs/TUI.md) for full documentation.
 
 | Mode | Key |
 |------|-----|
