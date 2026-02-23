@@ -34,7 +34,7 @@ grep -r "TODO" src/ | art "Prioritize these TODOs"
 cat mymodule.py | art "Write pytest tests"
 
 # Attach files as context with prompt
-cat error.log | art -a glm-5 -s "Why doesn't this work?" -f relevant_code.cpp
+cat error.log | art -a glm-5 "Why doesn't this work?" -f relevant_code.cpp
 
 # Multiple files as context
 art -f main.py -f utils.py "Refactor these to reduce duplication"
