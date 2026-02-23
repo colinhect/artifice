@@ -10,11 +10,13 @@ import logging
 import os
 import shutil
 import sys
+from typing import TYPE_CHECKING
 
-from artifice.agent import Agent, AnyLLMProvider
-from artifice.agent.tools.base import ToolCall, execute_tool_call
 from artifice.core.config import load_config, get_config_path, get_config_file_path
 from artifice.core.prompts import list_prompts, load_prompt
+
+if TYPE_CHECKING:
+    from artifice.agent.tools.base import ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -226,6 +228,9 @@ async def run_prompt_with_tools(
     tool_allowlist: list[str] | None,
 ) -> str:
     """Run a prompt with tool support and interactive approval."""
+    from artifice.agent import Agent, AnyLLMProvider
+    from artifice.agent.tools.base import execute_tool_call
+
     provider_instance = AnyLLMProvider(
         model=model,
         api_key=api_key,
@@ -525,6 +530,8 @@ async def run_prompt_simple(
     base_url: str | None,
 ) -> str:
     """Run a simple prompt without tool support."""
+    from artifice.agent import Agent, AnyLLMProvider
+
     provider_instance = AnyLLMProvider(
         model=model,
         api_key=api_key,

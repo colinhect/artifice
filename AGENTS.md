@@ -3,7 +3,7 @@
 ## Important Constraints
 
 ### Do Not Execute
-- **Never run the application directly** (`artifice` or `python -m artifice.app`)
+- **Never run the application directly** (`artifice` or `python -m artifice.tui`)
 - The TUI interface requires terminal interaction that won't work in in AI agent environment
 - Test changes through unit tests instead
 
@@ -85,7 +85,8 @@
 ```
 src/artifice/
 ├── __init__.py              # Public API exports
-├── app.py                   # Entry point (argparse, main(), ArtificeApp)
+├── cli.py                   # Entry point for CLI
+├── tui.py                   # Entry point for TUI
 │
 ├── core/                    # Domain layer - business logic
 │   ├── config.py           # Configuration management

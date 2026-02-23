@@ -43,7 +43,7 @@ from artifice.ui.components.status import StatusIndicatorManager
 from artifice.ui.controllers import AgentCoordinator, NavigationController
 
 if TYPE_CHECKING:
-    from artifice.app import ArtificeApp
+    from artifice.tui import ArtificeApp
     from typing import Union
 
     AnyAgent = Union[Agent, SimulatedAgent]
@@ -77,7 +77,7 @@ class ArtificeTerminal(Widget):
 
     def __init__(
         self,
-        app: ArtificeApp,
+        tui: ArtificeApp,
         name: str | None = None,
         id: str | None = None,  # pylint: disable=redefined-builtin
         classes: str | None = None,
@@ -92,7 +92,7 @@ class ArtificeTerminal(Widget):
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
 
-        self._config = app.config
+        self._config = tui.config
         self._send_user_commands_to_agent: bool = (
             self._config.send_user_commands_to_agent
         )

@@ -17,7 +17,7 @@ Artifice is a minimal AI agent harness with a terminal interface. It provides a 
 ┌─────────────────────────────────────────────────────────────┐
 │                    ArtificeApp (Entry)                      │
 │  - Parses args, loads config                                │
-│  - Initializes Textual app with theme                       │
+│  - Initializes Textual TUI with theme                       │
 └───────────────────────┬─────────────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────────────┐
