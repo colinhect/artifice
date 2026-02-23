@@ -10,6 +10,7 @@ import logging
 import os
 import shutil
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -33,10 +34,13 @@ BASH_COMPLETION = """_art_completion() {
         -s|--system-prompt)
             return
             ;;
+        --add-prompt|--new-prompt)
+            return
+            ;;
     esac
 
     if [[ ${cur} == -* ]]; then
-        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt --logging --list-agents --list-prompts --get-current-agent --print-completion --tools --tool-approval" -- "${cur}"))
+        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt --logging --list-agents --list-prompts --get-current-agent --print-completion --tools --tool-approval --install --add-prompt --new-prompt" -- "${cur}"))
     fi
 }
 
@@ -65,7 +69,10 @@ _art() {
         '--get-current-agent[Print the current agent name and exit]' \
         '--print-completion[Print shell completion script]:shell:(bash zsh fish)' \
         '--tools[Tool patterns (e.g., "*", "read,write")]' \
-        '--tool-approval[Tool approval mode]:mode:(ask auto deny)'
+        '--tool-approval[Tool approval mode]:mode:(ask auto deny)' \
+        '--install[Install default configuration to ~/.artifice/]' \
+        '--add-prompt[Add a prompt from FILE to ~/.artifice/prompts/]:file:_files' \
+        '--new-prompt[Create a new prompt in ~/.artifice/prompts/]:prompt name:'
 }
 """
 
@@ -81,6 +88,9 @@ complete -c art -l get-current-agent -d 'Print the current agent name and exit'
 complete -c art -l print-completion -d 'Print shell completion script' -a 'bash zsh fish'
 complete -c art -l tools -d 'Tool patterns (e.g., "*", "read,write")'
 complete -c art -l tool-approval -d 'Tool approval mode' -a 'ask auto deny'
+complete -c art -l install -d 'Install default configuration to ~/.artifice/'
+complete -c art -l add-prompt -d 'Add a prompt from FILE to ~/.artifice/prompts/' -a '(_files -g "*.md")'
+complete -c art -l new-prompt -d 'Create a new prompt in ~/.artifice/prompts/'
 """
 
 
@@ -378,10 +388,60 @@ def main() -> None:
         action="store_true",
         help="Install default configuration to ~/.artifice/",
     )
+    parser.add_argument(
+        "--add-prompt",
+        metavar="FILE",
+        help="Add a prompt from FILE to ~/.artifice/prompts/",
+    )
+    parser.add_argument(
+        "--new-prompt",
+        metavar="NAME",
+        help="Create a new prompt with NAME in ~/.artifice/prompts/ (reads from stdin)",
+    )
     args = parser.parse_args()
 
     if args.install:
         install_config()
+        sys.exit(0)
+
+    if args.add_prompt:
+        from artifice.core.config import get_config_path
+
+        prompts_dir = get_config_path() / "prompts"
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+        source = Path(args.add_prompt)
+        if not source.is_file():
+            print(f"Error: File not found: {args.add_prompt}", file=sys.stderr)
+            sys.exit(1)
+        dest = prompts_dir / source.name
+        if dest.exists():
+            print(f"Error: Prompt already exists: {dest}", file=sys.stderr)
+            sys.exit(1)
+        shutil.copy(source, dest)
+        print(f"Added prompt: {dest}")
+        sys.exit(0)
+
+    if args.new_prompt:
+        from artifice.core.config import get_config_path
+
+        prompts_dir = get_config_path() / "prompts"
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+        name = args.new_prompt
+        if not name.endswith(".md"):
+            name += ".md"
+        dest = prompts_dir / name
+        if dest.exists():
+            print(f"Error: Prompt already exists: {dest}", file=sys.stderr)
+            sys.exit(1)
+        if sys.stdin.isatty():
+            print(
+                f"Enter prompt content for '{args.new_prompt}'. "
+                "Press Ctrl-D (or Ctrl-Z on Windows) to save.",
+                file=sys.stderr,
+            )
+        content = sys.stdin.read()
+        dest.write_text(content)
+        print(f"Created prompt: {dest}")
         sys.exit(0)
 
     if args.logging:
