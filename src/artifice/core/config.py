@@ -52,6 +52,8 @@ _FIELDS: dict[str, Any] = {
     "streaming_fps": 60,
     "shell_poll_interval": 0.02,
     "python_executor_sleep": 0.005,
+    # Session saving
+    "save_session": True,
 }
 
 
@@ -104,6 +106,9 @@ class ArtificeConfig:
     streaming_fps: int
     shell_poll_interval: float
     python_executor_sleep: float
+
+    # Session saving
+    save_session: bool
 
     def __init__(self):
         for key, default in _FIELDS.items():

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import datetime
 import importlib.resources
 import json
 import logging
@@ -17,6 +18,44 @@ if TYPE_CHECKING:
     from artifice.agent.tools.base import ToolCall
 
 logger = logging.getLogger(__name__)
+
+
+def save_session(
+    prompt: str,
+    system_prompt: str | None,
+    model: str,
+    provider: str | None,
+    response: str,
+) -> Path | None:
+    """Save prompt and response to a session markdown file.
+
+    Returns the path to the saved file, or None if saving was disabled.
+    """
+    sessions_dir = Path.home() / ".artifice" / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    session_file = sessions_dir / f"{timestamp}.md"
+
+    content = f"""# Session: {timestamp}
+
+## Model
+- **Provider**: {provider or "default"}
+- **Model**: {model}
+
+## System Prompt
+{system_prompt or "(none)"}
+
+## User Prompt
+{prompt}
+
+## Response
+{response}
+"""
+
+    session_file.write_text(content, encoding="utf-8")
+    return session_file
+
 
 BASH_COMPLETION = """_art_completion() {
     local cur prev words cword
@@ -398,6 +437,11 @@ def main() -> None:
         metavar="NAME",
         help="Create a new prompt with NAME in ~/.artifice/prompts/ (reads from stdin)",
     )
+    parser.add_argument(
+        "--no-session",
+        action="store_true",
+        help="Disable saving session to ~/.artifice/sessions/",
+    )
     args = parser.parse_args()
 
     if args.install:
@@ -571,6 +615,17 @@ def main() -> None:
         )
         if response and not response.endswith("\n"):
             print()
+
+        if config.save_session and not args.no_session:
+            session_path = save_session(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                model=model,
+                provider=provider,
+                response=response,
+            )
+            if session_path:
+                print(f"\n[Session saved to {session_path}]", file=sys.stderr)
     except KeyboardInterrupt:
         sys.exit(130)
     except Exception as e:
