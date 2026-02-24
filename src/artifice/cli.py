@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING
 from textual.app import App, ComposeResult
 from textual.widgets import Markdown
 
+from artifice.utils.theme import create_artifice_theme
+
 if TYPE_CHECKING:
     from artifice.agent.client import Agent
     from artifice.agent.tools.base import ToolCall
@@ -28,6 +30,9 @@ class MarkdownStreamApp(App):
     """Inline Textual app for streaming markdown output."""
 
     CSS = """
+    Screen {
+        overflow-y: scroll;
+    }
     Markdown {
         background: transparent;
         padding: 0;
@@ -69,6 +74,8 @@ class MarkdownStreamApp(App):
         yield self._markdown
 
     async def on_mount(self) -> None:
+        self.register_theme(create_artifice_theme())
+        self.theme = "artifice"
         if self._markdown is not None:
             self._stream = self._markdown.get_stream(self._markdown)
             self._stream_ready.set()
