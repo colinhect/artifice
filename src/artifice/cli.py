@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from textual.app import App, ComposeResult
-from textual.widgets import Markdown
+from textual.events import Key
+from textual.widgets import Markdown, Static
 
 from artifice.utils.theme import create_artifice_theme
 
@@ -37,6 +38,11 @@ class MarkdownStreamApp(App):
         background: transparent;
         padding: 0;
         margin: 0;
+    }
+    #exit-hint {
+        color: $text-muted;
+        text-align: right;
+        padding: 0 1;
     }
     """
 
@@ -68,10 +74,12 @@ class MarkdownStreamApp(App):
         self._stream = None
         self._stream_ready = asyncio.Event()
         self._final_text = ""
+        self._streaming_done = False
 
     def compose(self) -> ComposeResult:
         self._markdown = Markdown("")
         yield self._markdown
+        yield Static("", id="exit-hint")
 
     async def on_mount(self) -> None:
         self.register_theme(create_artifice_theme())
@@ -80,6 +88,10 @@ class MarkdownStreamApp(App):
             self._stream = self._markdown.get_stream(self._markdown)
             self._stream_ready.set()
         self.run_worker(self._run_prompt())
+
+    def on_key(self, event: Key) -> None:
+        if self._streaming_done and event.key in ("enter", "escape"):
+            self.exit()
 
     async def _run_prompt(self) -> None:
         from artifice.agent import Agent, AnyLLMProvider
@@ -104,6 +116,7 @@ class MarkdownStreamApp(App):
             await self._stream_ready.wait()
             if self._stream is not None:
                 await self._stream.write(chunk)
+            self.screen.scroll_end(animate=False)
 
         response = await agent.send(
             self._prompt, on_chunk=lambda c: asyncio.create_task(on_chunk(c))
@@ -120,7 +133,8 @@ class MarkdownStreamApp(App):
                     total_usage.input_tokens, total_usage.output_tokens
                 )
                 print(f"\n[{usage_str}]", file=sys.stderr)
-            self.exit()
+            self._streaming_done = True
+            self.query_one("#exit-hint", Static).update("Press Enter or Escape to exit")
             return
 
         approver = ToolApprover(self._tool_approval or "ask", self._tool_allowlist)
@@ -130,7 +144,8 @@ class MarkdownStreamApp(App):
                 response.tool_calls, agent, approver, self._tool_output
             )
             if not should_continue:
-                self.exit()
+                self._streaming_done = True
+                self.query_one("#exit-hint", Static).update("Press Enter or Escape to exit")
                 return
 
             response = await agent.send(
@@ -148,7 +163,8 @@ class MarkdownStreamApp(App):
             )
             print(f"\n[{usage_str}]", file=sys.stderr)
 
-        self.exit()
+        self._streaming_done = True
+        self.query_one("#exit-hint", Static).update("Press Enter or Escape to exit")
 
 
 def save_session(
