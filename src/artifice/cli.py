@@ -200,6 +200,17 @@ def format_tool_args(tool_call: ToolCall) -> str:
     return " ".join(parts)
 
 
+def format_token_usage(
+    input_tokens: int, output_tokens: int, context_window: int | None = None
+) -> str:
+    """Format token usage for display."""
+    parts = [f"in:{input_tokens}", f"out:{output_tokens}"]
+    if context_window:
+        used_pct = (input_tokens + output_tokens) / context_window * 100
+        parts.append(f"{used_pct:.0f}%")
+    return " ".join(parts)
+
+
 def get_context_length(messages: list[dict]) -> int:
     """Calculate total character length of message content."""
     total = 0
@@ -258,6 +269,8 @@ async def process_tool_calls(
     Returns:
         True if processing should continue, False if cancelled.
     """
+    if tool_calls:
+        print("", file=sys.stderr)
     for tool_call in tool_calls:
         is_allowed, continue_session = approver.approve_tool(tool_call)
 
@@ -266,7 +279,7 @@ async def process_tool_calls(
             return False
 
         args_str = format_tool_args(tool_call)
-        print(f"\n{tool_call.name}({args_str})", end="", flush=True, file=sys.stderr)
+        print(f"{tool_call.name}({args_str})", end="", flush=True, file=sys.stderr)
 
         if is_allowed:
             success, msg = await execute_tool(tool_call, agent, tool_output)
@@ -295,6 +308,7 @@ async def run_prompt(
 ) -> str:
     """Run a prompt with optional tool support and interactive approval."""
     from artifice.agent import Agent, AnyLLMProvider
+    from artifice.agent.providers.base import TokenUsage
 
     provider_instance = AnyLLMProvider(
         model=model,
@@ -305,6 +319,7 @@ async def run_prompt(
 
     agent = Agent(provider=provider_instance, system_prompt=system_prompt, tools=tools)
     final_text = ""
+    total_usage = TokenUsage()
 
     def on_chunk(chunk: str) -> None:
         nonlocal final_text
@@ -313,7 +328,17 @@ async def run_prompt(
 
     response = await agent.send(prompt, on_chunk=on_chunk)
 
+    if response.usage:
+        total_usage.input_tokens += response.usage.input_tokens
+        total_usage.output_tokens += response.usage.output_tokens
+        total_usage.total_tokens += response.usage.total_tokens
+
     if not tools:
+        if total_usage.total_tokens > 0:
+            usage_str = format_token_usage(
+                total_usage.input_tokens, total_usage.output_tokens
+            )
+            print(f"\n[{usage_str}]", file=sys.stderr)
         return final_text
 
     approver = ToolApprover(tool_approval or "ask", tool_allowlist)
@@ -324,7 +349,19 @@ async def run_prompt(
         )
         if not should_continue:
             return final_text
+
         response = await agent.send("", on_chunk=on_chunk)
+
+        if response.usage:
+            total_usage.input_tokens += response.usage.input_tokens
+            total_usage.output_tokens += response.usage.output_tokens
+            total_usage.total_tokens += response.usage.total_tokens
+
+    if total_usage.total_tokens > 0:
+        usage_str = format_token_usage(
+            total_usage.input_tokens, total_usage.output_tokens
+        )
+        print(f"\n[{usage_str}]", file=sys.stderr)
 
     return final_text
 
