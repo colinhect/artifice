@@ -12,7 +12,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from textual.app import App, ComposeResult
 from textual.events import Key
@@ -22,6 +22,7 @@ from artifice.utils.theme import create_artifice_theme
 
 if TYPE_CHECKING:
     from artifice.agent.client import Agent
+    from artifice.agent.providers.base import TokenUsage
     from artifice.agent.tools.base import ToolCall
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,6 @@ class MarkdownStreamApp(App):
         self._tool_output = tool_output
         self._markdown: Markdown | None = None
         self._stream = None
-        self._stream_ready = asyncio.Event()
         self._final_text = ""
         self._streaming_done = False
 
@@ -86,8 +86,11 @@ class MarkdownStreamApp(App):
         self.theme = "artifice"
         if self._markdown is not None:
             self._stream = self._markdown.get_stream(self._markdown)
-            self._stream_ready.set()
         self.run_worker(self._run_prompt())
+
+    @property
+    def final_text(self) -> str:
+        return self._final_text
 
     def on_key(self, event: Key) -> None:
         if self._streaming_done and event.key in ("enter", "escape"):
@@ -95,7 +98,6 @@ class MarkdownStreamApp(App):
 
     async def _run_prompt(self) -> None:
         from artifice.agent import Agent, AnyLLMProvider
-        from artifice.agent.providers.base import TokenUsage
 
         provider_instance = AnyLLMProvider(
             model=self._model,
@@ -103,59 +105,27 @@ class MarkdownStreamApp(App):
             provider=self._provider,
             base_url=self._base_url,
         )
-
         agent = Agent(
             provider=provider_instance,
             system_prompt=self._system_prompt,
             tools=self._tools,
         )
-        total_usage = TokenUsage()
 
-        async def on_chunk(chunk: str) -> None:
-            self._final_text += chunk
-            await self._stream_ready.wait()
+        def on_chunk(chunk: str) -> None:
             if self._stream is not None:
-                await self._stream.write(chunk)
+                asyncio.create_task(self._stream.write(chunk))
             self.screen.scroll_end(animate=False)
 
-        response = await agent.send(
-            self._prompt, on_chunk=lambda c: asyncio.create_task(on_chunk(c))
+        final_text, total_usage = await _run_agent_loop(
+            agent,
+            self._prompt,
+            on_chunk,
+            self._tools,
+            self._tool_approval,
+            self._tool_allowlist,
+            self._tool_output,
         )
-
-        if response.usage:
-            total_usage.input_tokens += response.usage.input_tokens
-            total_usage.output_tokens += response.usage.output_tokens
-            total_usage.total_tokens += response.usage.total_tokens
-
-        if not self._tools:
-            if total_usage.total_tokens > 0:
-                usage_str = format_token_usage(
-                    total_usage.input_tokens, total_usage.output_tokens
-                )
-                print(f"\n[{usage_str}]", file=sys.stderr)
-            self._streaming_done = True
-            self.query_one("#exit-hint", Static).update("Press Enter or Escape to exit")
-            return
-
-        approver = ToolApprover(self._tool_approval or "ask", self._tool_allowlist)
-
-        while response.tool_calls:
-            should_continue = await process_tool_calls(
-                response.tool_calls, agent, approver, self._tool_output
-            )
-            if not should_continue:
-                self._streaming_done = True
-                self.query_one("#exit-hint", Static).update("Press Enter or Escape to exit")
-                return
-
-            response = await agent.send(
-                "", on_chunk=lambda c: asyncio.create_task(on_chunk(c))
-            )
-
-            if response.usage:
-                total_usage.input_tokens += response.usage.input_tokens
-                total_usage.output_tokens += response.usage.output_tokens
-                total_usage.total_tokens += response.usage.total_tokens
+        self._final_text = final_text
 
         if total_usage.total_tokens > 0:
             usage_str = format_token_usage(
@@ -249,7 +219,6 @@ class ToolApprover:
         self.approval_mode = approval_mode
         self.allowlist = allowlist or []
         self.always_allowed: set[str] = set()
-        self.session_allowed: set[str] = set()
 
     def is_allowed(self, tool_name: str) -> bool:
         """Check if a tool is allowed based on approval mode and lists."""
@@ -264,22 +233,19 @@ class ToolApprover:
             if fnmatch(tool_name, pattern):
                 return True
 
-        if tool_name in self.always_allowed:
-            return True
+        return tool_name in self.always_allowed
 
-        return False
-
-    def prompt_approval(self, tool_call: ToolCall) -> str:
+    def prompt_approval(self, tool_call: "ToolCall") -> str:
         """Prompt user for tool call approval.
 
-        Returns one of: "allow", "deny", "always", "once"
+        Returns one of: "allow", "always", "deny", "abort"
         """
         print(f"\nTool Call: {tool_call.name}", file=sys.stderr)
         print(f"   Arguments: {json.dumps(tool_call.args, indent=4)}", file=sys.stderr)
 
         while True:
             print(
-                "\nApprove this tool call? [Y]es [N]o [A]lways [O]nce: ",
+                "\nApprove this tool call? [Y]es [N]o [A]lways [C]ancel: ",
                 end="",
                 flush=True,
                 file=sys.stderr,
@@ -292,26 +258,20 @@ class ToolApprover:
                     return "deny"
                 if response in ("a", "always"):
                     return "always"
-                if response in ("o", "once"):
-                    return "once"
-                print("Invalid response. Please enter Y, N, A, or O.", file=sys.stderr)
+                if response in ("c", "cancel"):
+                    return "abort"
+                print("Invalid response. Please enter Y, N, A, or C.", file=sys.stderr)
             except (KeyboardInterrupt, EOFError):
                 print("\nOperation cancelled.", file=sys.stderr)
-                return "deny"
+                return "abort"
 
-    def approve_tool(self, tool_call: ToolCall) -> tuple[bool, bool]:
+    def approve_tool(self, tool_call: "ToolCall") -> tuple[bool, bool]:
         """Approve or deny a tool call.
 
         Returns:
             tuple of (is_allowed, continue_session)
         """
-        tool_name = tool_call.name
-
-        if tool_name in self.session_allowed:
-            self.session_allowed.remove(tool_name)
-            return True, True
-
-        if self.is_allowed(tool_name):
+        if self.is_allowed(tool_call.name):
             return True, True
 
         decision = self.prompt_approval(tool_call)
@@ -319,13 +279,12 @@ class ToolApprover:
         if decision == "allow":
             return True, True
         if decision == "always":
-            self.always_allowed.add(tool_name)
+            self.always_allowed.add(tool_call.name)
             return True, True
-        if decision == "once":
-            self.session_allowed.add(tool_name)
-            return True, True
+        if decision == "deny":
+            return False, True  # deny this call but continue the session
 
-        return False, False
+        return False, False  # abort
 
 
 def format_tool_args(tool_call: ToolCall) -> str:
@@ -440,6 +399,56 @@ async def process_tool_calls(
     return True
 
 
+async def _run_agent_loop(
+    agent: "Agent",
+    prompt: str,
+    on_chunk: Callable[[str], None],
+    tools: list[str] | None,
+    tool_approval: str | None,
+    tool_allowlist: list[str] | None,
+    tool_output: bool,
+) -> "tuple[str, TokenUsage]":
+    """Core agent loop shared by streaming and non-streaming modes.
+
+    Returns (final_text, total_usage).
+    """
+    from artifice.agent.providers.base import TokenUsage
+
+    final_text = ""
+    total_usage = TokenUsage()
+
+    def collecting_chunk(chunk: str) -> None:
+        nonlocal final_text
+        final_text += chunk
+        on_chunk(chunk)
+
+    response = await agent.send(prompt, on_chunk=collecting_chunk)
+
+    if response.usage:
+        total_usage.input_tokens += response.usage.input_tokens
+        total_usage.output_tokens += response.usage.output_tokens
+        total_usage.total_tokens += response.usage.total_tokens
+
+    if tools:
+        approver = ToolApprover(tool_approval or "ask", tool_allowlist)
+
+        while response.tool_calls:
+            should_continue = await process_tool_calls(
+                response.tool_calls, agent, approver, tool_output
+            )
+            if not should_continue:
+                return final_text, total_usage
+
+            response = await agent.send("", on_chunk=collecting_chunk)
+
+            if response.usage:
+                total_usage.input_tokens += response.usage.input_tokens
+                total_usage.output_tokens += response.usage.output_tokens
+                total_usage.total_tokens += response.usage.total_tokens
+
+    return final_text, total_usage
+
+
 async def run_prompt(
     prompt: str,
     model: str,
@@ -454,7 +463,6 @@ async def run_prompt(
 ) -> str:
     """Run a prompt with optional tool support and interactive approval."""
     from artifice.agent import Agent, AnyLLMProvider
-    from artifice.agent.providers.base import TokenUsage
 
     provider_instance = AnyLLMProvider(
         model=model,
@@ -462,46 +470,14 @@ async def run_prompt(
         provider=provider,
         base_url=base_url,
     )
-
     agent = Agent(provider=provider_instance, system_prompt=system_prompt, tools=tools)
-    final_text = ""
-    total_usage = TokenUsage()
 
     def on_chunk(chunk: str) -> None:
-        nonlocal final_text
         print(chunk, end="", flush=True)
-        final_text += chunk
 
-    response = await agent.send(prompt, on_chunk=on_chunk)
-
-    if response.usage:
-        total_usage.input_tokens += response.usage.input_tokens
-        total_usage.output_tokens += response.usage.output_tokens
-        total_usage.total_tokens += response.usage.total_tokens
-
-    if not tools:
-        if total_usage.total_tokens > 0:
-            usage_str = format_token_usage(
-                total_usage.input_tokens, total_usage.output_tokens
-            )
-            print(f"\n[{usage_str}]", file=sys.stderr)
-        return final_text
-
-    approver = ToolApprover(tool_approval or "ask", tool_allowlist)
-
-    while response.tool_calls:
-        should_continue = await process_tool_calls(
-            response.tool_calls, agent, approver, tool_output
-        )
-        if not should_continue:
-            return final_text
-
-        response = await agent.send("", on_chunk=on_chunk)
-
-        if response.usage:
-            total_usage.input_tokens += response.usage.input_tokens
-            total_usage.output_tokens += response.usage.output_tokens
-            total_usage.total_tokens += response.usage.total_tokens
+    final_text, total_usage = await _run_agent_loop(
+        agent, prompt, on_chunk, tools, tool_approval, tool_allowlist, tool_output
+    )
 
     if total_usage.total_tokens > 0:
         usage_str = format_token_usage(
@@ -510,6 +486,78 @@ async def run_prompt(
         print(f"\n[{usage_str}]", file=sys.stderr)
 
     return final_text
+
+
+def _build_prompt(args: argparse.Namespace) -> str:
+    """Build the prompt string from CLI args, stdin, and attached files."""
+    prompt = args.prompt or ""
+
+    if not sys.stdin.isatty():
+        stdin_content = sys.stdin.read()
+        if args.prompt and stdin_content.strip():
+            prompt = f"{args.prompt}\n\n{stdin_content}"
+        elif stdin_content.strip():
+            prompt = stdin_content
+
+    if not prompt.strip():
+        return prompt
+
+    if args.files:
+        file_contents: list[str] = []
+        for file_path in args.files:
+            path = Path(file_path)
+            if not path.is_file():
+                print(f"Error: File not found: {file_path}", file=sys.stderr)
+                sys.exit(1)
+            try:
+                content = path.read_text(encoding="utf-8")
+                file_contents.append(f"--- {file_path} ---\n{content}")
+            except Exception as e:
+                print(f"Error reading {file_path}: {e}", file=sys.stderr)
+                sys.exit(1)
+        if file_contents:
+            context = "\n\n".join(file_contents)
+            prompt = f"{context}\n\n---\n\n{prompt}"
+
+    return prompt
+
+
+def _resolve_agent(
+    args: argparse.Namespace, config
+) -> tuple[str, str | None, str | None, str | None, dict]:
+    """Resolve agent configuration from args and config.
+
+    Returns (model, api_key, provider, base_url, agent_def).
+    Exits with an error message if the agent cannot be resolved.
+    """
+    agent_name = args.agent or config.agent
+    if not agent_name or not config.agents:
+        print(
+            "Error: No agent specified. Use --agent or configure a default agent.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    agent_def = config.agents.get(agent_name)
+    if not agent_def:
+        print(f"Error: Unknown agent '{agent_name}'", file=sys.stderr)
+        sys.exit(1)
+
+    model = agent_def.get("model")
+    if not model:
+        print(f"Error: Agent '{agent_name}' has no model defined", file=sys.stderr)
+        sys.exit(1)
+
+    api_key = agent_def.get("api_key")
+    if api_key is None:
+        env_var = agent_def.get("api_key_env")
+        if env_var:
+            api_key = os.environ.get(env_var)
+
+    provider = agent_def.get("provider")
+    base_url = agent_def.get("base_url")
+
+    return model, api_key, provider, base_url, agent_def
 
 
 def main() -> None:
@@ -694,58 +742,15 @@ def main() -> None:
         print(agent_name)
         sys.exit(0)
 
-    prompt = args.prompt or ""
-
-    if not sys.stdin.isatty():
-        stdin_content = sys.stdin.read()
-        if args.prompt and stdin_content.strip():
-            prompt = f"{args.prompt}\n\n{stdin_content}"
-        elif stdin_content.strip():
-            prompt = stdin_content
-
+    prompt = _build_prompt(args)
     if not prompt.strip():
         sys.exit(0)
 
-    if args.files:
-        file_contents: list[str] = []
-        for file_path in args.files:
-            path = Path(file_path)
-            if not path.is_file():
-                print(f"Error: File not found: {file_path}", file=sys.stderr)
-                sys.exit(1)
-            try:
-                content = path.read_text(encoding="utf-8")
-                file_contents.append(f"--- {file_path} ---\n{content}")
-            except Exception as e:
-                print(f"Error reading {file_path}: {e}", file=sys.stderr)
-                sys.exit(1)
-        if file_contents:
-            context = "\n\n".join(file_contents)
-            prompt = f"{context}\n\n---\n\n{prompt}"
+    model, api_key, provider, base_url, agent_def = _resolve_agent(args, config)
 
-    agent_name = args.agent or config.agent
-    if not agent_name or not config.agents:
-        print(
-            "Error: No agent specified. Use --agent or configure a default agent.",
-            file=sys.stderr,
-        )
+    if provider and provider.lower() == "simulated":
+        print("Error: Simulated agents not supported in CLI mode", file=sys.stderr)
         sys.exit(1)
-
-    agent_def = config.agents.get(agent_name)
-    if not agent_def:
-        print(f"Error: Unknown agent '{agent_name}'", file=sys.stderr)
-        sys.exit(1)
-
-    model = agent_def.get("model")
-    if not model:
-        print(f"Error: Agent '{agent_name}' has no model defined", file=sys.stderr)
-        sys.exit(1)
-
-    api_key = agent_def.get("api_key")
-    if api_key is None:
-        env_var = agent_def.get("api_key_env")
-        if env_var:
-            api_key = os.environ.get(env_var)
 
     system_prompt = args.system_prompt
     if system_prompt is None:
@@ -762,13 +767,6 @@ def main() -> None:
             _, system_prompt = prompt_result
         else:
             system_prompt = agent_def.get("system_prompt", config.system_prompt)
-
-    provider = agent_def.get("provider")
-    if provider and provider.lower() == "simulated":
-        print("Error: Simulated agents not supported in CLI mode", file=sys.stderr)
-        sys.exit(1)
-
-    base_url = agent_def.get("base_url")
 
     tools = None
     if args.tools:
@@ -794,7 +792,7 @@ def main() -> None:
                 tool_output=args.tool_output,
             )
             app.run(inline=True, inline_no_clear=True)
-            response = app._final_text
+            response = app.final_text
         else:
             response = asyncio.run(
                 run_prompt(

@@ -34,7 +34,7 @@ grep -r "TODO" src/ | art "Prioritize these TODOs"
 cat mymodule.py | art "Write pytest tests"
 
 # Attach files as context with prompt
-cat error.log | art -a glm-5 "Why doesn't this work?" -f relevant_code.cpp
+cat error.log | art -a glm-flash "Why doesn't this work?" -f relevant_code.cpp
 
 # Multiple files as context
 art -f main.py -f utils.py "Refactor these to reduce duplication"
@@ -77,7 +77,7 @@ art --tools "read,glob" "Find Python files with TODOs"
 **Available tools:** `read`, `write`, `edit`, `glob`, `shell`, `python`
 
 **Approval modes:**
-- `ask` — prompt for each call (default)
+- `ask` — prompt for each call (default): `y`=yes, `n`=no, `a`=always allow, `c`=cancel session
 - `auto` — approve everything
 - `deny` — reject everything
 
@@ -93,25 +93,14 @@ Options:
   -p, --prompt-name NAME  Named prompt from config
   -s, --system-prompt     Override system prompt
   -f, --file FILE         Attach file(s) as context (multiple allowed)
+  -m, --markdown          Render output as markdown in real-time
   --tools PATTERNS        Enable tools ("*" or "read,write,...")
   --tool-approval MODE    ask | auto | deny
+  --tool-output           Show tool call output (hidden by default)
+  --no-session            Disable saving session to ~/.artifice/sessions/
   --list-agents           List available agents
   --list-prompts          List available prompts
-```
-
----
-
-## Shell Completion
-
-```bash
-# Zsh
-art --print-completion zsh > ~/.zsh/completions/_art
-
-# Bash
-art --print-completion bash >> ~/.bash_completion
-
-# Fish
-art --print-completion fish > ~/.config/fish/completions/art.fish
+  --install               Install default config to ~/.artifice/
 ```
 
 ---
