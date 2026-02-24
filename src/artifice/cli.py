@@ -57,103 +57,6 @@ def save_session(
     return session_file
 
 
-BASH_COMPLETION = """_art_completion() {
-    local cur prev words cword
-    _init_completion || return
-
-    case ${prev} in
-        -a|--agent)
-            COMPREPLY=($(compgen -W "$(art --list-agents 2>/dev/null)" -- "${cur}"))
-            return
-            ;;
-        -p|--prompt-name)
-            COMPREPLY=($(compgen -W "$(art --list-prompts 2>/dev/null)" -- "${cur}"))
-            return
-            ;;
-        -s|--system-prompt)
-            return
-            ;;
-        --add-prompt|--new-prompt)
-            return
-            ;;
-        -f|--file)
-            COMPREPLY=($(compgen -f -- "${cur}"))
-            return
-            ;;
-    esac
-
-    if [[ ${cur} == -* ]]; then
-        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt -r --rich -f --file --logging --list-agents --list-prompts --get-current-agent --print-completion --tools --tool-approval --install --add-prompt --new-prompt --no-session" -- "${cur}"))
-    fi
-}
-
-complete -F _art_completion art
-"""
-
-ZSH_COMPLETION = """#compdef art
-
-_art() {
-    local -a agents prompts
-
-    agents=(${(f)"$(art --list-agents 2>/dev/null)"})
-    prompts=(${(f)"$(art --list-prompts 2>/dev/null)"})
-
-    _arguments \
-        '1:prompt:' \
-        '-a[Agent name from config]:agent:($agents)' \
-        '--agent[Agent name from config]:agent:($agents)' \
-        '-p[Named prompt from config]:prompt:($prompts)' \
-        '--prompt-name[Named prompt from config]:prompt:($prompts)' \
-        '-s[System prompt for the model]:system prompt:' \
-        '--system-prompt[System prompt for the model]:system prompt:' \
-        '-r[Enable rich markdown rendering for output]' \
-        '--rich[Enable rich markdown rendering for output]' \
-        '-f[Attach file as context]:file:_files' \
-        '--file[Attach file as context]:file:_files' \
-        '--logging[Enable logging to stderr]' \
-        '--list-agents[List available agent names]' \
-        '--list-prompts[List available prompt names]' \
-        '--get-current-agent[Print the current agent name and exit]' \
-        '--print-completion[Print shell completion script]:shell:(bash zsh fish)' \
-        '--tools[Tool patterns (e.g., "*", "read,write")]' \
-        '--tool-approval[Tool approval mode]:mode:(ask auto deny)' \
-        '--install[Install default configuration to ~/.artifice/]' \
-        '--add-prompt[Add a prompt from FILE to ~/.artifice/prompts/]:file:_files' \
-        '--new-prompt[Create a new prompt in ~/.artifice/prompts/]:prompt name:'
-}
-"""
-
-FISH_COMPLETION = """complete -c art -f
-
-complete -c art -s a -l agent -d 'Agent name from config' -a '(art --list-agents 2>/dev/null)'
-complete -c art -s p -l prompt-name -d 'Named prompt from config' -a '(art --list-prompts 2>/dev/null)'
-complete -c art -s s -l system-prompt -d 'System prompt for the model'
-complete -c art -s r -l rich -d 'Enable rich markdown rendering for output'
-complete -c art -s f -l file -d 'Attach file as context' -a '(_files)'
-complete -c art -l logging -d 'Enable logging to stderr'
-complete -c art -l list-agents -d 'List available agent names'
-complete -c art -l list-prompts -d 'List available prompt names'
-complete -c art -l get-current-agent -d 'Print the current agent name and exit'
-complete -c art -l print-completion -d 'Print shell completion script' -a 'bash zsh fish'
-complete -c art -l tools -d 'Tool patterns (e.g., "*", "read,write")'
-complete -c art -l tool-approval -d 'Tool approval mode' -a 'ask auto deny'
-complete -c art -l install -d 'Install default configuration to ~/.artifice/'
-complete -c art -l add-prompt -d 'Add a prompt from FILE to ~/.artifice/prompts/' -a '(_files -g "*.md")'
-complete -c art -l new-prompt -d 'Create a new prompt in ~/.artifice/prompts/'
-complete -c art -l no-session -d 'Disable saving session to ~/.artifice/sessions/'
-"""
-
-
-def _print_completion(shell: str) -> None:
-    """Print shell completion script."""
-    scripts = {
-        "bash": BASH_COMPLETION,
-        "zsh": ZSH_COMPLETION,
-        "fish": FISH_COMPLETION,
-    }
-    print(scripts.get(shell, ""))
-
-
 def install_config() -> None:
     """Install default configuration to ~/.artifice/."""
     from artifice.core.config import get_config_path, get_config_file_path
@@ -405,22 +308,17 @@ def main() -> None:
     parser.add_argument(
         "--list-agents",
         action="store_true",
-        help="List available agent names (for shell completion)",
+        help="List available agent names",
     )
     parser.add_argument(
         "--list-prompts",
         action="store_true",
-        help="List available prompt names (for shell completion)",
+        help="List available prompt names",
     )
     parser.add_argument(
         "--get-current-agent",
         action="store_true",
         help="Print the current agent name and exit",
-    )
-    parser.add_argument(
-        "--print-completion",
-        choices=["bash", "zsh", "fish"],
-        help="Print shell completion script",
     )
     parser.add_argument(
         "--tools",
@@ -548,10 +446,6 @@ def main() -> None:
             print("Error: No agent configured", file=sys.stderr)
             sys.exit(1)
         print(agent_name)
-        sys.exit(0)
-
-    if args.print_completion:
-        _print_completion(args.print_completion)
         sys.exit(0)
 
     prompt = args.prompt or ""
