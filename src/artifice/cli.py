@@ -1,4 +1,4 @@
-"""Simple command-line interface for artifice - GNU-style input/output mode."""
+"""Simple command-line interface for artifice."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from artifice.agent.client import Agent
     from artifice.agent.tools.base import ToolCall
 
 logger = logging.getLogger(__name__)
@@ -111,14 +112,12 @@ class ToolApprover:
         if self.approval_mode == "deny":
             return False
 
-        # Check permanent allowlist
         from fnmatch import fnmatch
 
         for pattern in self.allowlist:
             if fnmatch(tool_name, pattern):
                 return True
 
-        # Check always-allowed tools
         if tool_name in self.always_allowed:
             return True
 
@@ -129,7 +128,7 @@ class ToolApprover:
 
         Returns one of: "allow", "deny", "always", "once"
         """
-        print(f"\n🛠️  Tool Call: {tool_call.name}", file=sys.stderr)
+        print(f"\nTool Call: {tool_call.name}", file=sys.stderr)
         print(f"   Arguments: {json.dumps(tool_call.args, indent=4)}", file=sys.stderr)
 
         while True:
@@ -162,16 +161,13 @@ class ToolApprover:
         """
         tool_name = tool_call.name
 
-        # Check if tool has a one-time session allowance
         if tool_name in self.session_allowed:
             self.session_allowed.remove(tool_name)
             return True, True
 
-        # Check if tool is pre-approved
         if self.is_allowed(tool_name):
             return True, True
 
-        # Prompt user for decision
         decision = self.prompt_approval(tool_call)
 
         if decision == "allow":
@@ -183,24 +179,122 @@ class ToolApprover:
             self.session_allowed.add(tool_name)
             return True, True
 
-        # decision == "deny"
         return False, False
 
 
-async def run_prompt_with_tools(
+def format_tool_args(tool_call: ToolCall) -> str:
+    """Format tool arguments for display on one line."""
+    if not tool_call.args:
+        return ""
+    parts = []
+    for key, value in tool_call.args.items():
+        if isinstance(value, str):
+            if len(value) > 40:
+                value = value[:37] + "..."
+            value = f'"{value}"'
+        elif isinstance(value, dict):
+            value = "{...}"
+        elif isinstance(value, list):
+            value = f"[{len(value)} items]"
+        parts.append(f"{key}={value}")
+    return " ".join(parts)
+
+
+def get_context_length(messages: list[dict]) -> int:
+    """Calculate total character length of message content."""
+    total = 0
+    for msg in messages:
+        if isinstance(msg.get("content"), str):
+            total += len(msg["content"])
+        elif isinstance(msg.get("content"), list):
+            for part in msg["content"]:
+                if isinstance(part.get("text"), str):
+                    total += len(part["text"])
+    return total
+
+
+async def execute_tool(
+    tool_call: ToolCall,
+    agent: "Agent",
+    tool_output: bool = False,
+) -> tuple[bool, str]:
+    """Execute a single tool call and add result to agent.
+
+    Returns:
+        tuple of (success, result_message)
+    """
+    from artifice.agent.tools.base import execute_tool_call
+
+    try:
+        before_len = get_context_length(agent.messages)
+        result = await execute_tool_call(tool_call)
+        if result is None:
+            result = f"Tool {tool_call.name} not executed (no executor)"
+
+        agent.add_tool_result(tool_call.id, result)
+        after_len = get_context_length(agent.messages)
+        added = after_len - before_len
+
+        if tool_output:
+            print(result, file=sys.stderr)
+
+        logger.debug("Tool %s executed successfully", tool_call.name)
+        return True, f"+{added} chars"
+    except Exception:
+        logger.error("Error executing tool %s", tool_call.name, exc_info=True)
+        error = f"Error executing tool {tool_call.name}"
+        agent.add_tool_result(tool_call.id, error)
+        return False, "error"
+
+
+async def process_tool_calls(
+    tool_calls: list["ToolCall"],
+    agent: "Agent",
+    approver: ToolApprover,
+    tool_output: bool = False,
+) -> bool:
+    """Process a list of tool calls with approval.
+
+    Returns:
+        True if processing should continue, False if cancelled.
+    """
+    for tool_call in tool_calls:
+        is_allowed, continue_session = approver.approve_tool(tool_call)
+
+        if not continue_session:
+            print("\nOperation cancelled by user.", file=sys.stderr)
+            return False
+
+        args_str = format_tool_args(tool_call)
+        print(f"\n{tool_call.name}({args_str})", end="", flush=True, file=sys.stderr)
+
+        if is_allowed:
+            success, msg = await execute_tool(tool_call, agent, tool_output)
+            print(f" → {msg}", file=sys.stderr)
+        else:
+            agent.add_tool_result(
+                tool_call.id, f"Tool call {tool_call.name} was denied by user"
+            )
+            print(" → denied", file=sys.stderr)
+            logger.debug("Tool %s denied by user", tool_call.name)
+
+    return True
+
+
+async def run_prompt(
     prompt: str,
     model: str,
     system_prompt: str | None,
     api_key: str | None,
     provider: str | None,
     base_url: str | None,
-    tools: list[str] | None,
-    tool_approval: str,
-    tool_allowlist: list[str] | None,
+    tools: list[str] | None = None,
+    tool_approval: str | None = None,
+    tool_allowlist: list[str] | None = None,
+    tool_output: bool = False,
 ) -> str:
-    """Run a prompt with tool support and interactive approval."""
+    """Run a prompt with optional tool support and interactive approval."""
     from artifice.agent import Agent, AnyLLMProvider
-    from artifice.agent.tools.base import execute_tool_call
 
     provider_instance = AnyLLMProvider(
         model=model,
@@ -209,10 +303,6 @@ async def run_prompt_with_tools(
         base_url=base_url,
     )
 
-    # Initialize tool approver
-    approver = ToolApprover(tool_approval, tool_allowlist)
-
-    # Create agent with tools
     agent = Agent(provider=provider_instance, system_prompt=system_prompt, tools=tools)
     final_text = ""
 
@@ -221,51 +311,19 @@ async def run_prompt_with_tools(
         print(chunk, end="", flush=True)
         final_text += chunk
 
-    # Initial prompt
     response = await agent.send(prompt, on_chunk=on_chunk)
 
-    # Handle tool calls in a loop
+    if not tools:
+        return final_text
+
+    approver = ToolApprover(tool_approval or "ask", tool_allowlist)
+
     while response.tool_calls:
-        print(
-            f"\n🔧 Processing {len(response.tool_calls)} tool call(s)...",
-            file=sys.stderr,
+        should_continue = await process_tool_calls(
+            response.tool_calls, agent, approver, tool_output
         )
-
-        for tool_call in response.tool_calls:
-            # Check approval
-            is_allowed, continue_session = approver.approve_tool(tool_call)
-
-            if not continue_session:
-                print("\n❌ Operation cancelled by user.", file=sys.stderr)
-                return final_text
-
-            if is_allowed:
-                print(f"\n✅ Executing tool: {tool_call.name}", file=sys.stderr)
-
-                # Execute the tool
-                try:
-                    result = await execute_tool_call(tool_call)
-                    if result is None:
-                        result = f"Tool {tool_call.name} not executed (no executor)"
-
-                    # Add tool result to conversation
-                    agent.add_tool_result(tool_call.id, result)
-                    logger.debug("Tool %s executed successfully", tool_call.name)
-                except Exception:
-                    logger.error(
-                        "Error executing tool %s", tool_call.name, exc_info=True
-                    )
-                    error = f"Error executing tool {tool_call.name}"
-                    agent.add_tool_result(tool_call.id, error)
-            else:
-                # Denied tool
-                logger.debug("Tool %s denied by user", tool_call.name)
-                agent.add_tool_result(
-                    tool_call.id, f"Tool call {tool_call.name} was denied by user"
-                )
-
-        # Get next response with tool results
-        print("\n💭 Continuing conversation...", file=sys.stderr)
+        if not should_continue:
+            return final_text
         response = await agent.send("", on_chunk=on_chunk)
 
     return final_text
@@ -352,10 +410,9 @@ def main() -> None:
         help="Disable saving session to ~/.artifice/sessions/",
     )
     parser.add_argument(
-        "-r",
-        "--rich",
+        "--tool-output",
         action="store_true",
-        help="Enable rich markdown rendering for output",
+        help="Show tool call output (hidden by default)",
     )
     parser.add_argument(
         "-f",
@@ -524,7 +581,6 @@ def main() -> None:
 
     base_url = agent_def.get("base_url")
 
-    # Parse tools configuration
     tools = None
     if args.tools:
         tools = [pattern.strip() for pattern in args.tools.split(",")]
@@ -546,7 +602,7 @@ def main() -> None:
                 tools,
                 tool_approval,
                 tool_allowlist,
-                rich=args.rich,
+                tool_output=args.tool_output,
             )
         )
         if response and not response.endswith("\n"):
@@ -565,176 +621,6 @@ def main() -> None:
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
-
-
-async def run_prompt(
-    prompt: str,
-    model: str,
-    system_prompt: str | None,
-    api_key: str | None,
-    provider: str | None,
-    base_url: str | None,
-    tools: list[str] | None = None,
-    tool_approval: str | None = None,
-    tool_allowlist: list[str] | None = None,
-    rich: bool = False,
-) -> str:
-    """Run a prompt, optionally with tool support and interactive approval."""
-    from artifice.agent import Agent, AnyLLMProvider
-    from artifice.agent.tools.base import execute_tool_call
-
-    provider_instance = AnyLLMProvider(
-        model=model,
-        api_key=api_key,
-        provider=provider,
-        base_url=base_url,
-    )
-
-    agent = Agent(provider=provider_instance, system_prompt=system_prompt, tools=tools)
-    final_text = ""
-
-    if rich:
-        from rich.console import Console
-        from rich.live import Live
-        from rich.markdown import Markdown
-
-        console = Console()
-        accumulated = [""]
-
-        def on_chunk(chunk: str) -> None:
-            nonlocal final_text
-            final_text += chunk
-            accumulated[0] = final_text
-
-        with Live(console=console, refresh_per_second=30) as live:
-
-            async def update_display() -> None:
-                while True:
-                    await asyncio.sleep(0.03)
-                    if accumulated[0]:
-                        live.update(Markdown(accumulated[0]))
-
-            update_task = asyncio.create_task(update_display())
-
-            try:
-                response = await agent.send(prompt, on_chunk=on_chunk)
-
-                if tools:
-                    approver = ToolApprover(tool_approval or "ask", tool_allowlist)
-
-                    while response.tool_calls:
-                        live.stop()
-                        print(
-                            f"\n🔧 Processing {len(response.tool_calls)} tool call(s)...",
-                            file=sys.stderr,
-                        )
-
-                        for tool_call in response.tool_calls:
-                            is_allowed, continue_session = approver.approve_tool(
-                                tool_call
-                            )
-
-                            if not continue_session:
-                                print(
-                                    "\n❌ Operation cancelled by user.", file=sys.stderr
-                                )
-                                return final_text
-
-                            if is_allowed:
-                                print(
-                                    f"\n✅ Executing tool: {tool_call.name}",
-                                    file=sys.stderr,
-                                )
-
-                                try:
-                                    result = await execute_tool_call(tool_call)
-                                    if result is None:
-                                        result = f"Tool {tool_call.name} not executed (no executor)"
-
-                                    agent.add_tool_result(tool_call.id, result)
-                                    logger.debug(
-                                        "Tool %s executed successfully", tool_call.name
-                                    )
-                                except Exception:
-                                    logger.error(
-                                        "Error executing tool %s",
-                                        tool_call.name,
-                                        exc_info=True,
-                                    )
-                                    error = f"Error executing tool {tool_call.name}"
-                                    agent.add_tool_result(tool_call.id, error)
-                            else:
-                                logger.debug("Tool %s denied by user", tool_call.name)
-                                agent.add_tool_result(
-                                    tool_call.id,
-                                    f"Tool call {tool_call.name} was denied by user",
-                                )
-
-                        print("\n💭 Continuing conversation...", file=sys.stderr)
-                        live.start()
-                        response = await agent.send("", on_chunk=on_chunk)
-            finally:
-                update_task.cancel()
-                try:
-                    await update_task
-                except asyncio.CancelledError:
-                    pass
-
-                if final_text:
-                    live.update(Markdown(final_text))
-    else:
-
-        def on_chunk(chunk: str) -> None:
-            nonlocal final_text
-            print(chunk, end="", flush=True)
-            final_text += chunk
-
-        response = await agent.send(prompt, on_chunk=on_chunk)
-
-        if not tools:
-            return final_text
-
-        approver = ToolApprover(tool_approval or "ask", tool_allowlist)
-
-        while response.tool_calls:
-            print(
-                f"\n🔧 Processing {len(response.tool_calls)} tool call(s)...",
-                file=sys.stderr,
-            )
-
-            for tool_call in response.tool_calls:
-                is_allowed, continue_session = approver.approve_tool(tool_call)
-
-                if not continue_session:
-                    print("\n❌ Operation cancelled by user.", file=sys.stderr)
-                    return final_text
-
-                if is_allowed:
-                    print(f"\n✅ Executing tool: {tool_call.name}", file=sys.stderr)
-
-                    try:
-                        result = await execute_tool_call(tool_call)
-                        if result is None:
-                            result = f"Tool {tool_call.name} not executed (no executor)"
-
-                        agent.add_tool_result(tool_call.id, result)
-                        logger.debug("Tool %s executed successfully", tool_call.name)
-                    except Exception:
-                        logger.error(
-                            "Error executing tool %s", tool_call.name, exc_info=True
-                        )
-                        error = f"Error executing tool {tool_call.name}"
-                        agent.add_tool_result(tool_call.id, error)
-                else:
-                    logger.debug("Tool %s denied by user", tool_call.name)
-                    agent.add_tool_result(
-                        tool_call.id, f"Tool call {tool_call.name} was denied by user"
-                    )
-
-            print("\n💭 Continuing conversation...", file=sys.stderr)
-            response = await agent.send("", on_chunk=on_chunk)
-
-    return final_text
 
 
 if __name__ == "__main__":
