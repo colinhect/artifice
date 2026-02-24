@@ -116,6 +116,11 @@ class MarkdownStreamApp(App):
                 asyncio.create_task(self._stream.write(chunk))
             self.screen.scroll_end(animate=False)
 
+        def on_tool_call(text: str) -> None:
+            if self._stream is not None:
+                asyncio.create_task(self._stream.write(text))
+            self.screen.scroll_end(animate=False)
+
         final_text, total_usage = await _run_agent_loop(
             agent,
             self._prompt,
@@ -124,6 +129,7 @@ class MarkdownStreamApp(App):
             self._tool_approval,
             self._tool_allowlist,
             self._tool_output,
+            on_tool_call,
         )
         self._final_text = final_text
 
@@ -368,6 +374,7 @@ async def process_tool_calls(
     agent: "Agent",
     approver: ToolApprover,
     tool_output: bool = False,
+    on_tool_call: Callable[[str], None] | None = None,
 ) -> bool:
     """Process a list of tool calls with approval.
 
@@ -393,8 +400,12 @@ async def process_tool_calls(
             agent.add_tool_result(
                 tool_call.id, f"Tool call {tool_call.name} was denied by user"
             )
-            print(" → denied", file=sys.stderr)
+            msg = "denied"
+            print(f" → {msg}", file=sys.stderr)
             logger.debug("Tool %s denied by user", tool_call.name)
+
+        if on_tool_call is not None:
+            on_tool_call(f"\n\n`{tool_call.name}({args_str})` → {msg}\n\n")
 
     return True
 
@@ -407,6 +418,7 @@ async def _run_agent_loop(
     tool_approval: str | None,
     tool_allowlist: list[str] | None,
     tool_output: bool,
+    on_tool_call: Callable[[str], None] | None = None,
 ) -> "tuple[str, TokenUsage]":
     """Core agent loop shared by streaming and non-streaming modes.
 
@@ -434,7 +446,7 @@ async def _run_agent_loop(
 
         while response.tool_calls:
             should_continue = await process_tool_calls(
-                response.tool_calls, agent, approver, tool_output
+                response.tool_calls, agent, approver, tool_output, on_tool_call
             )
             if not should_continue:
                 return final_text, total_usage
