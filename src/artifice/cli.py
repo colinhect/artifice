@@ -14,11 +14,134 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from textual.app import App, ComposeResult
+from textual.widgets import Markdown
+
 if TYPE_CHECKING:
     from artifice.agent.client import Agent
     from artifice.agent.tools.base import ToolCall
 
 logger = logging.getLogger(__name__)
+
+
+class MarkdownStreamApp(App):
+    """Inline Textual app for streaming markdown output."""
+
+    CSS = """
+    Markdown {
+        background: transparent;
+        padding: 0;
+        margin: 0;
+    }
+    """
+
+    def __init__(
+        self,
+        prompt: str,
+        model: str,
+        system_prompt: str | None,
+        api_key: str | None,
+        provider: str | None,
+        base_url: str | None,
+        tools: list[str] | None = None,
+        tool_approval: str | None = None,
+        tool_allowlist: list[str] | None = None,
+        tool_output: bool = False,
+    ) -> None:
+        super().__init__()
+        self._prompt = prompt
+        self._model = model
+        self._system_prompt = system_prompt
+        self._api_key = api_key
+        self._provider = provider
+        self._base_url = base_url
+        self._tools = tools
+        self._tool_approval = tool_approval
+        self._tool_allowlist = tool_allowlist
+        self._tool_output = tool_output
+        self._markdown: Markdown | None = None
+        self._stream = None
+        self._stream_ready = asyncio.Event()
+        self._final_text = ""
+
+    def compose(self) -> ComposeResult:
+        self._markdown = Markdown("")
+        yield self._markdown
+
+    async def on_mount(self) -> None:
+        if self._markdown is not None:
+            self._stream = self._markdown.get_stream(self._markdown)
+            self._stream_ready.set()
+        self.run_worker(self._run_prompt())
+
+    async def _run_prompt(self) -> None:
+        from artifice.agent import Agent, AnyLLMProvider
+        from artifice.agent.providers.base import TokenUsage
+
+        provider_instance = AnyLLMProvider(
+            model=self._model,
+            api_key=self._api_key,
+            provider=self._provider,
+            base_url=self._base_url,
+        )
+
+        agent = Agent(
+            provider=provider_instance,
+            system_prompt=self._system_prompt,
+            tools=self._tools,
+        )
+        total_usage = TokenUsage()
+
+        async def on_chunk(chunk: str) -> None:
+            self._final_text += chunk
+            await self._stream_ready.wait()
+            if self._stream is not None:
+                await self._stream.write(chunk)
+
+        response = await agent.send(
+            self._prompt, on_chunk=lambda c: asyncio.create_task(on_chunk(c))
+        )
+
+        if response.usage:
+            total_usage.input_tokens += response.usage.input_tokens
+            total_usage.output_tokens += response.usage.output_tokens
+            total_usage.total_tokens += response.usage.total_tokens
+
+        if not self._tools:
+            if total_usage.total_tokens > 0:
+                usage_str = format_token_usage(
+                    total_usage.input_tokens, total_usage.output_tokens
+                )
+                print(f"\n[{usage_str}]", file=sys.stderr)
+            self.exit()
+            return
+
+        approver = ToolApprover(self._tool_approval or "ask", self._tool_allowlist)
+
+        while response.tool_calls:
+            should_continue = await process_tool_calls(
+                response.tool_calls, agent, approver, self._tool_output
+            )
+            if not should_continue:
+                self.exit()
+                return
+
+            response = await agent.send(
+                "", on_chunk=lambda c: asyncio.create_task(on_chunk(c))
+            )
+
+            if response.usage:
+                total_usage.input_tokens += response.usage.input_tokens
+                total_usage.output_tokens += response.usage.output_tokens
+                total_usage.total_tokens += response.usage.total_tokens
+
+        if total_usage.total_tokens > 0:
+            usage_str = format_token_usage(
+                total_usage.input_tokens, total_usage.output_tokens
+            )
+            print(f"\n[{usage_str}]", file=sys.stderr)
+
+        self.exit()
 
 
 def save_session(
@@ -459,6 +582,12 @@ def main() -> None:
         metavar="FILE",
         help="Attach file(s) as context (can be specified multiple times)",
     )
+    parser.add_argument(
+        "-m",
+        "--markdown",
+        action="store_true",
+        help="Render output as markdown in real-time using Textual",
+    )
     args = parser.parse_args()
 
     if args.install:
@@ -628,22 +757,38 @@ def main() -> None:
     tool_allowlist = config.tool_allowlist
 
     try:
-        response = asyncio.run(
-            run_prompt(
-                prompt,
-                model,
-                system_prompt,
-                api_key,
-                provider,
-                base_url,
-                tools,
-                tool_approval,
-                tool_allowlist,
+        if args.markdown:
+            app = MarkdownStreamApp(
+                prompt=prompt,
+                model=model,
+                system_prompt=system_prompt,
+                api_key=api_key,
+                provider=provider,
+                base_url=base_url,
+                tools=tools,
+                tool_approval=tool_approval,
+                tool_allowlist=tool_allowlist,
                 tool_output=args.tool_output,
             )
-        )
-        if response and not response.endswith("\n"):
-            print()
+            app.run(inline=True, inline_no_clear=True)
+            response = app._final_text
+        else:
+            response = asyncio.run(
+                run_prompt(
+                    prompt,
+                    model,
+                    system_prompt,
+                    api_key,
+                    provider,
+                    base_url,
+                    tools,
+                    tool_approval,
+                    tool_allowlist,
+                    tool_output=args.tool_output,
+                )
+            )
+            if response and not response.endswith("\n"):
+                print()
 
         if config.save_session and not args.no_session:
             save_session(
