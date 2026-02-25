@@ -31,14 +31,10 @@ class CopilotProvider(Provider):
         *,
         cli_path: str | None = None,
         cli_url: str | None = None,
-        port: int = 0,
-        use_stdio: bool = True,
     ) -> None:
         self.model = model
         self._cli_path = cli_path
         self._cli_url = cli_url
-        self._port = port
-        self._use_stdio = use_stdio
         self._client: Any = None
         self._session: Any = None
         self._lock = asyncio.Lock()
@@ -50,11 +46,7 @@ class CopilotProvider(Provider):
 
         from copilot import CopilotClient
 
-        config: CopilotClientOptions = {
-            "port": self._port,
-            "use_stdio": self._use_stdio,
-            "auto_start": True,
-        }
+        config: CopilotClientOptions = {}
         if self._cli_path:
             config["cli_path"] = self._cli_path
         if self._cli_url:
@@ -76,6 +68,8 @@ class CopilotProvider(Provider):
         config: dict[str, Any] = {
             "model": self.model,
             "streaming": True,
+            "tools": [],
+            "available_tools": [],
         }
 
         if system_message:
@@ -84,33 +78,33 @@ class CopilotProvider(Provider):
                 "content": system_message,
             }
 
-        if tools:
-            from copilot import define_tool
-            from copilot.types import ToolInvocation
+        # if tools:
+        #    from copilot import define_tool
+        #    from copilot.types import ToolInvocation
 
-            copilot_tools = []
-            for tool in tools:
-                tool_name = tool.get("name", "")
+        #    copilot_tools = []
+        #    for tool in tools:
+        #        tool_name = tool.get("name", "")
 
-                def make_handler(
-                    t: dict[str, Any],
-                ) -> Callable[[Any, ToolInvocation], Any]:
-                    def handler(args: Any, inv: ToolInvocation) -> dict[str, Any]:
-                        return {
-                            "text_result_for_llm": f"Tool {t.get('name', '')} execution is handled externally",
-                            "result_type": "success",
-                        }
+        #        def make_handler(
+        #            t: dict[str, Any],
+        #        ) -> Callable[[Any, ToolInvocation], Any]:
+        #            def handler(args: Any, inv: ToolInvocation) -> dict[str, Any]:
+        #                return {
+        #                    "text_result_for_llm": f"Tool {t.get('name', '')} execution is handled externally",
+        #                    "result_type": "success",
+        #                }
 
-                    return handler
+        #            return handler
 
-                copilot_tools.append(
-                    define_tool(  # type: ignore[call-overload]
-                        name=tool_name,
-                        description=tool.get("description", ""),
-                        handler=make_handler(tool),
-                    )
-                )
-            config["tools"] = copilot_tools
+        #        copilot_tools.append(
+        #            define_tool(  # type: ignore[call-overload]
+        #                name=tool_name,
+        #                description=tool.get("description", ""),
+        #                handler=make_handler(tool),
+        #            )
+        #        )
+        #    config["tools"] = copilot_tools
 
         if self._session is None:
             self._session = await client.create_session(config)
@@ -139,6 +133,9 @@ class CopilotProvider(Provider):
         on_thinking_chunk: Callable[[str], None] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         """Stream completion from GitHub Copilot."""
+
+        from copilot.generated.session_events import SessionEventType
+
         async with self._lock:
             session = await self._create_session(tools)
 
@@ -147,7 +144,7 @@ class CopilotProvider(Provider):
 
         def handler(event: Any) -> None:
             try:
-                if event.type == "assistant.message.delta":
+                if event.type == SessionEventType.ASSISTANT_MESSAGE_DELTA:
                     content = event.data.delta_content
                     if content:
                         chunk = StreamChunk(content=content)
@@ -155,7 +152,7 @@ class CopilotProvider(Provider):
                         if on_chunk:
                             on_chunk(content)
 
-                elif event.type == "assistant.reasoning.delta":
+                elif event.type == SessionEventType.ASSISTANT_REASONING_DELTA:
                     reasoning = event.data.delta_content
                     if reasoning:
                         chunk = StreamChunk(reasoning=reasoning)
@@ -163,37 +160,37 @@ class CopilotProvider(Provider):
                         if on_thinking_chunk:
                             on_thinking_chunk(reasoning)
 
-                elif event.type == "assistant.message":
+                elif event.type == SessionEventType.ASSISTANT_MESSAGE:
                     content = event.data.content
                     if content:
                         chunk = StreamChunk(content=content)
                         queue.put_nowait(chunk)
 
-                elif event.type == "assistant.reasoning":
+                elif event.type == SessionEventType.ASSISTANT_REASONING:
                     reasoning = event.data.content
                     if reasoning:
                         chunk = StreamChunk(reasoning=reasoning)
                         queue.put_nowait(chunk)
 
-                elif event.type == "tool.executionStart":
-                    chunk = StreamChunk(
-                        tool_calls=[
-                            {
-                                "id": getattr(event.data, "tool_call_id", ""),
-                                "type": "function",
-                                "function": {
-                                    "name": getattr(event.data, "tool_name", ""),
-                                    "arguments": getattr(event.data, "arguments", "{}"),
-                                },
-                            }
-                        ]
-                    )
-                    queue.put_nowait(chunk)
+                # elif event.type == SessionEventType.TOOL_EXECUTION_START:
+                #    chunk = StreamChunk(
+                #        tool_calls=[
+                #            {
+                #                "id": getattr(event.data, "tool_call_id", ""),
+                #                "type": "function",
+                #                "function": {
+                #                    "name": getattr(event.data, "tool_name", ""),
+                #                    "arguments": getattr(event.data, "arguments", "{}"),
+                #                },
+                #            }
+                #        ]
+                #    )
+                #    queue.put_nowait(chunk)
 
-                elif event.type == "session.idle":
+                elif event.type == SessionEventType.SESSION_IDLE:
                     done.set()
 
-                elif event.type == "session.error":
+                elif event.type == SessionEventType.SESSION_ERROR:
                     error_msg = getattr(event.data, "message", "Unknown error")
                     logger.error("Session error: %s", error_msg)
                     done.set()
@@ -203,10 +200,13 @@ class CopilotProvider(Provider):
                 done.set()
 
         unsubscribe = session.on(handler)
+        send_task: asyncio.Task[Any] | None = None
 
         try:
             prompt = self._messages_to_prompt(messages)
-            await session.send({"prompt": prompt})
+            # send_and_wait drives the SDK event loop; run as a task so we can
+            # yield chunks concurrently while it processes.
+            send_task = asyncio.create_task(session.send_and_wait({"prompt": prompt}))
 
             while not done.is_set():
                 try:
@@ -223,29 +223,23 @@ class CopilotProvider(Provider):
 
         finally:
             unsubscribe()
+            if send_task is not None:
+                try:
+                    await send_task
+                except Exception as e:
+                    logger.warning("Error in send_and_wait: %s", e)
 
     def _messages_to_prompt(self, messages: list[dict[str, Any]]) -> str:
-        """Convert message history to a prompt string.
+        """Extract the latest user message as the prompt.
 
-        Copilot SDK uses a single prompt rather than a message array.
-        We format the conversation history into a readable format.
+        The Copilot SDK session is stateful and retains conversation history
+        internally, so we only need to send the most recent user turn rather
+        than serializing the full history on every call.
         """
-        parts = []
-        for msg in messages:
-            role = msg.get("role", "unknown")
-            content = msg.get("content", "")
-
-            if role == "system":
-                parts.append(f"System: {content}")
-            elif role == "user":
-                parts.append(f"User: {content}")
-            elif role == "assistant":
-                parts.append(f"Assistant: {content}")
-            elif role == "tool":
-                tool_name = msg.get("name", "unknown")
-                parts.append(f"Tool ({tool_name}): {content}")
-
-        return "\n\n".join(parts)
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                return msg.get("content", "")
+        return ""
 
     async def check_connection(self) -> bool:
         """Check connectivity to Copilot CLI."""

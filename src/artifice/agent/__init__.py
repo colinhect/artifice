@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from artifice.agent.client import Agent, AgentResponse
 from artifice.agent.providers import (
     AnyLLMProvider,
+    CopilotProvider,
     Provider,
     StreamChunk,
     TokenUsage,
@@ -27,6 +28,7 @@ __all__ = [
     "AgentConfig",
     "AgentResponse",
     "AnyLLMProvider",
+    "CopilotProvider",
     "EchoAgent",
     "execute_tool_call",
     "Provider",
@@ -145,12 +147,17 @@ def create_agent(
         else None
     )
 
-    provider_instance = AnyLLMProvider(
-        model=agent_config.model,
-        api_key=agent_config.api_key,
-        provider=llm_provider,
-        base_url=agent_config.base_url,
-    )
+    if llm_provider and llm_provider.lower() == "copilot":
+        provider_instance = CopilotProvider(
+            model=agent_config.model,
+        )
+    else:
+        provider_instance = AnyLLMProvider(
+            model=agent_config.model,
+            api_key=agent_config.api_key,
+            provider=llm_provider,
+            base_url=agent_config.base_url,
+        )
 
     return Agent(
         provider=provider_instance,

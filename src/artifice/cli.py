@@ -423,7 +423,12 @@ def main() -> None:
     if not prompt.strip():
         sys.exit(0)
 
-    from artifice.agent import Agent, AnyLLMProvider, resolve_agent_config
+    from artifice.agent import (
+        Agent,
+        AnyLLMProvider,
+        CopilotProvider,
+        resolve_agent_config,
+    )
 
     try:
         agent_config = resolve_agent_config(config, args.agent)
@@ -458,12 +463,15 @@ def main() -> None:
     tool_approval = args.tool_approval or config.tool_approval
     tool_allowlist = config.tool_allowlist
 
-    provider_instance = AnyLLMProvider(
-        model=agent_config.model,
-        api_key=agent_config.api_key,
-        provider=agent_config.provider,
-        base_url=agent_config.base_url,
-    )
+    if agent_config.provider and agent_config.provider.lower() == "copilot":
+        provider_instance = CopilotProvider(model=agent_config.model)
+    else:
+        provider_instance = AnyLLMProvider(
+            model=agent_config.model,
+            api_key=agent_config.api_key,
+            provider=agent_config.provider,
+            base_url=agent_config.base_url,
+        )
     agent = Agent(
         provider=provider_instance,
         system_prompt=system_prompt,
