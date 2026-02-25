@@ -105,6 +105,14 @@ Options:
 
 ---
 
+## NeoVim Plugin
+
+Stream LLM responses directly into your editor with commands like `:Art`, `:ArtInline`, and `:ArtReplace`.
+
+See [docs/neovim.md](docs/neovim.md) for full documentation.
+
+---
+
 ## Experimental TUI
 
 Run `artifice` for an interactive terminal interface with:
