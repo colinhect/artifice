@@ -16,7 +16,7 @@ from textual.app import App, ComposeResult
 from textual.events import Key
 from textual.widgets import Markdown, Static
 
-from artifice.agent.runner import format_token_usage, run_agent_loop
+from artifice.agent.runner import run_agent_loop
 from artifice.utils.theme import create_artifice_theme
 
 if TYPE_CHECKING:
@@ -94,7 +94,7 @@ class MarkdownStreamApp(App):
                 asyncio.create_task(self._stream.write(text))
             self.screen.scroll_end(animate=False)
 
-        final_text, total_usage = await run_agent_loop(
+        final_text, _ = await run_agent_loop(
             self._agent,
             self._prompt,
             on_chunk,
@@ -104,12 +104,6 @@ class MarkdownStreamApp(App):
             on_tool_call,
         )
         self._final_text = final_text
-
-        if total_usage.total_tokens > 0:
-            usage_str = format_token_usage(
-                total_usage.input_tokens, total_usage.output_tokens
-            )
-            print(f"\n[{usage_str}]", file=sys.stderr)
 
         self._streaming_done = True
         self.query_one("#exit-hint", Static).update("Press Enter or Escape to exit")
@@ -202,15 +196,9 @@ async def run_prompt(
     def on_chunk(chunk: str) -> None:
         print(chunk, end="", flush=True)
 
-    final_text, total_usage = await run_agent_loop(
+    final_text, _ = await run_agent_loop(
         agent, prompt, on_chunk, tool_approval, tool_allowlist, tool_output
     )
-
-    if total_usage.total_tokens > 0:
-        usage_str = format_token_usage(
-            total_usage.input_tokens, total_usage.output_tokens
-        )
-        print(f"\n[{usage_str}]", file=sys.stderr)
 
     return final_text
 
