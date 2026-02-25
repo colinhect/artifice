@@ -13,6 +13,10 @@ local function build_cmd(opts)
     table.insert(cmd, "--no-session")
   end
 
+  -- Disable tools for now
+  table.insert(cmd, "--tools")
+  table.insert(cmd, "''")
+
   -- Agent flag
   local agent = opts.agent or require("art.select").current_agent() or config.default_agent
   if agent then

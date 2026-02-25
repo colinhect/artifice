@@ -443,10 +443,6 @@ def main() -> None:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    if agent_config.provider and agent_config.provider.lower() == "simulated":
-        print("Error: Simulated agents not supported in CLI mode", file=sys.stderr)
-        sys.exit(1)
-
     system_prompt = args.system_prompt
     if system_prompt is None:
         if args.prompt_name:
