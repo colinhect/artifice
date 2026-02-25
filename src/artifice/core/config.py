@@ -6,8 +6,10 @@ and provides YAML-based configuration.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import traceback
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -15,106 +17,62 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-# Declarative mapping of YAML keys to their default values.
-# Used by ArtificeConfig.__init__ and load_config to avoid repetition.
-_FIELDS: dict[str, Any] = {
-    # Agent settings
-    "agent": None,
-    "agents": None,
-    "prompts": None,
-    "system_prompt": None,
-    "prompt_prefix": None,
-    "thinking_budget": None,
-    # Display settings
-    "banner": False,
-    "python_markdown": False,
-    "agent_markdown": True,
-    "shell_markdown": False,
-    # Output code block settings
-    "shell_output_code_block": True,
-    "tmux_output_code_block": False,
-    "python_output_code_block": True,
-    # Auto-send settings
-    "send_user_commands_to_agent": True,
-    # Tool output visibility
-    "show_tool_output": True,
-    # Tool settings (applied when tools are enabled)
-    "tools": None,
-    "tool_approval": "ask",  # "ask", "auto", "deny"
-    "tool_allowlist": None,  # list of tool names/patterns to always allow
-    # Shell init script
-    "shell_init_script": None,
-    # Tmux settings
-    "tmux_target": None,
-    "tmux_prompt_pattern": None,
-    "tmux_echo_exit_code": False,
-    # Performance settings
-    "streaming_fps": 60,
-    "shell_poll_interval": 0.02,
-    "python_executor_sleep": 0.005,
-    # Session saving
-    "save_session": True,
-}
 
-
+@dataclass
 class ArtificeConfig:
     """Configuration container for Artifice settings.
 
-    This class stores configuration values that can be set by the user's config.yaml file.
-    All settings have sensible defaults.
+    All settings have sensible defaults and can be overridden via config.yaml.
     """
 
     # Agent settings
-    agent: str | None
-    agents: dict | None
-    prompts: dict | None
-    system_prompt: str | None
-    prompt_prefix: str | None
-    thinking_budget: int | None
+    agent: str | None = None
+    agents: dict | None = None
+    prompts: dict | None = None
+    system_prompt: str | None = None
+    prompt_prefix: str | None = None
+    thinking_budget: int | None = None
 
     # Display settings
-    banner: bool
-    python_markdown: bool
-    agent_markdown: bool
-    shell_markdown: bool
+    banner: bool = False
+    python_markdown: bool = False
+    agent_markdown: bool = True
+    shell_markdown: bool = False
 
     # Output code block settings
-    shell_output_code_block: bool
-    tmux_output_code_block: bool
-    python_output_code_block: bool
+    shell_output_code_block: bool = True
+    tmux_output_code_block: bool = False
+    python_output_code_block: bool = True
 
     # Auto-send settings
-    send_user_commands_to_agent: bool
+    send_user_commands_to_agent: bool = True
 
     # Tool output visibility
-    show_tool_output: bool
+    show_tool_output: bool = True
 
-    # Tool settings
-    tools: list[str] | None
-    tool_approval: str
-    tool_allowlist: list[str] | None
+    # Tool settings (applied when tools are enabled)
+    tools: list[str] | None = None
+    tool_approval: str = "ask"  # "ask", "auto", "deny"
+    tool_allowlist: list[str] | None = None
 
     # Shell init script
-    shell_init_script: str | None
+    shell_init_script: str | None = None
 
     # Tmux settings
-    tmux_target: str | None
-    tmux_prompt_pattern: str | None
-    tmux_echo_exit_code: bool
+    tmux_target: str | None = None
+    tmux_prompt_pattern: str | None = None
+    tmux_echo_exit_code: bool = False
 
     # Performance settings
-    streaming_fps: int
-    shell_poll_interval: float
-    python_executor_sleep: float
+    streaming_fps: int = 60
+    shell_poll_interval: float = 0.02
+    python_executor_sleep: float = 0.005
 
     # Session saving
-    save_session: bool
+    save_session: bool = True
 
-    def __init__(self):
-        for key, default in _FIELDS.items():
-            setattr(self, key, default)
-        # Custom settings (user can add any additional settings)
-        self._custom: dict[str, Any] = {}
+    # Custom settings (user can add any additional settings)
+    _custom: dict[str, Any] = field(default_factory=dict, repr=False, init=False)
 
     def set(self, key: str, value: Any) -> None:
         """Set a custom configuration value."""
@@ -123,6 +81,11 @@ class ArtificeConfig:
     def get(self, key: str, default: Any = None) -> Any:
         """Get a custom configuration value."""
         return self._custom.get(key, default)
+
+
+_KNOWN_FIELDS = {
+    f.name for f in dataclasses.fields(ArtificeConfig) if not f.name.startswith("_")
+}
 
 
 def get_config_path() -> Path:
@@ -196,13 +159,13 @@ def load_config() -> tuple[ArtificeConfig, str | None]:
                 continue
 
             # Load known fields from YAML data
-            for key in _FIELDS:
+            for key in _KNOWN_FIELDS:
                 if key in data:
                     setattr(config, key, data[key])
 
             # Store any additional custom settings
             for key, value in data.items():
-                if key not in _FIELDS:
+                if key not in _KNOWN_FIELDS:
                     config.set(key, value)
 
             logger.info("Loaded config from %s (%s)", config_path, location)

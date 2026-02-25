@@ -77,7 +77,7 @@ def _register(tool: ToolDef) -> ToolDef:
     return tool
 
 
-def tool(
+def register_tool(
     name: str,
     description: str,
     params: dict,
@@ -135,21 +135,21 @@ async def execute_tool_call(tool_call: ToolCall) -> str | None:
     return None
 
 
-tool(
+register_tool(
     name="python",
     description="Execute Python code in the user's REPL session.",
     params={"code": {"type": "string"}},
     language="python",
 )
 
-tool(
+register_tool(
     name="shell",
     description="Execute a shell command in the user's terminal session.",
     params={"command": {"type": "string"}},
     language="bash",
 )
 
-tool(
+register_tool(
     name="read",
     description="Read the contents of a file.",
     params={
@@ -164,7 +164,7 @@ tool(
     executor=execute_read,
 )
 
-tool(
+register_tool(
     name="write",
     description="Write or create a file with the given content.",
     params={
@@ -174,7 +174,7 @@ tool(
     executor=execute_write,
 )
 
-tool(
+register_tool(
     name="glob",
     description="Search for files matching a glob pattern.",
     params={
@@ -191,7 +191,7 @@ tool(
     executor=execute_glob,
 )
 
-tool(
+register_tool(
     name="edit",
     description=(
         "Replace a unique string in a file with a new string. "
@@ -215,7 +215,7 @@ tool(
     executor=execute_edit,
 )
 
-# tool(
+# register_tool(
 #    name="grep",
 #    description="Search for regex patterns in files.",
 #    params={
@@ -291,7 +291,7 @@ tool(
 
 def get_all_schemas() -> list[dict]:
     """Return OpenAI function-call schemas for all registered tools."""
-    return [tool.to_schema() for tool in TOOLS.values()]
+    return [t.to_schema() for t in TOOLS.values()]
 
 
 def get_schemas_for(patterns: list[str]) -> list[dict]:
@@ -302,7 +302,7 @@ def get_schemas_for(patterns: list[str]) -> list[dict]:
     from fnmatch import fnmatch
 
     return [
-        tool.to_schema()
-        for tool in TOOLS.values()
-        if any(fnmatch(tool.name, pat) for pat in patterns)
+        t.to_schema()
+        for t in TOOLS.values()
+        if any(fnmatch(t.name, pat) for pat in patterns)
     ]

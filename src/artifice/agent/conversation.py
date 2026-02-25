@@ -1,4 +1,4 @@
-"""Conversation management mixin for agents."""
+"""Conversation management base class for agents."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from artifice.agent.tools.base import ToolCall
 
 
 class ConversationManager:
-    """Mixin for managing conversation history and pending tool calls.
+    """Base class for managing conversation history and pending tool calls.
 
     Provides shared functionality between Agent and SimulatedAgent for
     managing message history, pending tool calls, and common operations.
@@ -58,7 +58,7 @@ class ConversationManager:
     ) -> None:
         """Add an assistant message to the conversation."""
         msg: dict = {"role": "assistant"}
-        if content:
+        if content is not None:
             msg["content"] = content
         if tool_calls:
             msg["tool_calls"] = tool_calls

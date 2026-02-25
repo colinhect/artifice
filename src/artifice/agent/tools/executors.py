@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import glob
+import json
 import logging
 import re
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +88,6 @@ async def execute_write(args: dict[str, Any]) -> str:
             "error": str | None
         }
     """
-    import json
-
     path = Path(args["path"]).expanduser().resolve()
     display_path = _relative_path(path)
     content = args["content"]
@@ -248,129 +246,6 @@ async def execute_grep(args: dict[str, Any]) -> str:
     return output
 
 
-async def execute_replace(args: dict[str, Any]) -> str:
-    """Replace string occurrences in files with regex support."""
-    path = Path(args["path"]).expanduser().resolve()
-    display_path = _relative_path(path)
-    pattern = args["pattern"]
-    replacement = args["replacement"]
-    case_sensitive = args.get("case_sensitive", True)
-    dry_run = args.get("dry_run", True)
-
-    logger.debug(
-        "Replace: pattern=%s, replacement=%s, path=%s, case_sensitive=%s, dry_run=%s",
-        pattern,
-        replacement,
-        path,
-        case_sensitive,
-        dry_run,
-    )
-
-    if not path.is_file():
-        return f"Error: File not found: {display_path}"
-
-    try:
-        original_content = path.read_text(encoding="utf-8")
-    except PermissionError:
-        return f"Error: Permission denied: {display_path}"
-    except Exception as e:
-        return f"Error reading file: {e}"
-
-    try:
-        regex_flags = 0 if case_sensitive else re.IGNORECASE
-        compiled_pattern = re.compile(pattern, regex_flags)
-    except re.error as e:
-        return f"Error: Invalid regex pattern: {e}"
-
-    new_content, count = compiled_pattern.subn(replacement, original_content)
-
-    if count == 0:
-        return f"No matches found for '{pattern}' in {display_path}"
-
-    if dry_run:
-        diff_lines = []
-
-        matches = list(compiled_pattern.finditer(original_content))
-
-        if matches:
-            diff_lines.append(
-                f"DRY RUN: {count} replacement(s) would be made to {display_path}:"
-            )
-            diff_lines.append("")
-
-            for idx, match in enumerate(matches[:10]):
-                start_pos = match.start()
-                end_pos = match.end()
-
-                context_start = max(0, start_pos - 30)
-                context_end = min(len(original_content), end_pos + 30)
-
-                before = original_content[context_start:start_pos]
-                matched = original_content[start_pos:end_pos]
-                after = original_content[end_pos:context_end]
-
-                diff_lines.append(f"  Match {idx + 1} at position {start_pos}:")
-                diff_lines.append(f"    - {repr(before)}{repr(matched)}{repr(after)}")
-                diff_lines.append(
-                    f"    + {repr(before)}{repr(replacement)}{repr(after)}"
-                )
-                diff_lines.append("")
-
-            if count > 10:
-                diff_lines.append(f"  ... and {count - 10} more replacement(s)")
-
-        return "\n".join(diff_lines)
-
-    try:
-        path.write_text(new_content, encoding="utf-8")
-        logger.debug("Replaced %d occurrences in: %s", count, path)
-        return f"Replaced {count} occurrence(s) in {display_path}"
-    except Exception as e:
-        logger.error("Error writing file %s: %s", path, e)
-        return f"Error writing file: {e}"
-
-
-async def execute_web_fetch(args: dict[str, Any]) -> str:
-    """Fetch contents of a URL."""
-    import urllib.request
-
-    url = args["url"]
-
-    # Validate URL
-    try:
-        parsed = urlparse(url)
-        if not parsed.scheme or parsed.scheme not in ("http", "https"):
-            return f"Error: Invalid URL scheme '{parsed.scheme}'. Only http and https are supported."
-        if not parsed.netloc:
-            return "Error: Invalid URL: missing network location (domain)."
-    except Exception as e:
-        return f"Error: Invalid URL: {e}"
-
-    logger.debug("Fetching URL: %s", url)
-
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Artifice/1.0"})
-        loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: urllib.request.urlopen(req, timeout=15),  # noqa: S310
-        )
-        content = response.read()
-        try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError:
-            text = content.decode("latin-1")
-
-        max_chars = 50_000
-        if len(text) > max_chars:
-            text = text[:max_chars] + f"\n... (truncated, {len(text)} total chars)"
-        logger.debug("Fetched %d chars from: %s", len(text), url)
-        return text
-    except Exception as e:
-        logger.error("Error fetching URL %s: %s", url, e)
-        return f"Error fetching URL: {e}"
-
-
 async def execute_edit(args: dict[str, Any]) -> str:
     """Replace a unique string in a file.
 
@@ -397,8 +272,6 @@ async def execute_edit(args: dict[str, Any]) -> str:
             "error": str | None
         }
     """
-    import json
-
     path = Path(args["path"]).expanduser().resolve()
     display_path = _relative_path(path)
     old_string = args["old_string"]

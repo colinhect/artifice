@@ -1,9 +1,10 @@
-"""Backward compatibility re-export for agent module."""
+"""Agent module: client, providers, tools, and configuration resolution."""
 
 from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from artifice.agent.client import Agent, AgentResponse
@@ -23,11 +24,13 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Agent",
+    "AgentConfig",
     "AgentResponse",
     "AnyLLMProvider",
     "EchoAgent",
     "execute_tool_call",
     "Provider",
+    "resolve_agent_config",
     "ScriptedAgent",
     "SimulatedAgent",
     "StreamChunk",
@@ -38,6 +41,69 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class AgentConfig:
+    """Resolved agent configuration extracted from user config."""
+
+    model: str
+    api_key: str | None
+    provider: str | None
+    base_url: str | None
+    system_prompt: str | None
+    tools: list[str] | None
+
+
+def resolve_agent_config(
+    config: ArtificeConfig, agent_name: str | None = None
+) -> AgentConfig:
+    """Extract and validate agent settings from the user configuration.
+
+    Args:
+        config: The loaded ArtificeConfig.
+        agent_name: Override agent name (defaults to config.agent).
+
+    Returns:
+        An AgentConfig with all fields resolved.
+
+    Raises:
+        ValueError: If the agent cannot be resolved.
+    """
+    name = agent_name or config.agent
+    if not name or not config.agents:
+        msg = "No agent specified. Use --agent or configure a default agent."
+        raise ValueError(msg)
+
+    definition = config.agents.get(name)
+    if definition is None:
+        msg = f"Unknown agent: {name!r}"
+        raise ValueError(msg)
+
+    model = definition.get("model")
+    if not model:
+        msg = f"Agent {name!r} has no model defined"
+        raise ValueError(msg)
+
+    api_key: str | None = definition.get("api_key")
+    if api_key is None:
+        env_var = definition.get("api_key_env")
+        if env_var:
+            api_key = os.environ.get(env_var)
+
+    provider: str | None = definition.get("provider")
+    base_url: str | None = definition.get("base_url")
+    system_prompt = definition.get("system_prompt", config.system_prompt)
+    tools: list[str] | None = definition.get("tools")
+
+    return AgentConfig(
+        model=model,
+        api_key=api_key,
+        provider=provider,
+        base_url=base_url,
+        system_prompt=system_prompt,
+        tools=tools,
+    )
 
 
 def create_agent(
@@ -71,36 +137,24 @@ def create_agent(
         agent.configure_defaults()
         return agent
 
-    if model is None:
-        error = f"Agent {config.agent!r} requires a 'model' key in its definition"
-        raise ValueError(error)
+    agent_config = resolve_agent_config(config)
 
-    # Resolve API key
-    api_key: str | None = definition.get("api_key")
-    if api_key is None:
-        env_var = definition.get("api_key_env")
-        if env_var:
-            api_key = os.environ.get(env_var)
-
-    system_prompt = definition.get("system_prompt", config.system_prompt)
-    tools: list[str] | None = definition.get("tools")
-    base_url: str | None = definition.get("base_url")
-
-    # provider here is the any-llm provider override (not "simulated")
     llm_provider: str | None = (
-        provider if provider and provider.lower() != "simulated" else None
+        agent_config.provider
+        if agent_config.provider and agent_config.provider.lower() != "simulated"
+        else None
     )
 
     provider_instance = AnyLLMProvider(
-        model=model,
-        api_key=api_key,
+        model=agent_config.model,
+        api_key=agent_config.api_key,
         provider=llm_provider,
-        base_url=base_url,
+        base_url=agent_config.base_url,
     )
 
     return Agent(
         provider=provider_instance,
-        system_prompt=system_prompt,
-        tools=tools,
+        system_prompt=agent_config.system_prompt,
+        tools=agent_config.tools,
         on_connect=on_connect,
     )
