@@ -6,6 +6,14 @@ _art_completion() {
     local cur prev words cword
     _init_completion || return
 
+    # Complete @file attachments
+    if [[ ${cur} == @* ]]; then
+        local prefix="${cur#@}"
+        COMPREPLY=($(compgen -f -- "${prefix}" | sed 's/^/@/'))
+        compopt -o nospace
+        return
+    fi
+
     case ${prev} in
         -a|--agent)
             COMPREPLY=($(compgen -W "$(art --list-agents 2>/dev/null)" -- "${cur}"))
@@ -18,14 +26,21 @@ _art_completion() {
         -s|--system-prompt)
             return
             ;;
-        --print-completion)
-            COMPREPLY=($(compgen -W "bash zsh fish" -- "${cur}"))
+        --add-prompt)
+            _filedir
+            return
+            ;;
+        --tool-approval)
+            COMPREPLY=($(compgen -W "ask auto deny" -- "${cur}"))
+            return
+            ;;
+        --tools|--new-prompt)
             return
             ;;
     esac
 
     if [[ ${cur} == -* ]]; then
-        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt --logging --list-agents --list-prompts --print-completion" -- "${cur}"))
+        COMPREPLY=($(compgen -W "-a --agent -p --prompt-name -s --system-prompt -m --markdown --logging --list-agents --list-prompts --get-current-agent --tools --tool-approval --tool-output --install --add-prompt --new-prompt --no-session" -- "${cur}"))
     fi
 }
 

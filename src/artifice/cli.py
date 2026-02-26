@@ -118,7 +118,50 @@ async def run_prompt(
     return final_text
 
 
-def _build_user_message(args: argparse.Namespace) -> str:
+def _resolve_at_files(argv: list[str]) -> tuple[list[str], list[Path]]:
+    """Extract @file arguments from argv, resolve them, and return the rest.
+
+    Returns (remaining_argv, resolved_file_paths).
+    """
+    remaining = []
+    resolved: list[Path] = []
+    cwd = Path.cwd()
+
+    for arg in argv:
+        if arg.startswith("@") and len(arg) > 1:
+            filename = arg[1:]
+            # Check if it's a relative path (contains a separator)
+            if "/" in filename or "\\" in filename:
+                candidate = cwd / filename
+                if candidate.is_file():
+                    resolved.append(candidate)
+                else:
+                    print(f"Error: File not found: {filename}", file=sys.stderr)
+                    sys.exit(1)
+            else:
+                matches = list(cwd.rglob(filename))
+                matches = [m for m in matches if m.is_file()]
+                if len(matches) == 1:
+                    resolved.append(matches[0])
+                elif len(matches) == 0:
+                    print(f"Error: File not found: {filename}", file=sys.stderr)
+                    sys.exit(1)
+                else:
+                    rel_paths = [str(m.relative_to(cwd)) for m in sorted(matches)]
+                    listing = "\n".join(f"  @{p}" for p in rel_paths)
+                    print(
+                        f"Error: Multiple files match '{filename}':\n{listing}\n"
+                        "Use a more specific path to disambiguate.",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+        else:
+            remaining.append(arg)
+
+    return remaining, resolved
+
+
+def _build_user_message(args: argparse.Namespace, files: list[Path]) -> str:
     """Build the prompt string from CLI args, stdin, and attached files."""
     prompt = args.prompt or ""
 
@@ -132,18 +175,14 @@ def _build_user_message(args: argparse.Namespace) -> str:
     if not prompt.strip():
         return prompt
 
-    if args.files:
+    if files:
         file_contents: list[str] = []
-        for file_path in args.files:
-            path = Path(file_path)
-            if not path.is_file():
-                print(f"Error: File not found: {file_path}", file=sys.stderr)
-                sys.exit(1)
+        for path in files:
             try:
                 content = path.read_text(encoding="utf-8")
-                file_contents.append(f"--- {file_path} ---\n{content}")
+                file_contents.append(f"--- {path} ---\n{content}")
             except Exception as e:
-                print(f"Error reading {file_path}: {e}", file=sys.stderr)
+                print(f"Error reading {path}: {e}", file=sys.stderr)
                 sys.exit(1)
         if file_contents:
             context = "\n\n".join(file_contents)
@@ -238,20 +277,13 @@ def main() -> None:
         help="Show tool call output (hidden by default)",
     )
     parser.add_argument(
-        "-f",
-        "--file",
-        action="append",
-        dest="files",
-        metavar="FILE",
-        help="Attach file(s) as context (can be specified multiple times)",
-    )
-    parser.add_argument(
         "-m",
         "--markdown",
         action="store_true",
         help="Render output as markdown in real-time using Textual",
     )
-    args = parser.parse_args()
+    argv, attached_files = _resolve_at_files(sys.argv[1:])
+    args = parser.parse_args(argv)
 
     if args.install:
         install_config()
@@ -334,7 +366,7 @@ def main() -> None:
         print(agent_name)
         sys.exit(0)
 
-    prompt = _build_user_message(args)
+    prompt = _build_user_message(args, attached_files)
     if not prompt.strip():
         sys.exit(0)
 
