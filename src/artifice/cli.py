@@ -24,91 +24,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-class MarkdownStreamApp(App):
-    """Inline Textual app for streaming markdown output."""
-
-    CSS = """
-    Screen {
-        overflow-y: scroll;
-    }
-    Markdown {
-        background: transparent;
-        padding: 0;
-        margin: 0;
-    }
-    #exit-hint {
-        color: $text-muted;
-        text-align: right;
-        padding: 0 1;
-    }
-    """
-
-    def __init__(
-        self,
-        agent: Agent,
-        prompt: str,
-        tool_approval: str | None = None,
-        tool_allowlist: list[str] | None = None,
-        tool_output: bool = False,
-    ) -> None:
-        super().__init__()
-        self._agent = agent
-        self._prompt = prompt
-        self._tool_approval = tool_approval
-        self._tool_allowlist = tool_allowlist
-        self._tool_output = tool_output
-        self._markdown: Markdown | None = None
-        self._stream = None
-        self._final_text = ""
-        self._streaming_done = False
-
-    def compose(self) -> ComposeResult:
-        self._markdown = Markdown("")
-        yield self._markdown
-        yield Static("", id="exit-hint")
-
-    async def on_mount(self) -> None:
-        self.register_theme(create_artifice_theme())
-        self.theme = "artifice"
-        if self._markdown is not None:
-            self._stream = self._markdown.get_stream(self._markdown)
-        self.run_worker(self._run_prompt())
-
-    @property
-    def final_text(self) -> str:
-        return self._final_text
-
-    def on_key(self, event: Key) -> None:
-        if self._streaming_done and event.key in ("enter", "escape"):
-            self.exit()
-
-    async def _run_prompt(self) -> None:
-        def on_chunk(chunk: str) -> None:
-            if self._stream is not None:
-                asyncio.create_task(self._stream.write(chunk))
-            self.screen.scroll_end(animate=False)
-
-        def on_tool_call(text: str) -> None:
-            if self._stream is not None:
-                asyncio.create_task(self._stream.write(text))
-            self.screen.scroll_end(animate=False)
-
-        final_text, _ = await run_agent_loop(
-            self._agent,
-            self._prompt,
-            on_chunk,
-            self._tool_approval,
-            self._tool_allowlist,
-            self._tool_output,
-            on_tool_call,
-        )
-        self._final_text = final_text
-
-        self._streaming_done = True
-        self.query_one("#exit-hint", Static).update("Press Enter or Escape to exit")
-
-
 def save_session(
     prompt: str,
     system_prompt: str | None,
@@ -455,10 +370,6 @@ def main() -> None:
     tools = None
     if args.tools:
         tools = [pattern.strip() for pattern in args.tools.split(",")]
-    elif agent_config.tools:
-        tools = agent_config.tools
-    elif config.tools:
-        tools = config.tools
 
     tool_approval = args.tool_approval or config.tool_approval
     tool_allowlist = config.tool_allowlist
@@ -480,6 +391,7 @@ def main() -> None:
 
     try:
         if args.markdown:
+            from artifice.ui.markdown_stream import MarkdownStreamApp
             app = MarkdownStreamApp(
                 agent=agent,
                 prompt=prompt,
