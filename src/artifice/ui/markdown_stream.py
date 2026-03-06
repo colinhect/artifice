@@ -101,4 +101,3 @@ class MarkdownStreamApp(App):
 
         self._streaming_done = True
         self.query_one("#exit-hint", Static).update("Press Enter or Escape to exit")
-
