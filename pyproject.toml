@@ -21,7 +21,6 @@ dependencies = [
 
 [project.scripts]
 artifice = "artifice.tui:main"
-art = "artifice.cli:main"
 
 [project.optional-dependencies]
 dev = [
